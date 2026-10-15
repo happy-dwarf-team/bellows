@@ -16,8 +16,9 @@ constexpr const char* kDefaultConfig = R"(# EU4 Startup Boost settings.
 mimalloc = "on"            # faster memory allocator for the whole game session
 verifypath_listing = "on"  # answers PhysFS path checks from directory listings
 exists_index = "on"        # answers "does this file exist" for icon checks
-trigger_intern = "on"      # skips redundant work at the end of loading
+trigger_intern = "off"     # linear trigger interning; off: with the shipped trigger_profile.txt it is slower than the game's own code
 metascript_subst = "on"    # faster $parameter$ substitution in scripted effects
+open_warmup = "on"         # opens game files ahead of the game (big win after a reboot)
 )";
 
 std::optional<Mode> ParseMode(std::string text) {
@@ -52,8 +53,9 @@ Config LoadConfig(const std::filesystem::path& data_dir) {
         {"mimalloc", Mode::On, false},
         {"verifypath_listing", Mode::On, true},
         {"exists_index", Mode::On, true},
-        {"trigger_intern", Mode::On, true},
+        {"trigger_intern", Mode::Off, true},  // measured slower than the original with a non-empty map
         {"metascript_subst", Mode::On, true},
+        {"open_warmup", Mode::On, false},
     };
     const auto file = data_dir / "config.toml";
     std::error_code ec;

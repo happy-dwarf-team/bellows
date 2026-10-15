@@ -9,6 +9,15 @@ Context& context() {
     return instance;
 }
 
+double TicksToMs(LONG64 ticks) {
+    static const double frequency = [] {
+        LARGE_INTEGER f;
+        QueryPerformanceFrequency(&f);
+        return static_cast<double>(f.QuadPart);
+    }();
+    return static_cast<double>(ticks) * 1000.0 / frequency;
+}
+
 void Log(AnvilLogLevel level, const char* format, ...) {
     const Context& c = context();
     if (c.host == nullptr) return;

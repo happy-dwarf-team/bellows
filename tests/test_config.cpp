@@ -14,6 +14,7 @@ int main() {
     // Missing file: defaults ("on" everywhere) and a commented default file is written.
     sb::Config c = sb::LoadConfig(dir);
     assert(c.mode("mimalloc") == sb::Mode::On && c.mode("metascript_subst") == sb::Mode::On);
+    assert(c.mode("trigger_intern") == sb::Mode::Off);  // off by default
     assert(fs::exists(dir / "config.toml"));
     // The written default parses to the same values.
     c = sb::LoadConfig(dir);

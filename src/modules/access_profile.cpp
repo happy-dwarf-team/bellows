@@ -1,0 +1,282 @@
+#include "access_profile.hpp"
+
+#include <windows.h>
+#include <shlobj.h>
+
+#include <algorithm>
+#include <cwchar>
+#include <unordered_set>
+
+namespace sb::profile {
+
+std::wstring Lower(std::wstring text) {
+    for (auto& c : text) {
+        if (c >= L'A' && c <= L'Z') c = static_cast<wchar_t>(c + (L'a' - L'A'));
+    }
+    return text;
+}
+
+std::wstring Normalize(std::wstring path) {
+    for (auto& c : path) {
+        if (c == L'/') c = L'\\';
+    }
+    return path;
+}
+
+std::wstring ToStored(const std::wstring& path, const std::wstring& gameDir) {
+    const std::wstring normal = Normalize(path);
+    const std::wstring prefix = Lower(gameDir) + L"\\";
+    if (normal.size() > prefix.size() && Lower(normal.substr(0, prefix.size())) == prefix) {
+        return L"@\\" + normal.substr(prefix.size());
+    }
+    return normal;
+}
+
+std::wstring FromStored(const std::wstring& line, const std::wstring& gameDir) {
+    if (line.size() > 2 && line[0] == L'@' && line[1] == L'\\') return gameDir + line.substr(1);
+    return line;
+}
+
+std::uint64_t Fnv1a(const std::string& bytes) {
+    std::uint64_t hash = 0xcbf29ce484222325ULL;
+    for (unsigned char c : bytes) {
+        hash ^= c;
+        hash *= 0x100000001b3ULL;
+    }
+    return hash;
+}
+
+std::wstring Widen(const std::string& text) {
+    if (text.empty()) return {};
+    const int wide = MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0);
+    if (wide <= 0) return {};
+    std::wstring out(static_cast<std::size_t>(wide), L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), out.data(), wide);
+    return out;
+}
+
+std::string Narrow(const std::wstring& text) {
+    if (text.empty()) return {};
+    const int bytes = WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0, nullptr, nullptr);
+    if (bytes <= 0) return {};
+    std::string out(static_cast<std::size_t>(bytes), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), out.data(), bytes, nullptr, nullptr);
+    return out;
+}
+
+bool ReadWhole(const std::wstring& path, std::string& out, std::uint64_t limit) {
+    HANDLE file = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING,
+                              FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE) return false;
+    LARGE_INTEGER size{};
+    bool ok = GetFileSizeEx(file, &size) && size.QuadPart >= 0 && static_cast<std::uint64_t>(size.QuadPart) <= limit;
+    if (ok) {
+        out.assign(static_cast<std::size_t>(size.QuadPart), '\0');
+        DWORD read = 0;
+        ok = out.empty() || (ReadFile(file, out.data(), static_cast<DWORD>(out.size()), &read, nullptr) && read == out.size());
+    }
+    CloseHandle(file);
+    return ok;
+}
+
+std::vector<std::wstring> ParseList(const std::string& text) {
+    std::vector<std::wstring> lines;
+    std::size_t position = text.compare(0, 3, "\xEF\xBB\xBF") == 0 ? 3 : 0;
+    while (position < text.size()) {
+        std::size_t end = text.find('\n', position);
+        if (end == std::string::npos) end = text.size();
+        std::size_t stop = end;
+        if (stop > position && text[stop - 1] == '\r') --stop;
+        if (stop > position) lines.push_back(Widen(text.substr(position, stop - position)));
+        position = end + 1;
+    }
+    return lines;
+}
+
+std::vector<std::string> ParseEnabledMods(const std::string& json) {
+    std::vector<std::string> mods;
+    const std::size_t key = json.find("\"enabled_mods\"");
+    if (key == std::string::npos) return mods;
+    const std::size_t open = json.find('[', key);
+    const std::size_t close = open == std::string::npos ? std::string::npos : json.find(']', open);
+    if (close == std::string::npos) return mods;
+    std::size_t position = open + 1;
+    while (position < close) {
+        const std::size_t a = json.find('"', position);
+        if (a == std::string::npos || a >= close) break;
+        const std::size_t b = json.find('"', a + 1);
+        if (b == std::string::npos || b > close) break;
+        mods.push_back(json.substr(a + 1, b - a - 1));
+        position = b + 1;
+    }
+    return mods;
+}
+
+std::string DescriptorValue(const std::string& text, const std::string& key) {
+    std::size_t position = 0;
+    while (position < text.size()) {
+        std::size_t end = text.find('\n', position);
+        if (end == std::string::npos) end = text.size();
+        std::size_t start = position;
+        while (start < end && (text[start] == ' ' || text[start] == '\t')) ++start;
+        if (text.compare(start, key.size(), key) == 0) {
+            std::size_t cursor = start + key.size();
+            while (cursor < end && (text[cursor] == ' ' || text[cursor] == '\t')) ++cursor;
+            if (cursor < end && text[cursor] == '=') {
+                const std::size_t a = text.find('"', cursor);
+                const std::size_t b = a == std::string::npos ? std::string::npos : text.find('"', a + 1);
+                if (b != std::string::npos && b <= end) return text.substr(a + 1, b - a - 1);
+            }
+        }
+        position = end + 1;
+    }
+    return {};
+}
+
+bool IsAbsolute(const std::wstring& path) {
+    return (path.size() > 2 && path[1] == L':') || (path.size() > 1 && path[0] == L'\\' && path[1] == L'\\');
+}
+
+int Rank(const std::wstring& path) {
+    const std::size_t dot = path.find_last_of(L'.');
+    const std::size_t slash = path.find_last_of(L'\\');
+    const std::wstring ext =
+        (dot == std::wstring::npos || (slash != std::wstring::npos && dot < slash)) ? L"" : Lower(path.substr(dot));
+    if (ext == L".zip" || ext == L".dlc" || ext == L".mod") return 0;
+    if (ext == L".txt" || ext == L".yml" || ext == L".gui" || ext == L".gfx" || ext == L".csv" || ext == L".lua" ||
+        ext == L".asset" || ext == L".json") {
+        return 1;
+    }
+    if (ext == L".ogg" || ext == L".wav" || ext == L".mp3" || ext == L".bik" || ext == L".bank" || ext == L".fsb") return 3;
+    return 2;
+}
+
+bool AllListWanted(const std::wstring& relativeLower) {
+    if (Rank(relativeLower) <= 1) return true;  // archives, descriptors, definitions
+    static const wchar_t* const kLazy[] = {
+        L"sound\\", L"music\\", L"soundtrack\\", L"gfx\\interface\\", L"gfx\\event_pictures\\",
+        L"gfx\\dlc_pictures\\", L"gfx\\cursors\\", L"gfx\\loadingscreens\\", L"tutorial\\", L"tests\\",
+        L"ebook\\", L"tools\\", L"legal_notes\\", L"licenses\\", L"patchnotes\\", L"crash_reporter\\",
+        L"emptysteamdepot\\", L"tweakergui_assets\\", L"thumbnail", L"anvil\\",
+    };
+    for (const wchar_t* prefix : kLazy) {
+        if (relativeLower.compare(0, std::wcslen(prefix), prefix) == 0) return false;
+    }
+    return true;
+}
+
+namespace {
+
+void Enumerate(const std::wstring& directory, std::vector<std::wstring>& out, int depth) {
+    if (depth > 24) return;
+    WIN32_FIND_DATAW data{};
+    HANDLE find = FindFirstFileExW((directory + L"\\*").c_str(), FindExInfoBasic, &data, FindExSearchNameMatch, nullptr,
+                                   FIND_FIRST_EX_LARGE_FETCH);
+    if (find == INVALID_HANDLE_VALUE) return;
+    do {
+        const std::wstring name = data.cFileName;
+        if (name == L"." || name == L"..") continue;
+        const std::wstring full = directory + L"\\" + name;
+        if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+            // Junctions are followed; symbolic links are not.
+            if ((data.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) && data.dwReserved0 != IO_REPARSE_TAG_MOUNT_POINT) {
+                continue;
+            }
+            Enumerate(full, out, depth + 1);
+        } else {
+            out.push_back(full);
+        }
+    } while (FindNextFileW(find, &data));
+    FindClose(find);
+}
+
+}  // namespace
+
+std::vector<std::wstring> BuildAllList(const std::wstring& gameDir, const std::wstring& userDir,
+                                       const std::vector<std::string>& enabledMods, bool skipGame) {
+    std::vector<std::wstring> files;
+    auto addTree = [&files](const std::wstring& base) {
+        std::vector<std::wstring> found;
+        Enumerate(base, found, 0);
+        for (auto& f : found) {
+            if (AllListWanted(Lower(f.substr(base.size() + 1)))) files.push_back(std::move(f));
+        }
+    };
+    if (!skipGame) addTree(gameDir);
+    for (const std::string& descriptor : enabledMods) {
+        std::string text;
+        const std::wstring descriptorPath = userDir + L"\\" + Normalize(Widen(descriptor));
+        if (!ReadWhole(descriptorPath, text, 1 << 20)) continue;
+        files.push_back(descriptorPath);
+        std::wstring path = Normalize(Widen(DescriptorValue(text, "path")));
+        if (!path.empty()) {
+            if (!IsAbsolute(path)) path = userDir + L"\\" + path;
+            while (!path.empty() && path.back() == L'\\') path.pop_back();
+            addTree(path);
+        }
+        std::wstring archive = Normalize(Widen(DescriptorValue(text, "archive")));
+        if (!archive.empty()) {
+            if (!IsAbsolute(archive)) archive = userDir + L"\\" + archive;
+            files.push_back(archive);
+        }
+    }
+    std::stable_sort(files.begin(), files.end(), [](const std::wstring& a, const std::wstring& b) { return Rank(a) < Rank(b); });
+    std::vector<std::wstring> stored;
+    stored.reserve(files.size());
+    for (const auto& f : files) {
+        const std::wstring lower = Lower(f);
+        if (lower.size() >= 4 &&
+            (lower.compare(lower.size() - 4, 4, L".exe") == 0 || lower.compare(lower.size() - 4, 4, L".dll") == 0)) {
+            continue;
+        }
+        stored.push_back(ToStored(f, gameDir));
+    }
+    return stored;
+}
+
+std::vector<std::wstring> UniqueStored(const std::vector<std::wstring>& paths, const std::wstring& gameDir,
+                                       const std::vector<std::wstring>& previous) {
+    constexpr std::size_t kMaxEntries = 60000;
+    std::vector<std::wstring> out;
+    std::unordered_set<std::wstring> seen;
+    for (const auto& p : paths) {
+        const std::wstring stored = ToStored(p, gameDir);
+        if (seen.insert(Lower(stored)).second) out.push_back(stored);
+    }
+    for (const auto& stored : previous) {
+        if (out.size() >= kMaxEntries) break;
+        if (!stored.empty() && seen.insert(Lower(stored)).second) out.push_back(stored);
+    }
+    return out;
+}
+
+bool WriteList(const std::wstring& target, const std::vector<std::wstring>& lines) {
+    std::string text;
+    for (const auto& l : lines) {
+        text += Narrow(l);
+        text += '\n';
+    }
+    const std::wstring temp = target + L".tmp";
+    HANDLE file = CreateFileW(temp.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE) return false;
+    DWORD written = 0;
+    const BOOL ok = WriteFile(file, text.data(), static_cast<DWORD>(text.size()), &written, nullptr) && written == text.size();
+    CloseHandle(file);
+    if (!ok) {
+        DeleteFileW(temp.c_str());
+        return false;
+    }
+    return MoveFileExW(temp.c_str(), target.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
+}
+
+std::wstring UserDirectory() {
+    PWSTR documents = nullptr;
+    std::wstring out;
+    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Documents, 0, nullptr, &documents)) && documents != nullptr) {
+        out = std::wstring(documents) + L"\\Paradox Interactive\\Europa Universalis IV";
+    }
+    if (documents != nullptr) CoTaskMemFree(documents);
+    return out;
+}
+
+}  // namespace sb::profile

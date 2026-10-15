@@ -14,6 +14,10 @@ bool InstallVerifyPathListing(const Build& build, Mode mode);
 bool InstallExistsIndex(const Build& build, Mode mode);
 bool InstallTriggerIntern(const Build& build, Mode mode);
 bool InstallMetascriptSubst(const Build& build, Mode mode);
+bool InstallOpenWarmup(const Build& build, Mode mode);
+
+// Stops learning and saves the access profile (call on the game-ready event).
+void FinishOpenWarmup();
 
 // Writes the counters of every installed module to the log.
 void ReportMimalloc();
@@ -21,5 +25,6 @@ void ReportVerifyPathListing();
 void ReportExistsIndex();
 void ReportTriggerIntern();
 void ReportMetascriptSubst();
+void ReportOpenWarmup();
 
 }  // namespace sb

@@ -10,11 +10,13 @@
 namespace {
 
 void OnGameReady(const char*, const void*, void*) {
+    sb::FinishOpenWarmup();
     sb::ReportMimalloc();
     sb::ReportVerifyPathListing();
     sb::ReportExistsIndex();
     sb::ReportTriggerIntern();
     sb::ReportMetascriptSubst();
+    sb::ReportOpenWarmup();
 }
 
 }  // namespace
@@ -44,6 +46,7 @@ extern "C" ANVIL_PLUGIN_EXPORT AnvilResult anvil_plugin_load(const AnvilHost* ho
         bool (*install)(const sb::Build&, sb::Mode);
     } const modules[] = {
         {"mimalloc", sb::InstallMimalloc},  // first: before the game's runtime allocates
+        {"open_warmup", sb::InstallOpenWarmup},  // early: its threads must run ahead of the game
         {"verifypath_listing", sb::InstallVerifyPathListing},
         {"exists_index", sb::InstallExistsIndex},
         {"trigger_intern", sb::InstallTriggerIntern},

@@ -4,7 +4,7 @@ An [Anvil](https://github.com/happy-dwarf-team/anvil) plugin that makes
 **Europa Universalis IV** start faster, without changing game files or game
 behaviour.
 
-> Status: 0.1.0 (stage 2, first five modules) — not released to players yet.
+> Status: 0.2.0 in progress (stage 2) — not released to players yet.
 > Design: [docs/design.md](docs/design.md).
 
 ## Measured
@@ -28,8 +28,9 @@ answers with the game's own code: 0 differences over 3.6 million calls.
 | `mimalloc` | Faster memory allocator for the game's C runtime (whole session) |
 | `verifypath_listing` | Answers PhysFS path checks from directory listings |
 | `exists_index` | Answers "does this file exist" for the modifier icon check |
-| `trigger_intern` | Linear-time trigger interning at the end of loading |
+| `trigger_intern` | Alternative trigger interning (off by default: slower than the game's own code with the shipped trigger profile) |
 | `metascript_subst` | Single-pass `$parameter$` substitution in scripted effects |
+| `open_warmup` | Opens the files the game will need ahead of it on parallel threads, from a profile learned per mod set (big gain on the first start after a reboot) |
 
 Settings: `anvil/data/eu4-startup-boost/config.toml` (created on first start;
 each module `on`, `off` or `verify`). The plugin writes its counters to

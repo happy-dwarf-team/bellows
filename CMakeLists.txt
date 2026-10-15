@@ -30,13 +30,15 @@ FetchContent_MakeAvailable(tomlplusplus mimalloc)
 add_library(sb_core STATIC
     src/common.cpp
     src/config.cpp
+    src/modules/access_profile.cpp
     src/modules/exists_index.cpp
     src/modules/metascript_subst.cpp
     src/modules/mimalloc_heap.cpp
+    src/modules/open_warmup.cpp
     src/modules/trigger_intern.cpp
     src/modules/verifypath_listing.cpp)
 target_include_directories(sb_core PUBLIC third_party src)
-target_link_libraries(sb_core PUBLIC tomlplusplus::tomlplusplus mimalloc-static)
+target_link_libraries(sb_core PUBLIC tomlplusplus::tomlplusplus mimalloc-static shell32 ole32 uuid)
 target_compile_definitions(sb_core PUBLIC WIN32_LEAN_AND_MEAN NOMINMAX)
 if(MSVC)
     target_compile_options(sb_core PUBLIC /W4 /utf-8 /permissive- /EHsc)
@@ -51,10 +53,10 @@ endif()
 
 if(SB_BUILD_TESTS)
     enable_testing()
-    foreach(test trigger_intern metascript_subst config)
-        add_executable(test_${test} tests/test_${test}.cpp src/common.cpp src/config.cpp)
+    foreach(test trigger_intern metascript_subst config access_profile)
+        add_executable(test_${test} tests/test_${test}.cpp src/common.cpp src/config.cpp src/modules/access_profile.cpp)
         target_include_directories(test_${test} PRIVATE third_party src)
-        target_link_libraries(test_${test} PRIVATE tomlplusplus::tomlplusplus)
+        target_link_libraries(test_${test} PRIVATE tomlplusplus::tomlplusplus shell32 ole32 uuid)
         target_compile_definitions(test_${test} PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
         if(MSVC)
             # /UNDEBUG: the tests use assert(), which Release would compile out.
@@ -67,6 +69,7 @@ endif()
 # Plugin folder layout: <prefix>/eu4-startup-boost/{plugin.toml, eu4_startup_boost.dll, LICENSE}
 install(TARGETS eu4_startup_boost RUNTIME DESTINATION eu4-startup-boost COMPONENT plugin)
 install(FILES plugin/plugin.toml LICENSE DESTINATION eu4-startup-boost COMPONENT plugin)
+install(DIRECTORY plugin/profiles DESTINATION eu4-startup-boost COMPONENT plugin)
 # Third-party code compiled into the DLL (MIT): ship its license texts.
 install(FILES ${mimalloc_SOURCE_DIR}/LICENSE DESTINATION eu4-startup-boost/third-party RENAME mimalloc-LICENSE.txt COMPONENT plugin)
 install(FILES ${tomlplusplus_SOURCE_DIR}/LICENSE DESTINATION eu4-startup-boost/third-party RENAME tomlplusplus-LICENSE.txt COMPONENT plugin)

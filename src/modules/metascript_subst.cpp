@@ -38,6 +38,13 @@ SubstFn g_original = nullptr;
 AssignFn g_assign = nullptr;
 bool g_verifyOnly = false;
 volatile LONG64 g_sequence = 0;
+volatile LONG64 g_ticksTotal = 0;
+volatile LONG64 g_ticksOriginal = 0;
+
+void CallOriginal(void* unused, void* text, void* arguments, void* tokens) {
+    sb::ScopedTicks t(&g_ticksOriginal);
+    g_original(unused, text, arguments, tokens);
+}
 
 // MSVC std::string: buffer/pointer +0x00, size +0x10, capacity +0x18 (SSO when capacity < 16).
 struct View {
@@ -128,6 +135,7 @@ bool Disabled() noexcept {
 }  // namespace
 
 extern "C" void SB_MetascriptSubst(void* unused, void* text, void* arguments, void* tokens) {
+    sb::ScopedTicks total(&g_ticksTotal);
     sb::Increment(&EU4SB_MetascriptStats.requests);
     std::string result;
     LONG64 used = 0;
@@ -141,13 +149,13 @@ extern "C" void SB_MetascriptSubst(void* unused, void* text, void* arguments, vo
     }
     if (!ours) {
         sb::Increment(&EU4SB_MetascriptStats.skips);
-        g_original(unused, text, arguments, tokens);
+        CallOriginal(unused, text, arguments, tokens);
         return;
     }
     const LONG64 sequence = InterlockedIncrement64(&g_sequence);
     if (g_verifyOnly || (sequence & 255) == 1) {
         sb::Increment(&EU4SB_MetascriptStats.verifications);
-        g_original(unused, text, arguments, tokens);
+        CallOriginal(unused, text, arguments, tokens);
         if (!Equal(StringView(text), View{result.data(), result.size()})) {
             sb::Increment(&EU4SB_MetascriptStats.mismatches);
             if (!g_verifyOnly) InterlockedExchange(&EU4SB_MetascriptStats.cacheDisabled, 1);
@@ -193,6 +201,12 @@ bool InstallMetascriptSubst(const Build& build, Mode mode) {
     return true;
 }
 
-void ReportMetascriptSubst() { LogStats("metascript_subst", EU4SB_MetascriptStats); }
+void ReportMetascriptSubst() {
+    LogStats("metascript_subst", EU4SB_MetascriptStats);
+    if (EU4SB_MetascriptStats.requests > 0) {
+        Log(ANVIL_LOG_INFO, "metascript_subst: time in hook %.1f ms, of which original %.1f ms", TicksToMs(g_ticksTotal),
+            TicksToMs(g_ticksOriginal));
+    }
+}
 
 }  // namespace sb

@@ -141,7 +141,37 @@ Anvil without plugins 34.96 / 35.50 / 34.70 s (median 34.96 s); with the
 plugin 15.65 / 15.38 / 15.40 s (median 15.40 s). `setup.log`, `error.log`,
 `system.log` identical between the two.
 
-Next: `open_warmup` (+ access profiles), `attr_cache`, `ram_prefetch`.
+### Per-module contribution (0.2.0 work)
+
+Leave-one-out series `sb-loo1` (all modules on, then each off; 2 interleaved
+starts each; ±1–2 s run-to-run noise): all 16.69 s; without
+`verifypath_listing` 25.04 s; without `mimalloc` 18.29 s; without
+`exists_index` 16.58 s; without `metascript_subst` 16.71 s; without
+`trigger_intern` 15.92 s.
+
+Direct cost measurement in one start (verify mode times our code and the
+game's original separately): `trigger_intern` — original 682 ms for 2.35 M
+calls, ours ~1263 ms, i.e. **slower** with the real (non-empty) map;
+`metascript_subst` — original 860 ms, ours ~64 ms. `trigger_intern` is
+therefore **off by default** (kept with its verify mode; a cheaper
+canonicalization could revisit it, but at most ~0.7 s is available).
+
+### open_warmup and access profiles
+
+Ported with the learned profile per mod set
+(`anvil/data/eu4-startup-boost/profiles/<build>-<dlc_load hash>.txt`), the
+shipped base layer `plugin/profiles/eu4-1.37.5-steam-win64.txt` (10 695 game
+files, generated from a learned profile by keeping only `@\` game-folder
+entries — an approximation of a start without mods, because the lab's mod set
+was not changed) and the filtered "all" list for mods. Learning uses the
+game's `CreateFileW` import through Anvil `replace_import` and saves at the
+game-ready event. Warm starts: first start without a profile — "all" list
+13 619 entries in 1.86 s; with the base layer — 11 413 entries in 78 ms;
+learned profile — 11 503 entries in 76 ms; start ~15.1 s in each case. The
+cold-start effect (lab: 61 → 15 s) still has to be measured with the plugin
+after a reboot.
+
+Next: cold-start check, `attr_cache`, `ram_prefetch`.
 
 ## 7. Open questions (Q)
 

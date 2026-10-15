@@ -68,6 +68,13 @@ bool g_verifyOnly = false;
 SRWLOCK g_lock = SRWLOCK_INIT;
 State* g_state = nullptr;
 volatile LONG64 g_answerSequence = 0;
+volatile LONG64 g_ticksTotal = 0;     // whole hook, original calls included
+volatile LONG64 g_ticksOriginal = 0;  // calls to the original only
+
+std::uint64_t CallOriginal(void* singleton, void* node) {
+    sb::ScopedTicks t(&g_ticksOriginal);
+    return g_original(singleton, node);
+}
 
 struct ShapeError {};
 
@@ -175,10 +182,11 @@ bool Disabled() noexcept {
 }  // namespace
 
 extern "C" std::uint64_t SB_TriggerIntern(void* singleton, void* node) {
+    sb::ScopedTicks total(&g_ticksTotal);
     sb::Increment(&EU4SB_TriggerInternStats.requests);
     if (Disabled() || g_state == nullptr || singleton == nullptr) {
         sb::Increment(&EU4SB_TriggerInternStats.skips);
-        return g_original(singleton, node);
+        return CallOriginal(singleton, node);
     }
     std::uint64_t answer = 0;
     try {
@@ -199,12 +207,12 @@ extern "C" std::uint64_t SB_TriggerIntern(void* singleton, void* node) {
     } catch (...) {
         InterlockedExchange(&EU4SB_TriggerInternStats.cacheDisabled, 1);
         sb::Increment(&EU4SB_TriggerInternStats.skips);
-        return g_original(singleton, node);
+        return CallOriginal(singleton, node);
     }
     const LONG64 sequence = InterlockedIncrement64(&g_answerSequence);
     if (g_verifyOnly || (sequence & 255) == 1) {
         sb::Increment(&EU4SB_TriggerInternStats.verifications);
-        const std::uint64_t actual = g_original(singleton, node);
+        const std::uint64_t actual = CallOriginal(singleton, node);
         if (actual != answer) {
             sb::Increment(&EU4SB_TriggerInternStats.mismatches);
             if (!g_verifyOnly) InterlockedExchange(&EU4SB_TriggerInternStats.cacheDisabled, 1);
@@ -256,8 +264,8 @@ bool InstallTriggerIntern(const Build& build, Mode mode) {
 
 void ReportTriggerIntern() {
     LogStats("trigger_intern", EU4SB_TriggerInternStats);
-    Log(ANVIL_LOG_INFO, "trigger_intern: map size %lld, indexed %lld", EU4SB_TriggerInternMap.requests,
-        EU4SB_TriggerInternMap.hits);
+    Log(ANVIL_LOG_INFO, "trigger_intern: map size %lld, indexed %lld; time in hook %.1f ms, of which original %.1f ms",
+        EU4SB_TriggerInternMap.requests, EU4SB_TriggerInternMap.hits, TicksToMs(g_ticksTotal), TicksToMs(g_ticksOriginal));
 }
 
 }  // namespace sb

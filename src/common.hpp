@@ -68,6 +68,23 @@ inline T Read(const void* base, std::size_t offset) noexcept {
     return value;
 }
 
+inline LONG64 Ticks() noexcept {
+    LARGE_INTEGER t;
+    QueryPerformanceCounter(&t);
+    return t.QuadPart;
+}
+double TicksToMs(LONG64 ticks);
+
+// Adds the time spent in a scope to *sink (QPC ticks).
+struct ScopedTicks {
+    volatile LONG64* sink;
+    LONG64 start;
+    explicit ScopedTicks(volatile LONG64* s) noexcept : sink(s), start(Ticks()) {}
+    ~ScopedTicks() { InterlockedExchangeAdd64(sink, Ticks() - start); }
+    ScopedTicks(const ScopedTicks&) = delete;
+    ScopedTicks& operator=(const ScopedTicks&) = delete;
+};
+
 void Log(AnvilLogLevel level, const char* format, ...);
 void LogStats(const char* name, const Stats& stats);
 
