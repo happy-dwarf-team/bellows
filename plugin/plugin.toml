@@ -1,6 +1,6 @@
 id = "eu4-startup-boost"
 name = "EU4 Startup Boost"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Happy Dwarf Team"]
 description = "Faster Europa Universalis IV start-up without changing game files or game behaviour."
 api = 1
