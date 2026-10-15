@@ -62,6 +62,9 @@ ctest --test-dir build -C Release --output-on-failure
 cmake --install build --config Release --component plugin --prefix dist
 ```
 
+Contributions, the commit convention and the release process: see
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## License
 
 MIT — see [LICENSE](LICENSE). Bundles mimalloc (MIT, Microsoft). Unofficial
