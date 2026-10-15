@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/happy-dwarf-team/eu4-startup-boost/compare/v0.2.0...v0.2.1) (2026-10-15)
+
+
+### Documentation
+
+* describe the public release and how to install it ([#5](https://github.com/happy-dwarf-team/eu4-startup-boost/issues/5)) ([81dda3d](https://github.com/happy-dwarf-team/eu4-startup-boost/commit/81dda3d63ebbe0b5c0ee58ed1f8b4be997b16ef6))
+
 ## [0.2.0](https://github.com/happy-dwarf-team/eu4-startup-boost/compare/v0.1.0...v0.2.0) (2026-10-15)
 
 
