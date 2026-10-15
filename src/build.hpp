@@ -37,6 +37,19 @@ struct Build {
     uint32_t metascript_sites[2];
     uint32_t metascript_subst_fn;
     uint32_t string_assign_fn;
+
+    // ZIP archiver (PhysFS): Io template read slot and its target, mz_inflate and its call site outside the read
+    uint32_t zip_io_read_slot;
+    uint32_t zip_read_fn;
+    uint32_t mz_inflate_fn;
+    uint32_t mz_inflate_other_site;
+
+    // ram_prefetch: ZIP archiver table slots and their targets, tinfl_decompress, ZIP entry field offsets
+    uint32_t zip_open_archive_slot, zip_open_archive_fn;
+    uint32_t zip_open_read_slot, zip_open_read_fn;
+    uint32_t zip_close_archive_slot, zip_close_archive_fn;
+    uint32_t tinfl_decompress_fn;
+    uint32_t zip_entry_method, zip_entry_crc, zip_entry_compressed, zip_entry_uncompressed;
 };
 
 inline constexpr Build kBuilds[] = {
@@ -48,6 +61,10 @@ inline constexpr Build kBuilds[] = {
         0x1D9C968 + 0x30, 0x15CCE80,
         {0x205C0F, 0x205C3F}, 0xB9B4E0, 0x2340010,
         {0xDB090E, 0xDB0967}, 0xDB1800, 0x95110,
+        0x1C1D840 + 0x10, 0x1A07A10, 0x1A080D0, 0x1A0B6CB,
+        0x1C1D890 + 0x30, 0x1A073F0, 0x1C1D890 + 0x40, 0x1A07580, 0x1C1D890 + 0x70, 0x1A073B0,
+        0x1A08470,
+        0x46, 0x48, 0x50, 0x58,
     },
 };
 

@@ -150,11 +150,9 @@ DWORD WINAPI Starter(LPVOID) {
             sb::Log(ANVIL_LOG_WARNING, "open_warmup: dlc_load.json not found; warm-up skipped");
             return 0;
         }
-        char key[96] = {};
-        std::snprintf(key, sizeof(key), "%s-%016llx", g_buildId, static_cast<unsigned long long>(profile::Fnv1a(json)));
         const std::wstring dir = *g_dataDir + L"\\profiles";
         CreateDirectoryW(dir.c_str(), nullptr);
-        auto* target = new std::wstring(dir + L"\\" + profile::Widen(key) + L".txt");
+        auto* target = new std::wstring(dir + L"\\" + profile::ProfileKey(g_buildId, json) + L".txt");
         std::string text;
         std::vector<std::wstring> lines;
         LONG source = 0;

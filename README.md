@@ -17,6 +17,10 @@ the main menu, original `eu4.exe` with Anvil, 3 interleaved starts each:
 | Anvil without plugins | 34.96 / 35.50 / 34.70 s | 34.96 s |
 | Anvil + EU4 Startup Boost 0.1.0 | 15.65 / 15.38 / 15.40 s | **15.40 s** |
 
+With `ram_prefetch` (0.2.0 work, separate interleaved series): 12.24 s median
+(11.98 / 12.24 / 12.50) vs 15.16 s with every other module on and
+`ram_prefetch` off; game logs identical.
+
 The game's `setup.log`, `error.log` and `system.log` are identical with and
 without the plugin. In a verification start every module compared each of its
 answers with the game's own code: 0 differences over 3.6 million calls.
@@ -31,6 +35,7 @@ answers with the game's own code: 0 differences over 3.6 million calls.
 | `trigger_intern` | Alternative trigger interning (off by default: slower than the game's own code with the shipped trigger profile) |
 | `metascript_subst` | Single-pass `$parameter$` substitution in scripted effects |
 | `open_warmup` | Opens the files the game will need ahead of it on parallel threads, from a profile learned per mod set (big gain on the first start after a reboot) |
+| `ram_prefetch` | Reads and unpacks the DLC archive members the game will need into RAM on worker threads (learned per mod set; uses up to ~1.5 GB RAM during start-up) |
 | `attr_cache` | Remembers "file not found" answers for game and mod files during start-up (off by default: ~0.1 s left next to the other modules) |
 
 Settings: `anvil/data/eu4-startup-boost/config.toml` (created on first start;

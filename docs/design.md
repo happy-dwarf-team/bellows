@@ -194,7 +194,51 @@ invalidation on the game's own directory/file creation. Not implemented;
 estimated at most ~1 s summed over threads (hook time / query count), not
 measured on the critical path.
 
-Next: cold-start check, `ram_prefetch`.
+### ram_prefetch
+
+Potential first: diagnostic `zip_profile` (off by default; wraps the ZIP
+archiver's Io read slot) in start `sb-zipprof-2` with all other modules on:
+the game's **main thread** spent **2 748 ms in ZIP member reads (1 216 MB)**,
+another thread 567 ms (274 MB).
+
+Ported from the lab with these hooks: OpenArchive / OpenRead / CloseArchive
+slots of the ZIP archiver table (`patch_bytes`, expected pointers). Workers
+read and decode members into buffers; OpenRead wraps the game's Io and serves
+the buffer. Same safeguards as the lab: the local header is cross-checked with
+the central directory; CRC-32 is computed over the whole output; at open the
+game's own entry (method, CRC, sizes) must match; anything else goes to the
+original Io. Differences from the lab:
+
+- Prefetch starts at plugin load, in first-use order, instead of when the game
+  mounts an archive.
+- A buffer leaves the 2 GB budget when the game takes it; a second open of the
+  same member reads through the original path.
+- DEFLATE uses the game's own `tinfl_decompress` (pure miniz code, worker-owned
+  state) instead of zlib, so there is no new dependency; CRC-32 comes from
+  `ntdll!RtlComputeCrc32`.
+- The member list is an access profile learned per mod set
+  (`<key>.zip.txt`, "archive\tmember"); a game-folder base layer is shipped
+  (`plugin/profiles/<build>.zip.txt`, 2 523 members of 120 DLC archives).
+
+Results (EU4 1.37.5, the lab's mod set):
+
+- Learning start: 2 740 opens, 2 523 unique members, the same counts as the
+  lab's observer run.
+- Verify start `sb-ram-verify-1`: 2 523 served, 13 474 byte comparisons with
+  the game's reads, 0 mismatches; 217 second opens read by the game itself.
+- On: all 1 478 MB decoded ~0.6–0.7 s after load (decode 4.7–5.3 s summed over
+  8 below-normal workers). The main thread's ZIP read time fell from 2 748 ms
+  to 1.2 ms (`sb-ram-on-prof-1`).
+- Series `sb-ram-ab3` (3 + 3 interleaved, warm, learned profiles kept):
+  **12.24 s** median (11.98 / 12.24 / 12.50) vs 15.16 s without
+  `ram_prefetch` (15.14 / 15.16 / 15.66); the ranges do not overlap.
+  `setup.log`, `error.log` and `system.log` are identical between the two
+  variants.
+- Memory: the whole profile is resident before the game takes the first
+  member (peak not-yet-taken 1 478 MB). On machines with little RAM the budget
+  should be lower; it is not configurable yet.
+
+Next: cold-start check with all modules.
 
 ## 7. Open questions (Q)
 

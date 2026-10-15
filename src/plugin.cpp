@@ -11,6 +11,7 @@ namespace {
 
 void OnGameReady(const char*, const void*, void*) {
     sb::FinishOpenWarmup();
+    sb::FinishRamPrefetch();
     sb::ReportMimalloc();
     sb::ReportVerifyPathListing();
     sb::ReportExistsIndex();
@@ -18,6 +19,8 @@ void OnGameReady(const char*, const void*, void*) {
     sb::ReportMetascriptSubst();
     sb::ReportOpenWarmup();
     sb::ReportAttrCache();
+    sb::ReportRamPrefetch();
+    sb::ReportZipProfile();
 }
 
 }  // namespace
@@ -48,11 +51,13 @@ extern "C" ANVIL_PLUGIN_EXPORT AnvilResult anvil_plugin_load(const AnvilHost* ho
     } const modules[] = {
         {"mimalloc", sb::InstallMimalloc},  // first: before the game's runtime allocates
         {"open_warmup", sb::InstallOpenWarmup},  // early: its threads must run ahead of the game
+        {"ram_prefetch", sb::InstallRamPrefetch},  // early as well: workers decode ahead of the game
         {"verifypath_listing", sb::InstallVerifyPathListing},
         {"exists_index", sb::InstallExistsIndex},
         {"trigger_intern", sb::InstallTriggerIntern},
         {"metascript_subst", sb::InstallMetascriptSubst},
         {"attr_cache", sb::InstallAttrCache},
+        {"zip_profile", sb::InstallZipProfile},  // diagnostic, off unless EU4SB_ZIP_PROFILE=on
     };
     std::string summary;
     for (const auto& m : modules) {

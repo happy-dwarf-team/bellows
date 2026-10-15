@@ -234,6 +234,12 @@ std::vector<std::wstring> BuildAllList(const std::wstring& gameDir, const std::w
     return stored;
 }
 
+std::wstring ProfileKey(const char* buildId, const std::string& dlcLoadJson) {
+    char key[96] = {};
+    std::snprintf(key, sizeof(key), "%s-%016llx", buildId, static_cast<unsigned long long>(Fnv1a(dlcLoadJson)));
+    return Widen(key);
+}
+
 std::vector<std::wstring> ModFolders(const std::wstring& userDir, const std::vector<std::string>& enabledMods) {
     std::vector<std::wstring> folders;
     for (const std::string& descriptor : enabledMods) {

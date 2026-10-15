@@ -16,9 +16,14 @@ bool InstallTriggerIntern(const Build& build, Mode mode);
 bool InstallMetascriptSubst(const Build& build, Mode mode);
 bool InstallOpenWarmup(const Build& build, Mode mode);
 bool InstallAttrCache(const Build& build, Mode mode);
+bool InstallRamPrefetch(const Build& build, Mode mode);
+bool InstallZipProfile(const Build& build, Mode mode);  // diagnostic
 
 // Stops learning and saves the access profile (call on the game-ready event).
 void FinishOpenWarmup();
+
+// Stops prefetching, frees unused buffers and saves the archive-member profile (game-ready event).
+void FinishRamPrefetch();
 
 // Writes the counters of every installed module to the log.
 void ReportMimalloc();
@@ -28,5 +33,7 @@ void ReportTriggerIntern();
 void ReportMetascriptSubst();
 void ReportOpenWarmup();
 void ReportAttrCache();
+void ReportRamPrefetch();
+void ReportZipProfile();
 
 }  // namespace sb

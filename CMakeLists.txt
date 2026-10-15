@@ -32,6 +32,9 @@ add_library(sb_core STATIC
     src/config.cpp
     src/modules/access_profile.cpp
     src/modules/attr_cache.cpp
+    src/modules/zip_profile.cpp
+    src/modules/zip_reader.cpp
+    src/modules/ram_prefetch.cpp
     src/modules/exists_index.cpp
     src/modules/metascript_subst.cpp
     src/modules/mimalloc_heap.cpp
@@ -54,8 +57,8 @@ endif()
 
 if(SB_BUILD_TESTS)
     enable_testing()
-    foreach(test trigger_intern metascript_subst config access_profile path_rules)
-        add_executable(test_${test} tests/test_${test}.cpp src/common.cpp src/config.cpp src/modules/access_profile.cpp)
+    foreach(test trigger_intern metascript_subst config access_profile path_rules zip_reader)
+        add_executable(test_${test} tests/test_${test}.cpp src/common.cpp src/config.cpp src/modules/access_profile.cpp src/modules/zip_reader.cpp)
         target_include_directories(test_${test} PRIVATE third_party src)
         target_link_libraries(test_${test} PRIVATE tomlplusplus::tomlplusplus shell32 ole32 uuid)
         target_compile_definitions(test_${test} PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)

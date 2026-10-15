@@ -35,6 +35,9 @@ bool AllListWanted(const std::wstring& relativeLower);
 std::vector<std::wstring> BuildAllList(const std::wstring& gameDir, const std::wstring& userDir,
                                        const std::vector<std::string>& enabledMods, bool skipGame);
 
+// Profile key for a mod set: "<build>-<16 hex digits of FNV-1a(dlc_load.json)>".
+std::wstring ProfileKey(const char* buildId, const std::string& dlcLoadJson);
+
 // Folders of the enabled mods (descriptor "path", or the folder holding "archive").
 std::vector<std::wstring> ModFolders(const std::wstring& userDir, const std::vector<std::string>& enabledMods);
 
