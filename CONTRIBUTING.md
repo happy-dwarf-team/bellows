@@ -15,8 +15,11 @@ entry. Types and their effect on the version:
 | ------------------------------------- | ------- | ---------------------------------- |
 | `feat`                                | minor   | Features                           |
 | `fix`, `perf`, `revert`               | patch   | Bug Fixes / Performance / Reverts  |
-| `build`, `docs`                       | none    | Build / Documentation              |
-| `refactor`, `test`, `ci`, `chore`     | none    | hidden                             |
+| `build`                               | patch   | Build                              |
+| `docs`, `refactor`, `test`, `ci`, `chore` | none | hidden                           |
+
+A release is proposed only when the changelog would get a visible entry;
+commits of hidden types alone never start one and ship with the next release.
 
 Scopes: the module name (`ram_prefetch`, `attr_cache`, `open_warmup`,
 `exists_index`, `trigger_intern`, `metascript_subst`, `mimalloc_heap`,
