@@ -1,5 +1,15 @@
 cmake_minimum_required(VERSION 3.25)
-project(eu4_startup_boost VERSION 0.1.0 LANGUAGES C CXX)
+# version.txt holds the version; release-please bumps it together with plugin/plugin.toml.
+file(STRINGS version.txt SB_VERSION_TEXT LIMIT_COUNT 1 REGEX "^[0-9]+\\.[0-9]+\\.[0-9]+$")
+if(NOT SB_VERSION_TEXT)
+    message(FATAL_ERROR "version.txt must hold a MAJOR.MINOR.PATCH version")
+endif()
+file(STRINGS plugin/plugin.toml SB_MANIFEST_VERSION REGEX "^version = \"[^\"]*\"$")
+if(NOT SB_MANIFEST_VERSION STREQUAL "version = \"${SB_VERSION_TEXT}\"")
+    message(FATAL_ERROR "plugin/plugin.toml (${SB_MANIFEST_VERSION}) does not match version.txt (${SB_VERSION_TEXT})")
+endif()
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS version.txt plugin/plugin.toml)
+project(eu4_startup_boost VERSION ${SB_VERSION_TEXT} LANGUAGES C CXX)
 
 if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
     message(FATAL_ERROR "64-bit Windows only")
@@ -48,7 +58,9 @@ if(MSVC)
     target_compile_options(sb_core PUBLIC /W4 /utf-8 /permissive- /EHsc)
 endif()
 
-add_library(eu4_startup_boost SHARED src/plugin.cpp)
+# File version shown in the DLL's Properties, from the same version.txt.
+configure_file(src/version.rc.in ${CMAKE_CURRENT_BINARY_DIR}/sb_version.rc @ONLY)
+add_library(eu4_startup_boost SHARED src/plugin.cpp ${CMAKE_CURRENT_BINARY_DIR}/sb_version.rc)
 target_link_libraries(eu4_startup_boost PRIVATE sb_core)
 # Keep every module's exported counters even though nothing in the DLL references them.
 if(MSVC)
