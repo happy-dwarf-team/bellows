@@ -1,0 +1,72 @@
+name: Bug report
+description: A crash, a different game behaviour, missing content or errors with EU4 Startup Boost installed.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Security problems go through [private reporting](https://github.com/happy-dwarf-team/eu4-startup-boost/security/advisories/new).
+        Please narrow it down first: does the problem go away when the `eu4-startup-boost` folder is removed from `anvil/plugins/`, and when a single module is set to `off` in `anvil/data/eu4-startup-boost/config.toml`?
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Plugin and Anvil versions
+      description: "From `anvil/anvil.log`, e.g. `Anvil 0.2.0` and `eu4-startup-boost 0.2.0: loaded`."
+    validations:
+      required: true
+  - type: input
+    id: game-build
+    attributes:
+      label: Game build
+      description: The `game build:` line of `anvil/anvil.log`, and the game version shown in the launcher.
+    validations:
+      required: true
+  - type: dropdown
+    id: without-plugin
+    attributes:
+      label: Does it happen without the plugin?
+      options:
+        - "No, only with EU4 Startup Boost"
+        - "Yes, also without it (probably not this plugin)"
+        - Not tested
+    validations:
+      required: true
+  - type: input
+    id: module
+    attributes:
+      label: Module that causes it
+      description: The module whose `off` makes the problem go away, if you found one (e.g. `ram_prefetch`).
+  - type: textarea
+    id: config
+    attributes:
+      label: config.toml
+      description: Contents of `anvil/data/eu4-startup-boost/config.toml`.
+      render: toml
+  - type: textarea
+    id: mods
+    attributes:
+      label: Enabled mods
+      description: The mods of the playset (or "none"); several modules learn per mod set.
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: anvil/anvil.log
+      description: The whole file from the start where the problem happened. Check it for anything you do not want to share, such as your Windows user name in paths.
+      render: text
+    validations:
+      required: true

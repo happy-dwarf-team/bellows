@@ -1,0 +1,18 @@
+name: Feature request
+description: An idea for a new module or a change to an existing one.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is slow or missing
+      description: Where the time goes, if you know (a profile, log timestamps, a game phase).
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: How it could work. Modules must not change game behaviour; say how the result could be checked against the game's own code.
+    validations:
+      required: true
