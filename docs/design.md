@@ -268,8 +268,16 @@ since the reboot); in the second 74 ms. All modules loaded, `ram_prefetch`
 served 1 478 MB with the 1 GB budget; `setup.log`, `error.log` and
 `system.log` are identical to the start without Anvil.
 
-Still open: a start through the Paradox launcher's Play button (needs UI
-control) and the cold start with the plugin.
+Through the Paradox launcher (`sb-launcher-1`): Steam opened the launcher and
+Play was clicked through UI automation. `eu4.exe` was started by
+`Paradox Launcher` and the plugin loaded with all default modules. The start
+took 17.77 s, timed from the game process's creation. The game logs are
+identical to the start without Anvil, and the launcher left `dlc_load.json`
+unchanged. `open_warmup` (6.1 s) and the `ram_prefetch` workers (6.9 s) took
+longer than in the direct start (74 ms, 2.8 s); the cause is not known
+(one start).
+
+Still open: the cold start with the plugin.
 
 ## 7. Open questions (Q)
 
