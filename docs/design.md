@@ -73,7 +73,7 @@ mod.
    the mods override, plus each mod's layer — without a learning start. A mod
    update changes its key; the old layer is used, validated by file size and
    time, until the new one is learned.
-4. Memory budget for prefetch (default 2 GB, as in the lab) and prefetch order
+4. Memory budget for prefetch (default 1 GB, `[ram_prefetch] budget_mb`; the lab used 2 GB) and prefetch order
    = first-use order.
 
 Start with 1 and 2; keep the source attribution from day one so 3 needs no
@@ -211,7 +211,7 @@ original Io. Differences from the lab:
 
 - Prefetch starts at plugin load, in first-use order, instead of when the game
   mounts an archive.
-- A buffer leaves the 2 GB budget when the game takes it; a second open of the
+- A buffer leaves the memory budget when the game takes it; a second open of the
   same member reads through the original path.
 - DEFLATE uses the game's own `tinfl_decompress` (pure miniz code, worker-owned
   state) instead of zlib, so there is no new dependency; CRC-32 comes from
@@ -234,11 +234,42 @@ Results (EU4 1.37.5, the lab's mod set):
   `ram_prefetch` (15.14 / 15.16 / 15.66); the ranges do not overlap.
   `setup.log`, `error.log` and `system.log` are identical between the two
   variants.
-- Memory: the whole profile is resident before the game takes the first
-  member (peak not-yet-taken 1 478 MB). On machines with little RAM the budget
-  should be lower; it is not configurable yet.
+- Memory: with a 2 GB budget the whole profile is resident before the game
+  takes the first member (peak not-yet-taken 1 478 MB).
+- Budget (`[ram_prefetch] budget_mb` in `config.toml`, 64–8192 MB, override
+  `EU4SB_RAM_PREFETCH_BUDGET_MB`): workers wait while the not-yet-taken bytes
+  would exceed it. Series `sb-budget-1` (3 × 3 interleaved, warm):
+  - 2048 MB: 11.97 s median (11.70 / 11.97 / 12.22); everything decoded after
+    669 ms.
+  - 1024 MB: 11.95 s (11.70 / 11.95 / 12.22); everything decoded after 2.7 s,
+    and the budget was full at its peak.
+  - 512 MB: 12.23 s (11.68 / 12.23 / 12.47); 3 members were not ready in time.
 
-Next: cold-start check with all modules.
+  1024 and 2048 MB are equal within the noise, so the default is **1024 MB**.
+
+Next: cold-start check with all modules. The first attempt after a reboot
+(15.10, `sb-cold-all-1`, 74.6 s) ran with a stale Anvil 0.1.0 build that
+skipped the plugin (manifest requires `>=0.2.0`), so it measured Anvil alone.
+### Real game folder
+
+Anvil and the plugin installed in the Steam game folder (no junction copy),
+`eu4.exe` started there with Steam running and the launcher's working
+directory, fresh plugin data (shipped base layers), removed after each start
+(lab harness `anvil-smoke.ps1 -RealGameFolder`; warm, one start each):
+
+| Start | Running application |
+| --- | ---: |
+| without Anvil (`sb-real-vanilla-1`) | 33.60 s |
+| Anvil + plugin, first start (`sb-real-1`) | 14.91 s |
+| Anvil + plugin, again (`sb-real-2`) | 11.91 s |
+
+In the first start `open_warmup` took 5.5 s (these paths had not been opened
+since the reboot); in the second 74 ms. All modules loaded, `ram_prefetch`
+served 1 478 MB with the 1 GB budget; `setup.log`, `error.log` and
+`system.log` are identical to the start without Anvil.
+
+Still open: a start through the Paradox launcher's Play button (needs UI
+control) and the cold start with the plugin.
 
 ## 7. Open questions (Q)
 

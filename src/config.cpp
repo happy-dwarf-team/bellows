@@ -21,6 +21,9 @@ metascript_subst = "on"    # faster $parameter$ substitution in scripted effects
 open_warmup = "on"         # opens game files ahead of the game (big win after a reboot)
 ram_prefetch = "on"        # reads and unpacks DLC archive members into RAM ahead of the game
 attr_cache = "off"         # remembers "file not found" answers for game and mod files; off: saves at most ~0.1 s next to the other modules
+
+[ram_prefetch]
+budget_mb = 1024           # RAM for unpacked archive members the game has not taken yet (64-8192)
 )";
 
 std::optional<Mode> ParseMode(std::string text) {
@@ -29,6 +32,10 @@ std::optional<Mode> ParseMode(std::string text) {
     if (text == "off" || text == "0" || text == "false") return Mode::Off;
     if (text == "verify") return Mode::Verify;
     return std::nullopt;
+}
+
+bool ValidBudget(long long mb) {
+    return mb >= static_cast<long long>(kMinRamPrefetchBudgetMb) && mb <= static_cast<long long>(kMaxRamPrefetchBudgetMb);
 }
 
 }  // namespace
@@ -81,6 +88,14 @@ Config LoadConfig(const std::filesystem::path& data_dir) {
                     }
                 }
             }
+            if (const auto budget = table["ram_prefetch"]["budget_mb"]) {
+                const auto value = budget.value<std::int64_t>();
+                if (value && ValidBudget(*value)) {
+                    config.ram_prefetch_budget_mb = static_cast<std::uint64_t>(*value);
+                } else {
+                    config.notes.push_back("config.toml: invalid ram_prefetch.budget_mb (64-8192)");
+                }
+            }
         } catch (const toml::parse_error& e) {
             config.notes.push_back(std::string("config.toml ignored: ") + std::string(e.description()));
         }
@@ -99,6 +114,16 @@ Config LoadConfig(const std::filesystem::path& data_dir) {
         if (m.mode == Mode::Verify && !m.supports_verify) {
             m.mode = Mode::On;
             config.notes.push_back(std::string(m.name) + " has no verify mode; using on");
+        }
+    }
+    char budget[16] = {};
+    const DWORD budgetLength = GetEnvironmentVariableA("EU4SB_RAM_PREFETCH_BUDGET_MB", budget, sizeof(budget));
+    if (budgetLength > 0 && budgetLength < sizeof(budget)) {
+        char* end = nullptr;
+        const long long value = std::strtoll(budget, &end, 10);
+        if (end != budget && *end == '\0' && ValidBudget(value)) {
+            config.ram_prefetch_budget_mb = static_cast<std::uint64_t>(value);
+            config.notes.push_back(std::string("EU4SB_RAM_PREFETCH_BUDGET_MB=") + budget + " overrides config.toml");
         }
     }
     return config;

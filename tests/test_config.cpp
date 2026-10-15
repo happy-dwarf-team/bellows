@@ -19,6 +19,28 @@ int main() {
     // The written default parses to the same values.
     c = sb::LoadConfig(dir);
     assert(c.notes.empty() && c.mode("exists_index") == sb::Mode::On);
+    assert(c.ram_prefetch_budget_mb == sb::kDefaultRamPrefetchBudgetMb);
+
+    // Budget: from config.toml, invalid values keep the default, the environment overrides.
+    {
+        std::ofstream out(dir / "config.toml", std::ios::trunc);
+        out << "[ram_prefetch]\nbudget_mb = 512\n";
+    }
+    c = sb::LoadConfig(dir);
+    assert(c.ram_prefetch_budget_mb == 512 && c.notes.empty());
+    {
+        std::ofstream out(dir / "config.toml", std::ios::trunc);
+        out << "[ram_prefetch]\nbudget_mb = 10\n";
+    }
+    c = sb::LoadConfig(dir);
+    assert(c.ram_prefetch_budget_mb == sb::kDefaultRamPrefetchBudgetMb && c.notes.size() == 1);
+    SetEnvironmentVariableA("EU4SB_RAM_PREFETCH_BUDGET_MB", "2048");
+    c = sb::LoadConfig(dir);
+    assert(c.ram_prefetch_budget_mb == 2048);
+    SetEnvironmentVariableA("EU4SB_RAM_PREFETCH_BUDGET_MB", "lots");
+    c = sb::LoadConfig(dir);
+    assert(c.ram_prefetch_budget_mb == sb::kDefaultRamPrefetchBudgetMb);
+    SetEnvironmentVariableA("EU4SB_RAM_PREFETCH_BUDGET_MB", nullptr);
 
     {
         std::ofstream out(dir / "config.toml", std::ios::trunc);

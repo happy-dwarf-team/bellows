@@ -43,6 +43,7 @@ extern "C" ANVIL_PLUGIN_EXPORT AnvilResult anvil_plugin_load(const AnvilHost* ho
     c.ready_marker = sb::AtRva<const uint8_t>(build->ready_marker);
 
     const sb::Config config = sb::LoadConfig(std::filesystem::path(host->data_dir(self)));
+    sb::SetRamPrefetchBudget(config.ram_prefetch_budget_mb);
     for (const auto& note : config.notes) sb::Log(ANVIL_LOG_WARNING, "%s", note.c_str());
 
     struct Entry {

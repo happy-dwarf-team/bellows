@@ -46,7 +46,7 @@ namespace {
 
 namespace profile = sb::profile;
 
-constexpr std::uint64_t kBudgetBytes = 2048ULL << 20;
+std::uint64_t g_budgetBytes = 1024ULL << 20;  // set from config before install
 constexpr unsigned kWorkers = 8;
 constexpr std::size_t kTinflStateBytes = 64 * 1024;  // miniz tinfl_decompressor is ~11 KB
 constexpr std::size_t kMaxProfileEntries = 20000;
@@ -191,9 +191,9 @@ void Release(Backend& b, std::uint64_t bytes) {
 }
 
 bool Reserve(Backend& b, std::uint64_t bytes) {
-    if (bytes > kBudgetBytes) return false;
+    if (bytes > g_budgetBytes) return false;
     std::unique_lock<std::mutex> lock(b.mutex);
-    b.budgetCv.wait(lock, [&] { return b.stopping.load() || b.committed + bytes <= kBudgetBytes; });
+    b.budgetCv.wait(lock, [&] { return b.stopping.load() || b.committed + bytes <= g_budgetBytes; });
     if (b.stopping.load()) return false;
     b.committed += bytes;
     if (b.committed > b.committedPeak) b.committedPeak = b.committed;
@@ -583,6 +583,8 @@ DWORD WINAPI Starter(LPVOID) {
 
 namespace sb {
 
+void SetRamPrefetchBudget(std::uint64_t megabytes) { g_budgetBytes = megabytes << 20; }
+
 bool InstallRamPrefetch(const Build& build, Mode mode) {
     if (mode == Mode::Off) return false;
     wchar_t exe[MAX_PATH * 2] = {};
@@ -677,10 +679,11 @@ void ReportRamPrefetch() {
     const LONG64 finish = g_finishTicks;
     Log(ANVIL_LOG_INFO,
         "ram_prefetch: %s, %ld members in %ld archives; prefetched %.1f MB, served %.1f MB, failed %lld; decode %.0f ms "
-        "(sum over %u workers), workers %s %.0f ms; peak not yet taken %.0f MB; learned %zu members",
+        "(sum over %u workers), workers %s %.0f ms; peak not yet taken %.0f of %llu MB; learned %zu members",
         kSources[source], g_profileEntries, g_profileArchives, g_bytesPrefetched / 1048576.0, g_bytesServed / 1048576.0,
         g_failed, TicksToMs(g_ticksDecode), kWorkers, finish ? "finished after" : "still running at stop,",
-        finish ? TicksToMs(finish - g_startTicks) : 0.0, g_committedPeak / 1048576.0, g_learned->size());
+        finish ? TicksToMs(finish - g_startTicks) : 0.0, g_committedPeak / 1048576.0,
+        static_cast<unsigned long long>(g_budgetBytes >> 20), g_learned->size());
 }
 
 }  // namespace sb
