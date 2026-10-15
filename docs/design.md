@@ -250,8 +250,26 @@ Results (EU4 1.37.5, the lab's mod set):
 Next: cold-start check with all modules. The first attempt after a reboot
 (15.10, `sb-cold-all-1`, 74.6 s) ran with a stale Anvil 0.1.0 build that
 skipped the plugin (manifest requires `>=0.2.0`), so it measured Anvil alone.
-Also open: a start through Steam and the Paradox launcher with Anvil in the
-real game folder (so far only direct starts of a junction copy).
+### Real game folder
+
+Anvil and the plugin installed in the Steam game folder (no junction copy),
+`eu4.exe` started there with Steam running and the launcher's working
+directory, fresh plugin data (shipped base layers), removed after each start
+(lab harness `anvil-smoke.ps1 -RealGameFolder`; warm, one start each):
+
+| Start | Running application |
+| --- | ---: |
+| without Anvil (`sb-real-vanilla-1`) | 33.60 s |
+| Anvil + plugin, first start (`sb-real-1`) | 14.91 s |
+| Anvil + plugin, again (`sb-real-2`) | 11.91 s |
+
+In the first start `open_warmup` took 5.5 s (these paths had not been opened
+since the reboot); in the second 74 ms. All modules loaded, `ram_prefetch`
+served 1 478 MB with the 1 GB budget; `setup.log`, `error.log` and
+`system.log` are identical to the start without Anvil.
+
+Still open: a start through the Paradox launcher's Play button (needs UI
+control) and the cold start with the plugin.
 
 ## 7. Open questions (Q)
 
