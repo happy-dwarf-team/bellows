@@ -268,14 +268,32 @@ since the reboot); in the second 74 ms. All modules loaded, `ram_prefetch`
 served 1 478 MB with the 1 GB budget; `setup.log`, `error.log` and
 `system.log` are identical to the start without Anvil.
 
-Through the Paradox launcher (`sb-launcher-1`): Steam opened the launcher and
-Play was clicked through UI automation. `eu4.exe` was started by
-`Paradox Launcher` and the plugin loaded with all default modules. The start
-took 17.77 s, timed from the game process's creation. The game logs are
-identical to the start without Anvil, and the launcher left `dlc_load.json`
-unchanged. `open_warmup` (6.1 s) and the `ram_prefetch` workers (6.9 s) took
-longer than in the direct start (74 ms, 2.8 s); the cause is not known
-(one start).
+Through the Paradox launcher (`sb-launcher-1`, `-3`, `-4`, `-5`): Steam opened
+the launcher and Play was clicked through UI automation. `eu4.exe` was started
+by `Paradox Launcher` and the plugin loaded with all default modules each
+time, with fresh plugin data (shipped base layers). Starts are timed from the
+game process's creation:
+
+| Start | Running application | `open_warmup` | `ram_prefetch` workers |
+| --- | ---: | ---: | ---: |
+| `sb-launcher-1` | 17.77 s | 6 093 ms | 6 865 ms |
+| `sb-launcher-3` | 17.27 s | 5 556 ms | 6 709 ms |
+| `sb-launcher-4` | 13.81 s | 100 ms | 5 381 ms |
+| `sb-launcher-5` | 13.72 s | 89 ms | 5 449 ms |
+
+The game logs are identical to the start without Anvil, and the launcher left
+`dlc_load.json` unchanged.
+
+- **Slow warm-up:** the slow `open_warmup` runs were the first starts after a
+  break. A direct start shows the same (`sb-real-1`: 5.5 s), so it is not
+  launcher-specific.
+- **Launcher slower with warm files:** 13.7–13.8 s, against 11.91 s for one
+  direct start. The cause is not known; Steam's overlay injection and the
+  launcher working in the background are untested guesses.
+- **Plugin gain not measured here:** no start without Anvil was measured
+  through the launcher.
+- **Click timing:** a Play click while the launcher was still syncing at
+  start-up did not launch the game (`sb-launcher-2`).
 
 Still open: the cold start with the plugin.
 
