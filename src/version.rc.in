@@ -1,0 +1,32 @@
+// Version resource of eu4_startup_boost.dll; configured by CMake from version.txt.
+#include <winver.h>
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION @PROJECT_VERSION_MAJOR@,@PROJECT_VERSION_MINOR@,@PROJECT_VERSION_PATCH@,0
+PRODUCTVERSION @PROJECT_VERSION_MAJOR@,@PROJECT_VERSION_MINOR@,@PROJECT_VERSION_PATCH@,0
+FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+FILEFLAGS 0
+FILEOS VOS_NT_WINDOWS32
+FILETYPE VFT_DLL
+FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "CompanyName", "Happy Dwarf Team"
+            VALUE "FileDescription", "EU4 Startup Boost (Anvil plugin)"
+            VALUE "FileVersion", "@PROJECT_VERSION@"
+            VALUE "InternalName", "eu4-startup-boost"
+            VALUE "LegalCopyright", "Copyright (c) 2026 Happy Dwarf Team. MIT License."
+            VALUE "OriginalFilename", "eu4_startup_boost.dll"
+            VALUE "ProductName", "EU4 Startup Boost"
+            VALUE "ProductVersion", "@PROJECT_VERSION@"
+            VALUE "Comments", "Unofficial community project, not affiliated with Paradox Interactive. https://github.com/happy-dwarf-team/eu4-startup-boost"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 1200
+    END
+END
