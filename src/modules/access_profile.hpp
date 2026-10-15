@@ -35,6 +35,9 @@ bool AllListWanted(const std::wstring& relativeLower);
 std::vector<std::wstring> BuildAllList(const std::wstring& gameDir, const std::wstring& userDir,
                                        const std::vector<std::string>& enabledMods, bool skipGame);
 
+// Folders of the enabled mods (descriptor "path", or the folder holding "archive").
+std::vector<std::wstring> ModFolders(const std::wstring& userDir, const std::vector<std::string>& enabledMods);
+
 // Unique stored paths in first-use order, then previous entries not seen this time (max 60000).
 std::vector<std::wstring> UniqueStored(const std::vector<std::wstring>& paths, const std::wstring& gameDir,
                                        const std::vector<std::wstring>& previous = {});

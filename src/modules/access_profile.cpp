@@ -234,6 +234,25 @@ std::vector<std::wstring> BuildAllList(const std::wstring& gameDir, const std::w
     return stored;
 }
 
+std::vector<std::wstring> ModFolders(const std::wstring& userDir, const std::vector<std::string>& enabledMods) {
+    std::vector<std::wstring> folders;
+    for (const std::string& descriptor : enabledMods) {
+        std::string text;
+        if (!ReadWhole(userDir + L"\\" + Normalize(Widen(descriptor)), text, 1 << 20)) continue;
+        std::wstring path = Normalize(Widen(DescriptorValue(text, "path")));
+        if (path.empty()) {
+            path = Normalize(Widen(DescriptorValue(text, "archive")));
+            const std::size_t slash = path.find_last_of(L'\\');
+            path = slash == std::wstring::npos ? std::wstring() : path.substr(0, slash);
+        }
+        if (path.empty()) continue;
+        if (!IsAbsolute(path)) path = userDir + L"\\" + path;
+        while (!path.empty() && path.back() == L'\\') path.pop_back();
+        folders.push_back(std::move(path));
+    }
+    return folders;
+}
+
 std::vector<std::wstring> UniqueStored(const std::vector<std::wstring>& paths, const std::wstring& gameDir,
                                        const std::vector<std::wstring>& previous) {
     constexpr std::size_t kMaxEntries = 60000;

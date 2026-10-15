@@ -171,7 +171,30 @@ learned profile — 11 503 entries in 76 ms; start ~15.1 s in each case. The
 cold-start effect (lab: 61 → 15 s) still has to be measured with the plugin
 after a reboot.
 
-Next: cold-start check, `attr_cache`, `ram_prefetch`.
+### attr_cache
+
+Ported in the lab's "negative" policy only: `GetFileAttributesExW` and
+`GetFileAttributesA` (the game's only attribute imports) through Anvil
+`replace_import`; "not found" answers remembered for paths inside the game
+folder and the enabled mods' folders (11 roots), never for the user folder.
+Verify start `sb-attr-verify-4` (other modules at defaults): 75 389 queries
+before the ready marker (the lab counted ~1.05 M before `verifypath_listing`
+and `exists_index` existed), 12 491 real misses, 7 682 would-be hits —
+0 mismatches — whose real API calls took **114 ms** in total across threads;
+55 216 queries were outside the roots. The hook itself costs a full-path
+conversion and a lookup on every query, so the net effect is about zero:
+**off by default**, kept for verification.
+
+The skipped queries are almost all PhysFS `verifyPath` component checks in the
+write directory (`Documents\…\Europa Universalis IV\gfx`, `\common`,
+`\history`, …), which `verifypath_listing` deliberately does not answer. The
+write directory is not static: the game regenerates `gfx\flags\flagfiles_*.tga`
+there and writes `shadercache`, so a "not found" cache for it would need
+invalidation on the game's own directory/file creation. Not implemented;
+estimated at most ~1 s summed over threads (hook time / query count), not
+measured on the critical path.
+
+Next: cold-start check, `ram_prefetch`.
 
 ## 7. Open questions (Q)
 

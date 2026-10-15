@@ -31,6 +31,7 @@ answers with the game's own code: 0 differences over 3.6 million calls.
 | `trigger_intern` | Alternative trigger interning (off by default: slower than the game's own code with the shipped trigger profile) |
 | `metascript_subst` | Single-pass `$parameter$` substitution in scripted effects |
 | `open_warmup` | Opens the files the game will need ahead of it on parallel threads, from a profile learned per mod set (big gain on the first start after a reboot) |
+| `attr_cache` | Remembers "file not found" answers for game and mod files during start-up (off by default: ~0.1 s left next to the other modules) |
 
 Settings: `anvil/data/eu4-startup-boost/config.toml` (created on first start;
 each module `on`, `off` or `verify`). The plugin writes its counters to

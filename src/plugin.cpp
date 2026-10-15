@@ -17,6 +17,7 @@ void OnGameReady(const char*, const void*, void*) {
     sb::ReportTriggerIntern();
     sb::ReportMetascriptSubst();
     sb::ReportOpenWarmup();
+    sb::ReportAttrCache();
 }
 
 }  // namespace
@@ -51,6 +52,7 @@ extern "C" ANVIL_PLUGIN_EXPORT AnvilResult anvil_plugin_load(const AnvilHost* ho
         {"exists_index", sb::InstallExistsIndex},
         {"trigger_intern", sb::InstallTriggerIntern},
         {"metascript_subst", sb::InstallMetascriptSubst},
+        {"attr_cache", sb::InstallAttrCache},
     };
     std::string summary;
     for (const auto& m : modules) {

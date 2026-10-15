@@ -15,6 +15,7 @@ bool InstallExistsIndex(const Build& build, Mode mode);
 bool InstallTriggerIntern(const Build& build, Mode mode);
 bool InstallMetascriptSubst(const Build& build, Mode mode);
 bool InstallOpenWarmup(const Build& build, Mode mode);
+bool InstallAttrCache(const Build& build, Mode mode);
 
 // Stops learning and saves the access profile (call on the game-ready event).
 void FinishOpenWarmup();
@@ -26,5 +27,6 @@ void ReportExistsIndex();
 void ReportTriggerIntern();
 void ReportMetascriptSubst();
 void ReportOpenWarmup();
+void ReportAttrCache();
 
 }  // namespace sb
