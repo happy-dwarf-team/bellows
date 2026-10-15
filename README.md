@@ -4,7 +4,9 @@ An [Anvil](https://github.com/happy-dwarf-team/anvil) plugin that makes
 **Europa Universalis IV** start faster, without changing game files or game
 behaviour.
 
-> Status: 0.2.0 in progress (stage 2) — not released to players yet.
+> Status: stage 2, early public releases — see
+> [Releases](https://github.com/happy-dwarf-team/eu4-startup-boost/releases) and
+> [CHANGELOG.md](CHANGELOG.md). Requires Anvil 0.2.0 or newer.
 > Design: [docs/design.md](docs/design.md).
 
 ## Measured
@@ -45,10 +47,14 @@ each module `on`, `off` or `verify`). The plugin writes its counters to
 Supported game build: EU4 1.37.5 (Steam, Windows 64-bit). Other builds are
 skipped automatically by Anvil and the game starts normally.
 
-## Install (planned release layout)
+## Install / uninstall
 
-Install Anvil, then copy the `eu4-startup-boost` folder into
-`<EU4>/anvil/plugins/`. Remove the folder to uninstall.
+Install [Anvil](https://github.com/happy-dwarf-team/anvil#install--uninstall)
+0.2.0 or newer first. Then download `eu4-startup-boost-windows-x64.zip` from the
+[latest release](https://github.com/happy-dwarf-team/eu4-startup-boost/releases/latest)
+and extract it into `<EU4>/anvil/plugins/`; it contains the `eu4-startup-boost`
+folder (`SHA256SUMS.txt` next to the archive holds its checksum). Delete that
+folder to uninstall.
 
 ## Building
 
