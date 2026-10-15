@@ -106,6 +106,43 @@ format change.
    `attr_cache`, `ram_prefetch` (largest; depends on miniz call-site patches).
 3. Measure against the lab build; release candidate.
 
+## 6a. Results of stage 2, first slice (0.1.0)
+
+Modules ported: `mimalloc`, `verifypath_listing`, `exists_index`,
+`trigger_intern`, `metascript_subst` (`src/modules/`, addresses only in
+`src/build.hpp`). Patches go through Anvil: IAT slots and the vtable slot via
+`patch_bytes` (expected pointer values), the verifyPath site via
+`patch_bytes` + a stub in `alloc_near_image`, the trigger and metascript
+sites via `redirect_call`. Plugin: 10 patches, loaded in ~42 ms at the entry
+point.
+
+Findings while porting (both also apply to the lab build):
+
+- **`trigger_profile.txt`**: the game ships it in its root folder (332 KB);
+  at start-up `0xB9B5A0` reads it and fills the trigger-interning map (6870
+  entries). The lab's junction copies listed root files explicitly and missed
+  it, so every lab measurement ran with an empty map. With the real file the
+  module takes its hash-consing path for all 2.35 M calls; verify run: 0
+  differences.
+- **Write directory**: `verifypath_listing` in verify mode found 2 differences
+  per start, both `logs/error.log` / `logs/error_old.log` in the PhysFS write
+  directory (Documents\…\Europa Universalis IV), which the game renames during
+  start-up after the listing was read. Both listing-based modules now never
+  answer for the write directory or anything inside it (`PHYSFS_getWriteDir`);
+  after the change: 0 differences.
+
+Verify start (`verify` for all four modules that have it): verifypath
+932,405, exists_index 16,074, trigger_intern 2,347,067, metascript_subst
+320,905 comparisons, 0 mismatches.
+
+Timing (lab smoke harness `scripts/anvil-smoke.ps1`, junction copy with the
+original `eu4.exe`, loading screens pre-opened, 3 interleaved starts):
+Anvil without plugins 34.96 / 35.50 / 34.70 s (median 34.96 s); with the
+plugin 15.65 / 15.38 / 15.40 s (median 15.40 s). `setup.log`, `error.log`,
+`system.log` identical between the two.
+
+Next: `open_warmup` (+ access profiles), `attr_cache`, `ram_prefetch`.
+
 ## 7. Open questions (Q)
 
 - Whether `mimalloc` should be its own plugin (it stays active during play,

@@ -1,0 +1,100 @@
+#include "config.hpp"
+
+#include <toml++/toml.hpp>
+
+#include <fstream>
+#include <optional>
+
+namespace sb {
+namespace {
+
+constexpr const char* kDefaultConfig = R"(# EU4 Startup Boost settings.
+# Each module: "on" (default), "off", or "verify" (also run the game's own code
+# and keep its result; slower, for checking correctness — not every module).
+
+[modules]
+mimalloc = "on"            # faster memory allocator for the whole game session
+verifypath_listing = "on"  # answers PhysFS path checks from directory listings
+exists_index = "on"        # answers "does this file exist" for icon checks
+trigger_intern = "on"      # skips redundant work at the end of loading
+metascript_subst = "on"    # faster $parameter$ substitution in scripted effects
+)";
+
+std::optional<Mode> ParseMode(std::string text) {
+    for (auto& c : text) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    if (text == "on" || text == "1" || text == "true") return Mode::On;
+    if (text == "off" || text == "0" || text == "false") return Mode::Off;
+    if (text == "verify") return Mode::Verify;
+    return std::nullopt;
+}
+
+}  // namespace
+
+std::string ModeName(Mode mode) {
+    switch (mode) {
+    case Mode::Off: return "off";
+    case Mode::On: return "on";
+    case Mode::Verify: return "verify";
+    }
+    return "?";
+}
+
+Mode Config::mode(const char* name) const {
+    for (const auto& m : modules) {
+        if (std::strcmp(m.name, name) == 0) return m.mode;
+    }
+    return Mode::Off;
+}
+
+Config LoadConfig(const std::filesystem::path& data_dir) {
+    Config config;
+    config.modules = {
+        {"mimalloc", Mode::On, false},
+        {"verifypath_listing", Mode::On, true},
+        {"exists_index", Mode::On, true},
+        {"trigger_intern", Mode::On, true},
+        {"metascript_subst", Mode::On, true},
+    };
+    const auto file = data_dir / "config.toml";
+    std::error_code ec;
+    if (!std::filesystem::exists(file, ec)) {
+        std::ofstream out(file, std::ios::binary);
+        out << kDefaultConfig;
+    } else {
+        try {
+            const toml::table table = toml::parse_file(file.wstring());
+            if (const auto* modules = table.get_as<toml::table>("modules")) {
+                for (auto& m : config.modules) {
+                    if (const auto value = (*modules)[m.name].value<std::string>()) {
+                        if (const auto parsed = ParseMode(*value)) {
+                            m.mode = *parsed;
+                        } else {
+                            config.notes.push_back(std::string("config.toml: invalid value for ") + m.name);
+                        }
+                    }
+                }
+            }
+        } catch (const toml::parse_error& e) {
+            config.notes.push_back(std::string("config.toml ignored: ") + std::string(e.description()));
+        }
+    }
+    for (auto& m : config.modules) {
+        std::string variable = "EU4SB_";
+        for (const char* p = m.name; *p; ++p) variable += static_cast<char>(std::toupper(static_cast<unsigned char>(*p)));
+        char value[16] = {};
+        const DWORD length = GetEnvironmentVariableA(variable.c_str(), value, sizeof(value));
+        if (length > 0 && length < sizeof(value)) {
+            if (const auto parsed = ParseMode(value)) {
+                m.mode = *parsed;
+                config.notes.push_back(variable + "=" + value + " overrides config.toml");
+            }
+        }
+        if (m.mode == Mode::Verify && !m.supports_verify) {
+            m.mode = Mode::On;
+            config.notes.push_back(std::string(m.name) + " has no verify mode; using on");
+        }
+    }
+    return config;
+}
+
+}  // namespace sb
