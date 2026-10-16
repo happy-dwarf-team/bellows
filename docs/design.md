@@ -194,6 +194,24 @@ learned profile — 11 503 entries in 76 ms; start ~15.1 s in each case. The
 cold-start effect (lab: 61 → 15 s) still has to be measured with the plugin
 after a reboot.
 
+### token_dict_cache
+
+The script tokenizer (`0x170E700`) looks every word token up in a global
+case-insensitive ternary search tree (`0x2326720`, `0x6E4880`): one CRT
+`tolower` and one node per character. `token_dict_profile` (diagnostic)
+measured ~8.7 M lookups per start, 16.7 nodes per successful lookup and a
+215 k-node tree that grows during loading (get-or-add appends to the run-time
+token vector `0x242B8A0`). The tokenizer's call site is redirected to a
+per-thread open-addressing cache keyed by the token with ASCII letters
+lowercased; hits stay valid until the tree is rebuilt, misses only for the
+run-time token count read before the lookup. On by default and kept out of the
+written `config.toml`, so existing files get it too.
+
+Lab: verify start 0 mismatches over 8,447,519 cache answers; offline on the
+real keys 261–304 vs 704–723 ms (shuffled) and 137–142 vs 233–246 ms (runs);
+two interleaved start-up series −0.43 s (8/8 pairs) and −0.32 s (5/8), −0.38 s
+over 16 pairs (Anvil ready time); game logs identical in all starts.
+
 ### attr_cache
 
 Ported in the lab's "negative" policy only: `GetFileAttributesExW` and

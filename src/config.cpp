@@ -69,6 +69,7 @@ Config LoadConfig(const std::filesystem::path& data_dir) {
         {"attr_cache", Mode::Off, true},  // at most ~0.1 s left once verifypath_listing and exists_index are on
         {"zip_profile", Mode::Off, false},  // diagnostic; not in the default config.toml
         {"token_dict_profile", Mode::Off, false},  // diagnostic; not in the default config.toml
+        {"token_dict_cache", Mode::On, true},  // not in the default config.toml: on for existing files too; set "off" there to disable
     };
     const auto file = data_dir / "config.toml";
     std::error_code ec;

@@ -39,6 +39,7 @@ answers with the game's own code: 0 differences over 3.6 million calls.
 | `open_warmup` | Opens the files the game will need ahead of it on parallel threads, from a profile learned per mod set (big gain on the first start after a reboot) |
 | `ram_prefetch` | Reads and unpacks the DLC archive members the game will need into RAM on worker threads (learned per mod set; uses up to 1 GB of extra RAM during start-up, `[ram_prefetch] budget_mb`) |
 | `attr_cache` | Remembers "file not found" answers for game and mod files during start-up (off by default: ~0.1 s left next to the other modules) |
+| `token_dict_cache` | Caches the script tokenizer's keyword lookups (~0.4 s; on by default, also with an existing `config.toml`; add `token_dict_cache = "off"` under `[modules]` to disable) |
 
 Settings: `anvil/data/eu4-startup-boost/config.toml` (created on first start;
 each module `on`, `off` or `verify`). The plugin writes its counters to
