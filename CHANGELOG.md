@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.6.0](https://github.com/happy-dwarf-team/bellows/compare/v0.5.0...v0.6.0) (2026-10-16)
+
+
+### ⚠ BREAKING CHANGES
+
+* the plugin id, folder and DLL are now bellows; delete anvil/plugins/eu4-startup-boost/ when updating.
+
+### Features
+
+* rename EU4 Startup Boost to Bellows ([#20](https://github.com/happy-dwarf-team/bellows/issues/20)) ([e505902](https://github.com/happy-dwarf-team/bellows/commit/e50590242b03874a41d9745dd9395a0eff37ba8e))
+
 ## [0.5.0](https://github.com/happy-dwarf-team/eu4-startup-boost/compare/v0.4.0...v0.5.0) (2026-10-16)
 
 
