@@ -49,6 +49,7 @@ add_library(sb_core STATIC
     src/modules/metascript_subst.cpp
     src/modules/mimalloc_heap.cpp
     src/modules/open_warmup.cpp
+    src/modules/token_dict_profile.cpp
     src/modules/trigger_intern.cpp
     src/modules/verifypath_listing.cpp)
 target_include_directories(sb_core PUBLIC third_party src)

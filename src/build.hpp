@@ -50,6 +50,10 @@ struct Build {
     uint32_t zip_close_archive_slot, zip_close_archive_fn;
     uint32_t tinfl_decompress_fn;
     uint32_t zip_entry_method, zip_entry_crc, zip_entry_compressed, zip_entry_uncompressed;
+
+    // token_dict_profile (diagnostic): keyword dictionary, its lookup and the two lookup call sites,
+    // vector of tokens added at run time (begin, end at +8)
+    uint32_t token_dict, token_lookup_fn, token_lookup_tokenizer_site, token_lookup_get_or_add_site, token_dynamic_vector;
 };
 
 inline constexpr Build kBuilds[] = {
@@ -65,6 +69,7 @@ inline constexpr Build kBuilds[] = {
         0x1C1D890 + 0x30, 0x1A073F0, 0x1C1D890 + 0x40, 0x1A07580, 0x1C1D890 + 0x70, 0x1A073B0,
         0x1A08470,
         0x46, 0x48, 0x50, 0x58,
+        0x2326720, 0x6E4880, 0x170EA12, 0x170D47E, 0x242B8A0,
     },
 };
 

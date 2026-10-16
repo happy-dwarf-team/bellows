@@ -19,6 +19,7 @@ bool InstallAttrCache(const Build& build, Mode mode);
 bool InstallRamPrefetch(const Build& build, Mode mode);
 void SetRamPrefetchBudget(std::uint64_t megabytes);  // before InstallRamPrefetch
 bool InstallZipProfile(const Build& build, Mode mode);  // diagnostic
+bool InstallTokenDictProfile(const Build& build, Mode mode);  // diagnostic
 
 // Stops learning and saves the access profile (call on the game-ready event).
 void FinishOpenWarmup();
@@ -36,5 +37,6 @@ void ReportOpenWarmup();
 void ReportAttrCache();
 void ReportRamPrefetch();
 void ReportZipProfile();
+void ReportTokenDictProfile();
 
 }  // namespace sb
