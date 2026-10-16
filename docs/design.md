@@ -287,13 +287,26 @@ The game logs are identical to the start without Anvil, and the launcher left
 - **Slow warm-up:** the slow `open_warmup` runs were the first starts after a
   break. A direct start shows the same (`sb-real-1`: 5.5 s), so it is not
   launcher-specific.
-- **Launcher slower with warm files:** 13.7–13.8 s, against 11.91 s for one
-  direct start. The cause is not known; Steam's overlay injection and the
-  launcher working in the background are untested guesses.
-- **Plugin gain not measured here:** no start without Anvil was measured
-  through the launcher.
+- **Launcher slower with warm files:** 13.7–14.8 s, against ~11.9 s for direct
+  starts. Launcher starts load the Steam overlay (`gameoverlayrenderer64.dll`,
+  `steamclient64.dll`, checked 8 s after the process appears); a direct start
+  (`sb-real-3`, 11.97 s) loads neither. That the overlay causes the difference
+  is a hypothesis.
+- **Plugin gain through the launcher:** without Anvil 30.87 s and 30.08 s
+  (`sb-launcher-van-1`, `-van-2`), interleaved with `sb-launcher-6` at
+  14.79 s; the game logs are identical.
 - **Click timing:** a Play click while the launcher was still syncing at
   start-up did not launch the game (`sb-launcher-2`).
+
+### Gameplay
+
+`sb-play-2`: Anvil and the plugin in the game folder, the 1719 Russia save,
+five in-game years at speed 5 played through UI automation (37 popups
+answered), then exit through the game menu. The game wrote 5 yearly autosaves
+and showed no crash, error dialog or broken graphics. `error.log` holds only
+the mod-script errors already seen without the plugin. `sb-load-1`: the
+1724.1.1 autosave written in that session loads correctly. The starting save
+was unchanged after both sessions, and the game folder was clean.
 
 Still open: the cold start with the plugin.
 
