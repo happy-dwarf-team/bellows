@@ -8,7 +8,7 @@
 namespace sb {
 namespace {
 
-constexpr const char* kDefaultConfig = R"(# EU4 Startup Boost settings.
+constexpr const char* kDefaultConfig = R"(# Bellows settings.
 # Each module: "on" (default), "off", or "verify" (also run the game's own code
 # and keep its result; slower, for checking correctness — not every module).
 

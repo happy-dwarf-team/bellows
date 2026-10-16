@@ -1,11 +1,11 @@
 blank_issues_enabled: false
 contact_links:
   - name: Report a security vulnerability
-    url: https://github.com/happy-dwarf-team/eu4-startup-boost/security/advisories/new
+    url: https://github.com/happy-dwarf-team/bellows/security/advisories/new
     about: Report privately; see SECURITY.md.
   - name: Anvil (loader) issues
     url: https://github.com/happy-dwarf-team/anvil/issues/new/choose
     about: Problems that also happen without this plugin belong to Anvil.
   - name: Install guide
-    url: https://anvil.happydwarf.dev/plugins/eu4-startup-boost/
+    url: https://anvil.happydwarf.dev/plugins/bellows/
     about: How to install the plugin.

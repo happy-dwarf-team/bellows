@@ -1,13 +1,13 @@
 # Security policy
 
-EU4 Startup Boost is an Anvil plugin: native code that runs inside the game
+Bellows is an Anvil plugin: native code that runs inside the game
 process and patches it in memory. Please report security problems privately,
 not in public issues.
 
 ## Reporting a vulnerability
 
 Use GitHub's private vulnerability reporting:
-[Report a vulnerability](https://github.com/happy-dwarf-team/eu4-startup-boost/security/advisories/new).
+[Report a vulnerability](https://github.com/happy-dwarf-team/bellows/security/advisories/new).
 Include the plugin and Anvil versions (from `anvil/anvil.log`), how to
 reproduce the problem, and what an attacker gains.
 
@@ -25,7 +25,7 @@ Only the latest release receives security fixes.
   (archive reading in `zip_reader` / `ram_prefetch`, profile and
   `config.toml` parsing).
 - Files read or written outside the game, mod and
-  `anvil/data/eu4-startup-boost/` folders.
+  `anvil/data/bellows/` folders.
 - Release integrity: release assets that do not match `SHA256SUMS.txt` or
   their build provenance attestation.
 

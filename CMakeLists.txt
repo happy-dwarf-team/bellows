@@ -9,7 +9,7 @@ if(NOT SB_MANIFEST_VERSION STREQUAL "version = \"${SB_VERSION_TEXT}\"")
     message(FATAL_ERROR "plugin/plugin.toml (${SB_MANIFEST_VERSION}) does not match version.txt (${SB_VERSION_TEXT})")
 endif()
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS version.txt plugin/plugin.toml)
-project(eu4_startup_boost VERSION ${SB_VERSION_TEXT} LANGUAGES C CXX)
+project(bellows VERSION ${SB_VERSION_TEXT} LANGUAGES C CXX)
 
 if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
     message(FATAL_ERROR "64-bit Windows only")
@@ -39,6 +39,7 @@ FetchContent_MakeAvailable(tomlplusplus mimalloc)
 
 add_library(sb_core STATIC
     src/common.cpp
+    src/rename.cpp
     src/config.cpp
     src/modules/access_profile.cpp
     src/modules/attr_cache.cpp
@@ -62,17 +63,17 @@ endif()
 
 # File version shown in the DLL's Properties, from the same version.txt.
 configure_file(src/version.rc.in ${CMAKE_CURRENT_BINARY_DIR}/sb_version.rc @ONLY)
-add_library(eu4_startup_boost SHARED src/plugin.cpp ${CMAKE_CURRENT_BINARY_DIR}/sb_version.rc)
-target_link_libraries(eu4_startup_boost PRIVATE sb_core)
+add_library(bellows SHARED src/plugin.cpp ${CMAKE_CURRENT_BINARY_DIR}/sb_version.rc)
+target_link_libraries(bellows PRIVATE sb_core)
 # Keep every module's exported counters even though nothing in the DLL references them.
 if(MSVC)
-    target_link_options(eu4_startup_boost PRIVATE /OPT:NOREF)
+    target_link_options(bellows PRIVATE /OPT:NOREF)
 endif()
 
 if(SB_BUILD_TESTS)
     enable_testing()
-    foreach(test trigger_intern token_dict_cache metascript_subst config access_profile path_rules zip_reader)
-        add_executable(test_${test} tests/test_${test}.cpp src/common.cpp src/config.cpp src/modules/access_profile.cpp src/modules/zip_reader.cpp)
+    foreach(test rename trigger_intern token_dict_cache metascript_subst config access_profile path_rules zip_reader)
+        add_executable(test_${test} tests/test_${test}.cpp src/common.cpp src/config.cpp src/rename.cpp src/modules/access_profile.cpp src/modules/zip_reader.cpp)
         target_include_directories(test_${test} PRIVATE third_party src)
         target_link_libraries(test_${test} PRIVATE tomlplusplus::tomlplusplus shell32 ole32 uuid)
         target_compile_definitions(test_${test} PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
@@ -84,10 +85,10 @@ if(SB_BUILD_TESTS)
     endforeach()
 endif()
 
-# Plugin folder layout: <prefix>/eu4-startup-boost/{plugin.toml, eu4_startup_boost.dll, LICENSE}
-install(TARGETS eu4_startup_boost RUNTIME DESTINATION eu4-startup-boost COMPONENT plugin)
-install(FILES plugin/plugin.toml LICENSE DESTINATION eu4-startup-boost COMPONENT plugin)
-install(DIRECTORY plugin/profiles DESTINATION eu4-startup-boost COMPONENT plugin)
+# Plugin folder layout: <prefix>/bellows/{plugin.toml, bellows.dll, LICENSE}
+install(TARGETS bellows RUNTIME DESTINATION bellows COMPONENT plugin)
+install(FILES plugin/plugin.toml LICENSE DESTINATION bellows COMPONENT plugin)
+install(DIRECTORY plugin/profiles DESTINATION bellows COMPONENT plugin)
 # Third-party code compiled into the DLL (MIT): ship its license texts.
-install(FILES ${mimalloc_SOURCE_DIR}/LICENSE DESTINATION eu4-startup-boost/third-party RENAME mimalloc-LICENSE.txt COMPONENT plugin)
-install(FILES ${tomlplusplus_SOURCE_DIR}/LICENSE DESTINATION eu4-startup-boost/third-party RENAME tomlplusplus-LICENSE.txt COMPONENT plugin)
+install(FILES ${mimalloc_SOURCE_DIR}/LICENSE DESTINATION bellows/third-party RENAME mimalloc-LICENSE.txt COMPONENT plugin)
+install(FILES ${tomlplusplus_SOURCE_DIR}/LICENSE DESTINATION bellows/third-party RENAME tomlplusplus-LICENSE.txt COMPONENT plugin)

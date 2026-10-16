@@ -1,4 +1,4 @@
-# EU4 Startup Boost — design
+# Bellows — design
 
 Status: draft 2 (2026-10-15). Decisions marked **D** are agreed; **Q** are open.
 Background, measurements and reverse-engineering notes come from the private
@@ -40,9 +40,9 @@ not shipped in release builds; they may exist behind a build flag.
   `redirect_call`, `replace_import`, `hook_function`); stubs come from the
   host's trampoline allocator instead of `int3` padding inside `eu4.exe`.
 - Configuration moves from environment variables to
-  `anvil/data/eu4-startup-boost/config.toml` (module switches, worker counts,
+  `anvil/data/bellows/config.toml` (module switches, worker counts,
   verify modes). Environment variables stay as overrides for the lab harness.
-- Writable data lives in `anvil/data/eu4-startup-boost/`. The prefetch
+- Writable data lives in `anvil/data/bellows/`. The prefetch
   manifest and the warm-up list become one **access profile** (see §3a)
   instead of a lab-generated manifest.
 - The ready marker comes from `AnvilHost.game` / `on_game_ready`; modules stop
@@ -182,7 +182,7 @@ is released at the ready report.
 ### open_warmup and access profiles
 
 Ported with the learned profile per mod set
-(`anvil/data/eu4-startup-boost/profiles/<build>-<dlc_load hash>.txt`), the
+(`anvil/data/bellows/profiles/<build>-<dlc_load hash>.txt`), the
 shipped base layer `plugin/profiles/eu4-1.37.5-steam-win64.txt` (10 695 game
 files, generated from a learned profile by keeping only `@\` game-folder
 entries — an approximation of a start without mods, because the lab's mod set

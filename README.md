@@ -1,11 +1,15 @@
-# EU4 Startup Boost
+# Bellows
 
-An [Anvil](https://github.com/happy-dwarf-team/anvil) plugin that makes
-**Europa Universalis IV** start faster, without changing game files or game
-behaviour.
+**Faster Europa Universalis IV start-up.** An
+[Anvil](https://github.com/happy-dwarf-team/anvil) plugin that makes the game
+start faster, without changing game files or game behaviour. Like a smith's
+bellows, it gets the forge hot sooner.
+
+Formerly **EU4 Startup Boost** (plugin id `eu4-startup-boost`, up to 0.5.0);
+see [Updating from EU4 Startup Boost](#updating-from-eu4-startup-boost).
 
 > Status: stage 2, early public releases — see
-> [Releases](https://github.com/happy-dwarf-team/eu4-startup-boost/releases) and
+> [Releases](https://github.com/happy-dwarf-team/bellows/releases) and
 > [CHANGELOG.md](CHANGELOG.md). Requires Anvil 0.2.0 or newer.
 > Design: [docs/design.md](docs/design.md).
 
@@ -41,7 +45,7 @@ answers with the game's own code: 0 differences over 3.6 million calls.
 | `attr_cache` | Remembers "file not found" answers for game and mod files during start-up (off by default: ~0.1 s left next to the other modules) |
 | `token_dict_cache` | Caches the script tokenizer's keyword lookups (~0.4 s; on by default, also with an existing `config.toml`; add `token_dict_cache = "off"` under `[modules]` to disable) |
 
-Settings: `anvil/data/eu4-startup-boost/config.toml` (created on first start;
+Settings: `anvil/data/bellows/config.toml` (created on first start;
 each module `on`, `off` or `verify`). The plugin writes its counters to
 `anvil/anvil.log` when the game is ready.
 
@@ -51,11 +55,21 @@ skipped automatically by Anvil and the game starts normally.
 ## Install / uninstall
 
 Install [Anvil](https://github.com/happy-dwarf-team/anvil#install--uninstall)
-0.2.0 or newer first. Then download `eu4-startup-boost-windows-x64.zip` from the
-[latest release](https://github.com/happy-dwarf-team/eu4-startup-boost/releases/latest)
-and extract it into `<EU4>/anvil/plugins/`; it contains the `eu4-startup-boost`
+0.2.0 or newer first. Then download `bellows-windows-x64.zip` from the
+[latest release](https://github.com/happy-dwarf-team/bellows/releases/latest)
+and extract it into `<EU4>/anvil/plugins/`; it contains the `bellows`
 folder (`SHA256SUMS.txt` next to the archive holds its checksum). Delete that
 folder to uninstall.
+
+### Updating from EU4 Startup Boost
+
+Delete `<EU4>/anvil/plugins/eu4-startup-boost/` and extract Bellows as above.
+On its first start Bellows moves your settings and learned profiles from
+`anvil/data/eu4-startup-boost/` to `anvil/data/bellows/`. While the old folder
+is still in `anvil/plugins/`, Bellows changes nothing and says so in
+`anvil/anvil.log`, so the two never patch the game at the same time. The
+`EU4SB_<MODULE>` environment overrides and the exported `EU4SB_*` counters
+keep their names.
 
 ## Building
 
