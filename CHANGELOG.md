@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.0](https://github.com/happy-dwarf-team/eu4-startup-boost/compare/v0.4.0...v0.5.0) (2026-10-16)
+
+
+### Features
+
+* **token_dict_cache:** cache the tokenizer's keyword lookups, on by default ([#18](https://github.com/happy-dwarf-team/eu4-startup-boost/issues/18)) ([b505985](https://github.com/happy-dwarf-team/eu4-startup-boost/commit/b5059854e6e171db18d1346c28bdc105829e380c))
+* **token_dict_profile:** diagnostic counters for the tokenizer's keyword dictionary ([#17](https://github.com/happy-dwarf-team/eu4-startup-boost/issues/17)) ([6c8bc1c](https://github.com/happy-dwarf-team/eu4-startup-boost/commit/6c8bc1ccdb4900aeae2eadbf8e5d31bab332be66))
+
 ## [0.4.0](https://github.com/happy-dwarf-team/eu4-startup-boost/compare/v0.3.0...v0.4.0) (2026-10-16)
 
 
