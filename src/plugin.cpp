@@ -21,6 +21,7 @@ void OnGameReady(const char*, const void*, void*) {
     sb::ReportAttrCache();
     sb::ReportRamPrefetch();
     sb::ReportZipProfile();
+    sb::ReportTokenDictProfile();
 }
 
 }  // namespace
@@ -59,6 +60,7 @@ extern "C" ANVIL_PLUGIN_EXPORT AnvilResult anvil_plugin_load(const AnvilHost* ho
         {"metascript_subst", sb::InstallMetascriptSubst},
         {"attr_cache", sb::InstallAttrCache},
         {"zip_profile", sb::InstallZipProfile},  // diagnostic, off unless EU4SB_ZIP_PROFILE=on
+        {"token_dict_profile", sb::InstallTokenDictProfile},  // diagnostic, off unless EU4SB_TOKEN_DICT_PROFILE=on
     };
     std::string summary;
     for (const auto& m : modules) {
