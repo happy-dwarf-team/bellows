@@ -34,7 +34,7 @@ answers with the game's own code: 0 differences over 3.6 million calls.
 | `mimalloc` | Faster memory allocator for the game's C runtime (whole session) |
 | `verifypath_listing` | Answers PhysFS path checks from directory listings |
 | `exists_index` | Answers "does this file exist" for the modifier icon check |
-| `trigger_intern` | Alternative trigger interning (off by default: slower than the game's own code with the shipped trigger profile) |
+| `trigger_intern` | Faster trigger interning at the end of loading (~0.4 s instead of ~0.6 s for the game's own code with the shipped trigger profile; a `config.toml` written by 0.3.0 or earlier keeps `trigger_intern = "off"`, set it to `"on"` or delete the file) |
 | `metascript_subst` | Single-pass `$parameter$` substitution in scripted effects |
 | `open_warmup` | Opens the files the game will need ahead of it on parallel threads, from a profile learned per mod set (big gain on the first start after a reboot) |
 | `ram_prefetch` | Reads and unpacks the DLC archive members the game will need into RAM on worker threads (learned per mod set; uses up to 1 GB of extra RAM during start-up, `[ram_prefetch] budget_mb`) |

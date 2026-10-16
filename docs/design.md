@@ -152,11 +152,12 @@ starts each; ±1–2 s run-to-run noise): all 16.69 s; without
 Direct cost measurement in one start (verify mode times our code and the
 game's original separately): `trigger_intern` — original 682 ms for 2.35 M
 calls, ours ~1263 ms, i.e. **slower** with the real (non-empty) map;
-`metascript_subst` — original 860 ms, ours ~64 ms. `trigger_intern` is
+`metascript_subst` — original 860 ms, ours ~64 ms. `trigger_intern` was
 therefore **off by default** (kept with its verify mode; a cheaper
 canonicalization could revisit it, but at most ~0.7 s is available).
 
-Cheaper index (module still off by default): the structure table holds only
+Cheaper index (on by default since this change; a `config.toml` written by
+an earlier version keeps its `"off"`): the structure table holds only
 the map keys and their substructures (arena + open addressing, built with the
 index); a node's shape is only looked up, and a miss marks it "foreign"
 (answer 0, and its parents are foreign too), since a key consists solely of
