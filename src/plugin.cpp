@@ -1,8 +1,9 @@
-// EU4 Startup Boost — Anvil plugin entry point.
+// Bellows — Anvil plugin entry point.
 #include "build.hpp"
 #include "common.hpp"
 #include "config.hpp"
 #include "modules/modules.hpp"
+#include "rename.hpp"
 
 #include <filesystem>
 #include <string>
@@ -44,7 +45,18 @@ extern "C" ANVIL_PLUGIN_EXPORT AnvilResult anvil_plugin_load(const AnvilHost* ho
     c.image_size = host->game->image_size;
     c.ready_marker = sb::AtRva<const uint8_t>(build->ready_marker);
 
-    const sb::Config config = sb::LoadConfig(std::filesystem::path(host->data_dir(self)));
+    if (sb::FormerPluginInstalled(std::filesystem::path(host->plugin_dir(self)))) {
+        sb::Log(ANVIL_LOG_ERROR,
+                "EU4 Startup Boost (the former name of Bellows) is still installed; nothing changed. "
+                "Delete the anvil/plugins/eu4-startup-boost folder to use Bellows.");
+        return ANVIL_ERROR_UNSUPPORTED;
+    }
+    const std::filesystem::path data_dir(host->data_dir(self));
+    if (const std::string note = sb::MigrateFormerData(data_dir); !note.empty()) {
+        sb::Log(ANVIL_LOG_INFO, "%s", note.c_str());
+    }
+
+    const sb::Config config = sb::LoadConfig(data_dir);
     sb::SetRamPrefetchBudget(config.ram_prefetch_budget_mb);
     for (const auto& note : config.notes) sb::Log(ANVIL_LOG_WARNING, "%s", note.c_str());
 

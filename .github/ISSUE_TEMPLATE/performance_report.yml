@@ -1,5 +1,5 @@
 name: Performance report
-description: The start is not faster, or slower, with EU4 Startup Boost; or measurements from your setup.
+description: The start is not faster, or slower, with Bellows; or measurements from your setup.
 labels: [performance]
 body:
   - type: markdown

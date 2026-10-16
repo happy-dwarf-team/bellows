@@ -1,4 +1,4 @@
-# Contributing to EU4 Startup Boost
+# Contributing to Bellows
 
 The conventions are the same as in
 [Anvil](https://github.com/happy-dwarf-team/anvil/blob/main/CONTRIBUTING.md);
@@ -40,7 +40,7 @@ measured.
 `chore(main): release x.y.z` pull request that bumps `version.txt`, the
 `version` in `plugin/plugin.toml` and `CHANGELOG.md`. Merging it tags `vX.Y.Z`
 and creates the GitHub release; the release workflow then builds the tag and
-attaches `eu4-startup-boost-windows-x64.zip` (the `eu4-startup-boost/` plugin
+attaches `bellows-windows-x64.zip` (the `bellows/` plugin
 folder) and `SHA256SUMS.txt` with a build provenance attestation.
 
 Do not edit `version.txt`, the manifest `version` or `CHANGELOG.md` by hand;

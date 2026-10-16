@@ -5,7 +5,7 @@
   "packages": {
     ".": {
       "release-type": "simple",
-      "package-name": "eu4-startup-boost",
+      "package-name": "bellows",
       "bump-minor-pre-major": true,
       "extra-files": [
         { "type": "toml", "path": "plugin/plugin.toml", "jsonpath": "$.version" }

@@ -36,10 +36,10 @@ jobs:
             $relative = [IO.Path]::GetRelativePath('dist/package', $_.FullName).Replace('\', '/')
             "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $relative
           } | Set-Content dist/package/SHA256SUMS.txt
-          Compress-Archive -Path dist/package/* -DestinationPath dist/eu4-startup-boost-${{ github.sha }}.zip
+          Compress-Archive -Path dist/package/* -DestinationPath dist/bellows-${{ github.sha }}.zip
 
       # Per-commit artifact; for a release, release.yml attaches it to the GitHub release.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: eu4-startup-boost-${{ github.sha }}
-          path: dist/eu4-startup-boost-${{ github.sha }}.zip
+          name: bellows-${{ github.sha }}
+          path: dist/bellows-${{ github.sha }}.zip
