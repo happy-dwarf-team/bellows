@@ -442,6 +442,23 @@ int main() {
     HandBuiltScenario(registrySlot);
     for (std::uint32_t seed = 1; seed <= 4; ++seed) RandomDagScenario(seed, registrySlot);
 
+    // Timing: span between the first and the last timed call entry.
+    g_calls = g_firstCall = g_lastCall = 0;
+    const LONG64 before = sb::Ticks();
+    for (Node* n : registry) SB_TriggerIntern(g_singleton, n);
+    const LONG64 after = sb::Ticks();
+    assert(g_calls == static_cast<LONG64>(registry.size()));
+    assert(g_firstCall >= before && g_lastCall <= after && CallSpan() > 0);
+    const double spanMs = sb::TicksToMs(CallSpan());
+
+    // The ready report releases the index; later calls go to the original.
+    ResetStats();
+    sb::ReportTriggerIntern();
+    assert(S(&EU4SB_TriggerInternStats.readyDisabled) == 1 && g_state->memo.slots.empty() && g_state->shapes.Count() == 0);
+    SB_TriggerIntern(g_singleton, registry[0]);
+    assert(S(&EU4SB_TriggerInternStats.skips) == 1 && S(&EU4SB_TriggerInternStats.duplicateKeys) == 0);
+    std::printf("first to last call: %.2f ms\n", spanMs);
+
     std::printf("trigger intern fixture ok: %zu registered nodes, %llu map keys, %zu non-null\n", registry.size(),
                 static_cast<unsigned long long>(size), nonNull);
     return 0;

@@ -156,18 +156,27 @@ calls, ours ~1263 ms, i.e. **slower** with the real (non-empty) map;
 therefore **off by default** (kept with its verify mode; a cheaper
 canonicalization could revisit it, but at most ~0.7 s is available).
 
-Cheaper index (not yet measured in the game, module still off): the
-structure table holds only the map keys and their substructures (arena +
-open addressing, built with the index); a node's shape is only looked up, and
-a miss marks it "foreign" (answer 0, and its parents are foreign too), since a
-key consists solely of key substructures. Inner nodes are memoized in a flat
-pointer table presized from the registry's two set sizes (+0x10, +0x50);
-leaves skip the memo. Offline, on the lab's synthetic forest in game layout
-(2.35 M nodes, MSVC /O2 /MT): ~330 ms for the lookups, ~500 ms through the
-whole hook (two QPC reads, the SRW lock and the interlocked counters per call
-add ~110 ms), against ~1263 ms for the previous index in the game. Next step:
-a verify start (expect 0 mismatches over 2.35 M calls), then hook time vs
-the original from the plugin log.
+Cheaper index (module still off by default): the structure table holds only
+the map keys and their substructures (arena + open addressing, built with the
+index); a node's shape is only looked up, and a miss marks it "foreign"
+(answer 0, and its parents are foreign too), since a key consists solely of
+key substructures. Inner nodes are memoized in a flat pointer table presized
+from the registry's two set sizes (+0x10, +0x50); leaves skip the memo.
+Measured in the game (lab junction copy, warm starts): verify 0 mismatches
+over 2,347,067 calls; our part ~487 ms against 628 ms for the original; in
+on mode 417–436 ms summed per call. An interleaved on/off series of start-ups
+(5 vs 7 starts) gave 12.25 ± 0.50 s vs 12.37 ± 0.36 s to `Running
+application`: consistent with ~0.2 s, but within the noise.
+
+Hook overhead: timing every call (two QPC reads and a locked add) and the
+interlocked hot-path counters cost ~0.1–0.2 s offline. A locked instruction
+waits for the walk's outstanding cache misses, and a timed call cannot overlap
+its misses with its neighbours', so per-call timing also inflated the result.
+The hook now counts with plain updates (the game interns from one thread
+under its own mutex) and logs the span from the first to the last call
+(QPC at every 16th entry; the game's loop overhead included). Offline 474 →
+360 ms; in the game the span is 381–395 ms (verify: 0 mismatches). The index
+is released at the ready report.
 
 ### open_warmup and access profiles
 

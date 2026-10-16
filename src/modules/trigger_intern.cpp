@@ -192,9 +192,38 @@ volatile std::uintptr_t* g_registrySlot = nullptr;
 bool g_verifyOnly = false;
 SRWLOCK g_lock = SRWLOCK_INIT;
 State* g_state = nullptr;
-volatile LONG64 g_answerSequence = 0;
-volatile LONG64 g_ticksTotal = 0;     // whole hook, original calls included
+std::uint64_t g_answerSequence = 0;  // answered calls, guarded by g_lock
 volatile LONG64 g_ticksOriginal = 0;  // calls to the original only
+
+// Hook timing: the span between the first and the last call's entry. The game
+// makes all calls in two back-to-back loops, so the span is the hook time plus
+// the game's loop overhead (a getter call and a store per node), minus the
+// last calls. Timing each call instead (two QPC reads and a locked add on each
+// of 2.35 M calls) cost ~0.2 s offline and inflated the result, since a timed
+// call cannot overlap its cache misses with its neighbours'. The entry time is
+// taken every 16th call, so the span misses at most the last 16 calls.
+constexpr LONG64 kTimingSample = 16;
+volatile LONG64 g_calls = 0;
+volatile LONG64 g_firstCall = 0;
+volatile LONG64 g_lastCall = 0;
+
+// Hot-path counters use plain (non-locked) updates: the game interns from one
+// thread under its own mutex, and a locked instruction on every call waits for
+// the walk's outstanding cache misses. Concurrent calls could lose a count,
+// never change an answer.
+inline void Bump(volatile LONG64* value) noexcept { *value = *value + 1; }
+
+void NoteCall() noexcept {
+    const LONG64 call = g_calls;
+    g_calls = call + 1;
+    if (call % kTimingSample != 0) return;
+    const LONG64 now = sb::Ticks();
+    if (call == 0) g_firstCall = now;
+    g_lastCall = now;
+}
+
+// QPC ticks from the first to the last timed call entry.
+LONG64 CallSpan() noexcept { return g_lastCall - g_firstCall; }
 
 std::uint64_t CallOriginal(void* singleton, void* node) {
     sb::ScopedTicks t(&g_ticksOriginal);
@@ -343,15 +372,22 @@ bool Disabled() noexcept {
 }  // namespace
 
 extern "C" std::uint64_t SB_TriggerIntern(void* singleton, void* node) {
-    sb::ScopedTicks total(&g_ticksTotal);
-    sb::Increment(&EU4SB_TriggerInternStats.requests);
+    NoteCall();
+    Bump(&EU4SB_TriggerInternStats.requests);
     if (Disabled() || g_state == nullptr || singleton == nullptr) {
         sb::Increment(&EU4SB_TriggerInternStats.skips);
         return CallOriginal(singleton, node);
     }
     std::uint64_t answer = 0;
+    std::uint64_t sequence = 0;
     try {
         AcquireSRWLockExclusive(&g_lock);
+        // The index may have been released at the ready event while this call waited.
+        if (EU4SB_TriggerInternStats.readyDisabled != 0) {
+            ReleaseSRWLockExclusive(&g_lock);
+            sb::Increment(&EU4SB_TriggerInternStats.skips);
+            return CallOriginal(singleton, node);
+        }
         try {
             State& state = Prepare(singleton);
             // An empty map cannot contain the key: the original returns 0 after building it.
@@ -359,6 +395,7 @@ extern "C" std::uint64_t SB_TriggerIntern(void* singleton, void* node) {
                 const std::uint32_t id = NodeId(state, node, 0);
                 if (id != kForeign && id < state.isKey.size() && state.isKey[id] != 0) answer = state.values[id];
             }
+            sequence = ++g_answerSequence;  // under the lock: no interlocked operation needed
         } catch (...) {
             g_state->usable = false;
             ReleaseSRWLockExclusive(&g_lock);
@@ -370,7 +407,6 @@ extern "C" std::uint64_t SB_TriggerIntern(void* singleton, void* node) {
         sb::Increment(&EU4SB_TriggerInternStats.skips);
         return CallOriginal(singleton, node);
     }
-    const LONG64 sequence = InterlockedIncrement64(&g_answerSequence);
     if (g_verifyOnly || (sequence & 255) == 1) {
         sb::Increment(&EU4SB_TriggerInternStats.verifications);
         const std::uint64_t actual = CallOriginal(singleton, node);
@@ -381,7 +417,7 @@ extern "C" std::uint64_t SB_TriggerIntern(void* singleton, void* node) {
         }
         if (g_verifyOnly) return actual;
     }
-    sb::Increment(answer ? &EU4SB_TriggerInternStats.hits : &EU4SB_TriggerInternStats.misses);
+    Bump(answer ? &EU4SB_TriggerInternStats.hits : &EU4SB_TriggerInternStats.misses);
     return answer;
 }
 
@@ -425,8 +461,16 @@ bool InstallTriggerIntern(const Build& build, Mode mode) {
 
 void ReportTriggerIntern() {
     LogStats("trigger_intern", EU4SB_TriggerInternStats);
-    Log(ANVIL_LOG_INFO, "trigger_intern: map size %lld, indexed %lld; time in hook %.1f ms, of which original %.1f ms",
-        EU4SB_TriggerInternMap.requests, EU4SB_TriggerInternMap.hits, TicksToMs(g_ticksTotal), TicksToMs(g_ticksOriginal));
+    Log(ANVIL_LOG_INFO, "trigger_intern: map size %lld, indexed %lld; first to last call %.1f ms (game loop included), "
+        "of which original %.1f ms",
+        EU4SB_TriggerInternMap.requests, EU4SB_TriggerInternMap.hits, TicksToMs(CallSpan()), TicksToMs(g_ticksOriginal));
+    if (g_state == nullptr) return;
+    // The game is ready, so the index is no longer used: release its memory
+    // (tens of MB with a non-empty map). Later calls go to the original.
+    InterlockedExchange(&EU4SB_TriggerInternStats.readyDisabled, 1);
+    AcquireSRWLockExclusive(&g_lock);
+    *g_state = State{};
+    ReleaseSRWLockExclusive(&g_lock);
 }
 
 }  // namespace sb
