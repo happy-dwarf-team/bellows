@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.0](https://github.com/happy-dwarf-team/eu4-startup-boost/compare/v0.3.0...v0.4.0) (2026-10-16)
+
+
+### Features
+
+* **trigger_intern:** enable by default ([#14](https://github.com/happy-dwarf-team/eu4-startup-boost/issues/14)) ([d42d1f2](https://github.com/happy-dwarf-team/eu4-startup-boost/commit/d42d1f21ea34f2cf47dcf6484d895f262a6cd966))
+
+
+### Performance
+
+* **trigger_intern:** cut the hook's per-call overhead ([#13](https://github.com/happy-dwarf-team/eu4-startup-boost/issues/13)) ([474bca5](https://github.com/happy-dwarf-team/eu4-startup-boost/commit/474bca51543dc8bd090dc3160e23a797b03d5cba))
+* **trigger_intern:** faster index for a non-empty map ([#12](https://github.com/happy-dwarf-team/eu4-startup-boost/issues/12)) ([a57751e](https://github.com/happy-dwarf-team/eu4-startup-boost/commit/a57751ea41184d9d450c33bfc52c53cb0b048a3f))
+
 ## [0.3.0](https://github.com/happy-dwarf-team/eu4-startup-boost/compare/v0.2.0...v0.3.0) (2026-10-16)
 
 
