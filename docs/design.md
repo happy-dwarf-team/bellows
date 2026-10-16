@@ -194,6 +194,26 @@ learned profile — 11 503 entries in 76 ms; start ~15.1 s in each case. The
 cold-start effect (lab: 61 → 15 s) still has to be measured with the plugin
 after a reboot.
 
+### verifier_backoff (experiment, off by default)
+
+The modifier picture verifier's consumer loop (`0x8D80D0`) unlocks its queue
+mutex and, when it popped nothing, jumps straight back to the lock, so in the
+database phase it spins lock/unlock (~3 s CPU in the 0.4.0 profile) on the
+mutex the loading thread takes for every push. Anvil `patch_bytes` turns the
+9-byte branch at `0x8D814E` into a jump to a stub that re-executes it and, on
+an empty queue, runs 2000 `pause` instructions before locking again
+(`EU4SB_VERIFIER_BACKOFF=on`, `EU4SB_VERIFIER_BACKOFF_PAUSES`). Every item is
+still verified; the stub makes no calls.
+
+Interleaved series (lab, warm, junction copy, other modules at 0.4.0
+defaults, ABBA, 8 pairs): on 11.53 ± 0.26 s (n=8), off 11.87 ± 0.28 s (n=7;
+one off start at 20.2 s excluded: the whole start was slow, ram_prefetch
+decoding took 10.0 s instead of ~6.0 s). Paired difference −0.32 s
+(SE 0.12 s), on faster in 6 of 7 pairs; ~51–54 k empty-queue waits per
+start; `setup.log`, `error.log` and `system.log` identical in all 16 starts.
+The lab's earlier exe-patch version gave nothing at a 24.8 s start, when the
+verifier was bound by file-attribute syscalls that `exists_index` now answers.
+
 ### attr_cache
 
 Ported in the lab's "negative" policy only: `GetFileAttributesExW` and

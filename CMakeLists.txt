@@ -50,6 +50,7 @@ add_library(sb_core STATIC
     src/modules/mimalloc_heap.cpp
     src/modules/open_warmup.cpp
     src/modules/trigger_intern.cpp
+    src/modules/verifier_backoff.cpp
     src/modules/verifypath_listing.cpp)
 target_include_directories(sb_core PUBLIC third_party src)
 target_link_libraries(sb_core PUBLIC tomlplusplus::tomlplusplus mimalloc-static shell32 ole32 uuid)

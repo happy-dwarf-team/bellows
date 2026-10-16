@@ -68,6 +68,7 @@ Config LoadConfig(const std::filesystem::path& data_dir) {
         {"ram_prefetch", Mode::On, true},
         {"attr_cache", Mode::Off, true},  // at most ~0.1 s left once verifypath_listing and exists_index are on
         {"zip_profile", Mode::Off, false},  // diagnostic; not in the default config.toml
+        {"verifier_backoff", Mode::Off, false},  // experiment; not in the default config.toml
     };
     const auto file = data_dir / "config.toml";
     std::error_code ec;

@@ -50,6 +50,9 @@ struct Build {
     uint32_t zip_close_archive_slot, zip_close_archive_fn;
     uint32_t tinfl_decompress_fn;
     uint32_t zip_entry_method, zip_entry_crc, zip_entry_compressed, zip_entry_uncompressed;
+
+    // verifier_backoff (diagnostic): empty-queue branch in the picture verifier loop, its two targets
+    uint32_t verifier_empty_branch, verifier_item_continue, verifier_lock_loop;
 };
 
 inline constexpr Build kBuilds[] = {
@@ -65,6 +68,7 @@ inline constexpr Build kBuilds[] = {
         0x1C1D890 + 0x30, 0x1A073F0, 0x1C1D890 + 0x40, 0x1A07580, 0x1C1D890 + 0x70, 0x1A073B0,
         0x1A08470,
         0x46, 0x48, 0x50, 0x58,
+        0x8D814E, 0x8D8157, 0x8D8100,
     },
 };
 
