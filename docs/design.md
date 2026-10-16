@@ -156,6 +156,19 @@ calls, ours ~1263 ms, i.e. **slower** with the real (non-empty) map;
 therefore **off by default** (kept with its verify mode; a cheaper
 canonicalization could revisit it, but at most ~0.7 s is available).
 
+Cheaper index (not yet measured in the game, module still off): the
+structure table holds only the map keys and their substructures (arena +
+open addressing, built with the index); a node's shape is only looked up, and
+a miss marks it "foreign" (answer 0, and its parents are foreign too), since a
+key consists solely of key substructures. Inner nodes are memoized in a flat
+pointer table presized from the registry's two set sizes (+0x10, +0x50);
+leaves skip the memo. Offline, on the lab's synthetic forest in game layout
+(2.35 M nodes, MSVC /O2 /MT): ~330 ms for the lookups, ~500 ms through the
+whole hook (two QPC reads, the SRW lock and the interlocked counters per call
+add ~110 ms), against ~1263 ms for the previous index in the game. Next step:
+a verify start (expect 0 mismatches over 2.35 M calls), then hook time vs
+the original from the plugin log.
+
 ### open_warmup and access profiles
 
 Ported with the learned profile per mod set

@@ -10,9 +10,12 @@
 // key only to find nothing.
 //
 // Both call sites are redirected (Anvil redirect_call + byte checks around the
-// call) to SB_TriggerIntern: an empty map answers 0 immediately; otherwise
-// every structure gets a canonical id by hash-consing (id + sorted unique child
-// ids), memoized per node pointer, and the map keys are indexed the same way.
+// call) to SB_TriggerIntern: an empty map answers 0 immediately. Otherwise the
+// map keys and their substructures get canonical ids by hash-consing (id +
+// sorted unique child ids) in a flat table built with the index. A node's shape
+// is only looked up there (memoized per inner node pointer): a shape outside the
+// table, or a node with such a child, is "foreign" and answers 0, since a key
+// consists solely of key substructures and so cannot equal it.
 // "verify" = compute both, return the original's value, count mismatches;
 // "on" = return the index answer, compare every 256th call and disable on a
 // mismatch. A changed map size or registry, an unexpected shape, the ready
@@ -20,7 +23,6 @@
 #include "modules.hpp"
 
 #include <algorithm>
-#include <unordered_map>
 #include <vector>
 
 namespace {
@@ -38,24 +40,147 @@ constexpr std::size_t kMapNodeValue = 0x58;  // value of a map entry
 constexpr std::size_t kKeyId = 0x00;         // int
 constexpr std::size_t kKeySetHead = 0x10;    // key + 8 set, +0x10 list sentinel
 constexpr std::size_t kSetNodeValue = 0x10;  // unique_ptr<key> in a set node
+// Registry: two unordered_set<node*> of 0x40 bytes at +0x00 and +0x40 (list
+// head +0x08, size +0x10 each); the sizes only presize the memo.
+constexpr std::size_t kRegistrySizes[2] = {0x10, 0x50};
+constexpr std::uint64_t kMaxPresize = 1ULL << 26;
+constexpr std::size_t kDefaultPresize = 1u << 16;
+
+constexpr std::uint32_t kForeign = 0xFFFFFFFFu;  // not a key structure
+constexpr std::uint32_t kEmpty = 0xFFFFFFFEu;    // free slot in the structure table
 
 using InternFn = std::uint64_t (*)(void*, void*);
 
-struct VectorHash {
-    std::size_t operator()(const std::vector<std::uint32_t>& v) const noexcept {
-        std::uint64_t h = 0xcbf29ce484222325ULL;
-        for (std::uint32_t x : v) {
-            h ^= x;
-            h *= 0x100000001b3ULL;
+struct ShapeError {};
+
+// Power of two with a load factor of at most 0.7.
+std::size_t Capacity(std::size_t expected) {
+    std::size_t cap = 16;
+    while (cap / 10 * 7 < expected) cap <<= 1;
+    return cap;
+}
+
+// Key structures: shape = (id, sorted unique child ids) stored in an arena as
+// [length, id, c0, c1, ...]; open addressing over structure indices.
+struct Shapes {
+    std::vector<std::uint32_t> arena;
+    std::vector<std::uint32_t> offset;  // structure -> arena offset
+    std::vector<std::uint32_t> table;   // structure index or kEmpty
+    std::size_t mask = 0;
+
+    static std::uint64_t Hash(const std::uint32_t* p, std::size_t n) noexcept {
+        std::uint64_t h = 0x9E3779B97F4A7C15ULL ^ n;
+        for (std::size_t i = 0; i < n; ++i) {
+            h ^= p[i];
+            h *= 0xff51afd7ed558ccdULL;
+            h ^= h >> 32;
         }
-        return static_cast<std::size_t>(h);
+        return h;
+    }
+    std::uint32_t Count() const noexcept { return static_cast<std::uint32_t>(offset.size()); }
+    bool Equal(std::uint32_t s, const std::uint32_t* p, std::size_t n) const noexcept {
+        const std::uint32_t* q = arena.data() + offset[s];
+        return q[0] == n && std::equal(p, p + n, q + 1);
+    }
+    std::uint32_t Find(const std::uint32_t* p, std::size_t n) const noexcept {
+        if (table.empty()) return kForeign;
+        for (std::size_t i = Hash(p, n) & mask;; i = (i + 1) & mask) {
+            const std::uint32_t s = table[i];
+            if (s == kEmpty) return kForeign;
+            if (Equal(s, p, n)) return s;
+        }
+    }
+    std::uint32_t Insert(const std::uint32_t* p, std::size_t n) {
+        if (Capacity(offset.size() + 1) > table.size()) Rehash(Capacity(offset.size() + 1));
+        for (std::size_t i = Hash(p, n) & mask;; i = (i + 1) & mask) {
+            const std::uint32_t s = table[i];
+            if (s == kEmpty) {
+                const std::uint32_t index = Count();
+                if (index >= kEmpty) throw ShapeError{};
+                offset.push_back(static_cast<std::uint32_t>(arena.size()));
+                arena.push_back(static_cast<std::uint32_t>(n));
+                arena.insert(arena.end(), p, p + n);
+                table[i] = index;
+                return index;
+            }
+            if (Equal(s, p, n)) return s;
+        }
+    }
+    void Rehash(std::size_t cap) {
+        table.assign(cap, kEmpty);
+        mask = cap - 1;
+        for (std::uint32_t s = 0; s < Count(); ++s) {
+            const std::uint32_t* q = arena.data() + offset[s];
+            std::size_t i = Hash(q + 1, q[0]) & mask;
+            while (table[i] != kEmpty) i = (i + 1) & mask;
+            table[i] = s;
+        }
+    }
+};
+
+// Trigger node -> structure index or kForeign, open addressing on the pointer.
+struct Memo {
+    struct Slot {
+        const void* node;
+        std::uint32_t id;
+    };
+    std::vector<Slot> slots;
+    std::size_t mask = 0;
+    std::size_t used = 0;
+
+    static std::size_t Hash(const void* p) noexcept {
+        auto x = static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(p));
+        x ^= x >> 33;
+        x *= 0xff51afd7ed558ccdULL;
+        x ^= x >> 33;
+        return static_cast<std::size_t>(x);
+    }
+    void Init(std::size_t expected) {
+        slots.assign(Capacity(expected), Slot{nullptr, 0});
+        mask = slots.size() - 1;
+        used = 0;
+    }
+    bool Get(const void* node, std::uint32_t& id) const noexcept {
+        if (slots.empty()) return false;
+        for (std::size_t i = Hash(node) & mask;; i = (i + 1) & mask) {
+            if (slots[i].node == node) {
+                id = slots[i].id;
+                return true;
+            }
+            if (slots[i].node == nullptr) return false;
+        }
+    }
+    // node is not in the table yet (Get missed and nothing was inserted since).
+    void Put(const void* node, std::uint32_t id) {
+        if (Capacity(used + 1) > slots.size()) Grow();  // the presize was too small
+        std::size_t i = Hash(node) & mask;
+        while (slots[i].node != nullptr) i = (i + 1) & mask;
+        slots[i] = Slot{node, id};
+        ++used;
+    }
+    void Grow() {
+        std::vector<Slot> old;
+        old.swap(slots);
+        slots.assign(Capacity(used + 1) * 2, Slot{nullptr, 0});
+        mask = slots.size() - 1;
+        for (const Slot& slot : old) {
+            if (slot.node == nullptr) continue;
+            std::size_t i = Hash(slot.node) & mask;
+            while (slots[i].node != nullptr) i = (i + 1) & mask;
+            slots[i] = slot;
+        }
     }
 };
 
 struct State {
-    std::unordered_map<std::vector<std::uint32_t>, std::uint32_t, VectorHash> structures;
-    std::unordered_map<const void*, std::uint32_t> nodeIds;   // trigger node -> structure id
-    std::unordered_map<std::uint32_t, std::uint64_t> values;  // structure id -> map value
+    Shapes shapes;
+    Memo memo;
+    // Frames of (id, child ids...) during a walk; a heap stack instead of a
+    // buffer per call keeps recursion frames small for deep trees.
+    std::vector<std::uint32_t> scratch;
+    std::vector<std::uint64_t> values;  // structure -> map value
+    std::vector<std::uint8_t> isKey;    // structure -> 1 when it is a whole map key
+    std::size_t keyCount = 0;
     const void* singleton = nullptr;
     std::uint64_t mapSize = 0;
     std::uintptr_t registry = 0;
@@ -76,8 +201,6 @@ std::uint64_t CallOriginal(void* singleton, void* node) {
     return g_original(singleton, node);
 }
 
-struct ShapeError {};
-
 }  // namespace
 
 extern "C" {
@@ -86,7 +209,7 @@ extern "C" {
 // mismatches = comparisons with the original, mode = 1 on / 2 verify,
 // cacheDisabled = disabled after a mismatch or a shape error.
 __declspec(dllexport) sb::Stats EU4SB_TriggerInternStats = SB_STATS_INIT;
-// Last index build: requests = size of the singleton's key map, hits = structures indexed.
+// Last index build: requests = size of the singleton's key map, hits = distinct key structures.
 __declspec(dllexport) sb::Stats EU4SB_TriggerInternMap = SB_STATS_INIT;
 }
 
@@ -94,50 +217,77 @@ namespace {
 
 using sb::Read;
 
-std::uint32_t Intern(State& state, std::vector<std::uint32_t>&& shape) {
-    const auto next = static_cast<std::uint32_t>(state.structures.size());
-    return state.structures.emplace(std::move(shape), next).first->second;
-}
-
-std::uint32_t Finish(State& state, std::int32_t id, std::vector<std::uint32_t>& children) {
-    std::sort(children.begin(), children.end());
-    children.erase(std::unique(children.begin(), children.end()), children.end());
-    std::vector<std::uint32_t> shape;
-    shape.reserve(children.size() + 1);
-    shape.push_back(static_cast<std::uint32_t>(id));
-    shape.insert(shape.end(), children.begin(), children.end());
-    return Intern(state, std::move(shape));
+// Canonical id of the frame (id, children...) at scratch[base..], which is popped.
+template <bool Insert>
+std::uint32_t Canonical(State& state, std::size_t base) {
+    std::uint32_t* const p = state.scratch.data() + base;
+    std::uint32_t* const end = state.scratch.data() + state.scratch.size();
+    std::sort(p + 1, end);
+    const auto n = static_cast<std::size_t>(std::unique(p + 1, end) - p);
+    const std::uint32_t id = Insert ? state.shapes.Insert(p, n) : state.shapes.Find(p, n);
+    state.scratch.resize(base);
+    return id;
 }
 
 // Canonical id of a key stored in the map (key -> set of unique_ptr<key>).
 std::uint32_t KeyId(State& state, const void* key, std::size_t depth) {
     if (key == nullptr || depth > kMaxDepth) throw ShapeError{};
-    std::vector<std::uint32_t> children;
     const void* head = Read<const void*>(key, kKeySetHead);
     if (head == nullptr) throw ShapeError{};
+    const std::size_t base = state.scratch.size();
+    state.scratch.push_back(static_cast<std::uint32_t>(Read<std::int32_t>(key, kKeyId)));
     for (const void* entry = Read<const void*>(head, 0); entry != head; entry = Read<const void*>(entry, 0)) {
         if (entry == nullptr) throw ShapeError{};
-        children.push_back(KeyId(state, Read<const void*>(entry, kSetNodeValue), depth + 1));
+        const std::uint32_t child = KeyId(state, Read<const void*>(entry, kSetNodeValue), depth + 1);
+        state.scratch.push_back(child);
     }
-    return Finish(state, Read<std::int32_t>(key, kKeyId), children);
+    return Canonical<true>(state, base);
 }
 
-// Canonical id of a trigger node, memoized by node pointer.
+// Canonical id of a trigger node (kForeign outside the key structures), memoized by node pointer.
 std::uint32_t NodeId(State& state, const void* node, std::size_t depth) {
     if (node == nullptr || depth > kMaxDepth) throw ShapeError{};
-    const auto known = state.nodeIds.find(node);
-    if (known != state.nodeIds.end()) return known->second;
     const auto* const* array = Read<const void* const*>(node, kNodeChildren);
     const std::int32_t count = Read<std::int32_t>(node, kNodeCount);
     if (count < 0 || (count > 0 && array == nullptr)) throw ShapeError{};
-    std::vector<std::uint32_t> children;
-    children.reserve(static_cast<std::size_t>(count));
-    for (std::int32_t index = 0; index < count; ++index) {
-        children.push_back(NodeId(state, array[index], depth + 1));
+    // Leaves (most nodes) skip the memo: one lookup in the small structure
+    // table is cheaper than a probe in the large pointer table.
+    if (count == 0) {
+        const auto leaf = static_cast<std::uint32_t>(Read<std::int32_t>(node, kNodeId));
+        return state.shapes.Find(&leaf, 1);
     }
-    const std::uint32_t id = Finish(state, Read<std::int32_t>(node, kNodeId), children);
-    state.nodeIds.emplace(node, id);
+    std::uint32_t id = 0;
+    if (state.memo.Get(node, id)) return id;
+    const std::size_t base = state.scratch.size();
+    state.scratch.push_back(static_cast<std::uint32_t>(Read<std::int32_t>(node, kNodeId)));
+    bool foreign = false;
+    for (std::int32_t index = 0; index < count; ++index) {
+        // A foreign child makes the node foreign, but every child is still visited and memoized.
+        const std::uint32_t child = NodeId(state, array[index], depth + 1);
+        if (child == kForeign) {
+            foreign = true;
+        } else if (!foreign) {
+            state.scratch.push_back(child);
+        }
+    }
+    if (foreign) {
+        state.scratch.resize(base);
+        id = kForeign;
+    } else {
+        id = Canonical<false>(state, base);
+    }
+    state.memo.Put(node, id);
     return id;
+}
+
+// Number of registered nodes, a presize hint for the memo.
+std::size_t RegisteredNodes(std::uintptr_t registry) {
+    if (registry == 0) return kDefaultPresize;
+    std::uint64_t total = 0;
+    for (std::size_t offset : kRegistrySizes) {
+        total += std::min(Read<std::uint64_t>(reinterpret_cast<const void*>(registry), offset), kMaxPresize);
+    }
+    return static_cast<std::size_t>(std::min(total, kMaxPresize));
 }
 
 // (Re)build the index when the singleton, the map size or the registry changed.
@@ -158,20 +308,31 @@ State& Prepare(void* singleton) {
     for (const void* entry = Read<const void*>(head, 0); entry != head; entry = Read<const void*>(entry, 0)) {
         if (entry == nullptr || ++seen > mapSize) throw ShapeError{};
         const std::uint32_t id = KeyId(state, static_cast<const unsigned char*>(entry) + kMapNodeKey, 0);
+        if (id >= state.isKey.size()) {
+            state.values.resize(state.shapes.Count(), 0);
+            state.isKey.resize(state.shapes.Count(), 0);
+        }
         // Keys in the game's map are unique; a duplicate structure would mean a model error.
-        if (!state.values.emplace(id, Read<std::uint64_t>(entry, kMapNodeValue)).second) throw ShapeError{};
+        if (state.isKey[id] != 0) throw ShapeError{};
+        state.isKey[id] = 1;
+        state.values[id] = Read<std::uint64_t>(entry, kMapNodeValue);
+        ++state.keyCount;
     }
     if (seen != mapSize) throw ShapeError{};
+    // Node ids are only needed when a key can match.
+    if (state.keyCount != 0) state.memo.Init(RegisteredNodes(registry));
     sb::Increment(&EU4SB_TriggerInternStats.duplicateKeys);  // number of index builds
     InterlockedExchange64(&EU4SB_TriggerInternMap.requests, static_cast<LONG64>(mapSize));
-    InterlockedExchange64(&EU4SB_TriggerInternMap.hits, static_cast<LONG64>(state.values.size()));
+    InterlockedExchange64(&EU4SB_TriggerInternMap.hits, static_cast<LONG64>(state.keyCount));
     state.usable = true;
     return state;
 }
 
 bool Disabled() noexcept {
-    if (InterlockedCompareExchange(&EU4SB_TriggerInternStats.cacheDisabled, 0, 0) != 0) return true;
-    if (InterlockedCompareExchange(&EU4SB_TriggerInternStats.readyDisabled, 0, 0) != 0) return true;
+    // Plain volatile reads: aligned 32-bit loads are atomic on x64, and a locked
+    // read on each of the 2.35 M calls costs more than the lookup itself.
+    if (EU4SB_TriggerInternStats.cacheDisabled != 0) return true;
+    if (EU4SB_TriggerInternStats.readyDisabled != 0) return true;
     if (sb::ReadyReached()) {
         InterlockedExchange(&EU4SB_TriggerInternStats.readyDisabled, 1);
         return true;
@@ -194,9 +355,9 @@ extern "C" std::uint64_t SB_TriggerIntern(void* singleton, void* node) {
         try {
             State& state = Prepare(singleton);
             // An empty map cannot contain the key: the original returns 0 after building it.
-            if (!state.values.empty()) {
-                const auto found = state.values.find(NodeId(state, node, 0));
-                answer = found == state.values.end() ? 0 : found->second;
+            if (state.keyCount != 0) {
+                const std::uint32_t id = NodeId(state, node, 0);
+                if (id != kForeign && id < state.isKey.size() && state.isKey[id] != 0) answer = state.values[id];
             }
         } catch (...) {
             g_state->usable = false;
