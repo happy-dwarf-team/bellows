@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/happy-dwarf-team/eu4-startup-boost/compare/v0.2.0...v0.3.0) (2026-10-16)
+
+
+### Features
+
+* **ram_prefetch:** configurable memory budget, default 1 GB ([#9](https://github.com/happy-dwarf-team/eu4-startup-boost/issues/9)) ([a6f6679](https://github.com/happy-dwarf-team/eu4-startup-boost/commit/a6f6679d8a6aa16ee5a4228648a4216234141c32))
+
 ## [0.2.0](https://github.com/happy-dwarf-team/eu4-startup-boost/compare/v0.1.0...v0.2.0) (2026-10-15)
 
 
