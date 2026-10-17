@@ -212,6 +212,33 @@ real keys 261–304 vs 704–723 ms (shuffled) and 137–142 vs 233–246 ms (ru
 two interleaved start-up series −0.43 s (8/8 pairs) and −0.32 s (5/8), −0.38 s
 over 16 pairs (Anvil ready time); game logs identical in all starts.
 
+### range_profile (diagnostic, simulation)
+
+The first module aimed at the simulation, not the start. In the lab's profile
+of a year at speed 5 (1720, Russia 1719 save) 17% of the main thread was one
+chain: the province day (`0x9F52E0`) checks whether a country can still reach
+a province (`0x3532C0` → `0x3520D0`), and `0x3526B0` takes the minimum
+distance from the country's flagged provinces to the target, calling the
+province distance `0x2D2520` for each, with an early exit below the threshold.
+
+`range_profile` (off by default, not in the written `config.toml`) hooks
+`0x3526B0` and `0x2D2520` through Anvil `hook_function` only to observe: every
+check is recorded with its country, province, value, in-range answer, the
+distance calls inside it, its time and its caller. The game is usually closed
+without a clean exit, so a thread writes `range_profile*.tsv` to the data
+folder every 5 s: a summary, per game day, the 5000 busiest (country,
+province) pairs and the callers.
+
+Lab, `sim-range-8-a` trial 2 (only `range_profile` on, 8 workers per pool):
+the year 1720 took 27.73 s, of which 5.07 s (18.3%) inside the checks; 143,482
+checks (393 per day), 12.5 M distance calls (87 per check, up to 1497); every
+check came from `0x3520D0`. Over the whole session (655 game days) 1597 pairs
+of 85 countries were checked, each about once a day; their values changed only
+65 times (52 pairs) and the in-range answer twice. A memo per pair would
+answer almost every check if it can tell when the inputs change: the country's
+province list, the province flags and lists the check reads, the range
+modifier and the range bonus.
+
 ### attr_cache
 
 Ported in the lab's "negative" policy only: `GetFileAttributesExW` and

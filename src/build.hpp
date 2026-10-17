@@ -54,6 +54,11 @@ struct Build {
     // token_dict_profile (diagnostic): keyword dictionary, its lookup and the two lookup call sites,
     // vector of tokens added at run time (begin, end at +8)
     uint32_t token_dict, token_lookup_fn, token_lookup_tokenizer_site, token_lookup_get_or_add_site, token_dynamic_vector;
+
+    // range_profile (diagnostic): the country range check (minimum distance from the country's
+    // provinces), the province-to-province distance, and the pointer to the game root object
+    // (current date at +0x1DD0)
+    uint32_t range_min_distance_fn, province_distance_fn, game_root;
 };
 
 inline constexpr Build kBuilds[] = {
@@ -70,6 +75,7 @@ inline constexpr Build kBuilds[] = {
         0x1A08470,
         0x46, 0x48, 0x50, 0x58,
         0x2326720, 0x6E4880, 0x170EA12, 0x170D47E, 0x242B8A0,
+        0x3526B0, 0x2D2520, 0x233FE78,
     },
 };
 
