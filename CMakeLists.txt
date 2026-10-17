@@ -52,6 +52,7 @@ add_library(sb_core STATIC
     src/modules/open_warmup.cpp
     src/modules/token_dict_cache.cpp
     src/modules/token_dict_profile.cpp
+    src/modules/range_profile.cpp
     src/modules/trigger_intern.cpp
     src/modules/verifypath_listing.cpp)
 target_include_directories(sb_core PUBLIC third_party src)
@@ -72,7 +73,7 @@ endif()
 
 if(SB_BUILD_TESTS)
     enable_testing()
-    foreach(test rename trigger_intern token_dict_cache metascript_subst config access_profile path_rules zip_reader)
+    foreach(test rename trigger_intern token_dict_cache metascript_subst config access_profile path_rules zip_reader range_stats)
         add_executable(test_${test} tests/test_${test}.cpp src/common.cpp src/config.cpp src/rename.cpp src/modules/access_profile.cpp src/modules/zip_reader.cpp)
         target_include_directories(test_${test} PRIVATE third_party src)
         target_link_libraries(test_${test} PRIVATE tomlplusplus::tomlplusplus shell32 ole32 uuid)
