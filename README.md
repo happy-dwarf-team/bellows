@@ -44,6 +44,7 @@ answers with the game's own code: 0 differences over 3.6 million calls.
 | `ram_prefetch` | Reads and unpacks the DLC archive members the game will need into RAM on worker threads (learned per mod set; uses up to 1 GB of extra RAM during start-up, `[ram_prefetch] budget_mb`) |
 | `attr_cache` | Remembers "file not found" answers for game and mod files during start-up (off by default: ~0.1 s left next to the other modules) |
 | `token_dict_cache` | Caches the script tokenizer's keyword lookups (~0.4 s; on by default, also with an existing `config.toml`; add `token_dict_cache = "off"` under `[modules]` to disable) |
+| `range_witness` | **Simulation, not start-up.** Answers the country range check from the province that was in range last time instead of walking all of the country's provinces again; same answers as the game's code (lab: a year at speed 5 in 20.6 s instead of 27.6 s). Off by default for now: add `range_witness = "on"` (or `"verify"` to compare every answer with the game's) under `[modules]` |
 
 Settings: `anvil/data/bellows/config.toml` (created on first start;
 each module `on`, `off` or `verify`). The plugin writes its counters to

@@ -70,6 +70,7 @@ Config LoadConfig(const std::filesystem::path& data_dir) {
         {"zip_profile", Mode::Off, false},  // diagnostic; not in the default config.toml
         {"token_dict_profile", Mode::Off, false},  // diagnostic; not in the default config.toml
         {"range_profile", Mode::Off, false},  // diagnostic; not in the default config.toml
+        {"range_witness", Mode::Off, true},  // simulation; off by default until verified on more saves
         {"token_dict_cache", Mode::On, true},  // not in the default config.toml: on for existing files too; set "off" there to disable
     };
     const auto file = data_dir / "config.toml";

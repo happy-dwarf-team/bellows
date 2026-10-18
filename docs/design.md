@@ -239,6 +239,48 @@ answer almost every check if it can tell when the inputs change: the country's
 province list, the province flags and lists the check reads, the range
 modifier and the range bonus.
 
+### range_witness (simulation)
+
+`range_profile` showed what dominated the check: 97.5% of the distance calls
+went into walks that ended "in range", after 92.6 provinces on average, and the
+walk usually ended at the same province day after day. The answer 0x3520D0
+uses is only `value <= threshold`, and the walk stops at the first province
+below the threshold; so any province below the threshold gives the same answer.
+
+`range_witness` redirects the call at `0x35214C` (in `0x3520D0`). Per
+(country, target province, threshold) it keeps the province that ended the last
+walk (the witness), from the country's own list or from a related country (the
+second walk over the relation records at `+0x1510`, parallel to the country
+array at `root+0x1CE8`, qualified through the record's list at `+0x128` and the
+flag `+0x11F`, with the related country's own bonus through `+0x1420` and
+`0x7ACEC0`). A check first evaluates only the witness with the game's own
+functions and formula: still in the list, bit `0x10` at `+0x958`, the country in
+the province's list at `+0x490`, `min(0x2D2520, straight line) * 1000 / (1000 +
+bonus) < threshold`. Then it writes the value the original would write when
+stopping there. Otherwise the original walk runs and a new witness is looked
+up; when none exists (the answer came from a value exactly at the threshold),
+the lookup waits 30 game days. Nothing is kept across loads beyond what the
+session builds. `verify` always runs the original and compares.
+
+Lab (EU4 1.37.5, Russia 1719 save, 8 workers per pool, only this module on,
+Tongs-driven year 1720 at speed 5; lab `docs/simulation-profile.md`):
+
+- `verify`, two full sessions with the first walk only: 361,622 witness
+  answers, all equal to the original's, and in 359,338 of them the original
+  stopped at the witness and wrote the same value; 0 differences. With the
+  second walk (one session, ~200 game days): 72,233 answers, 0 differences,
+  72,042 same values.
+- `on`: 92% of the checks answered from the witness (236,981 of 258,100 in a
+  session, 56,197 from a related country); time inside the checks 1.2 s per
+  session instead of ~9 s.
+- Interleaved series (ABBA, one launch per trial): `on` 20.68, 20.48, 21.02,
+  20.05 s for the year, `off` 27.29, 27.58, 27.91 s (one `off` trial rejected
+  on an event pause): −7.0 s (−25.5%), no overlap. Main-thread CPU 19.1 s
+  instead of 25.5 s per year.
+
+Open: a full `verify` session with the second walk, other saves and later
+dates, and other country sizes; until then the module is off by default.
+
 ### attr_cache
 
 Ported in the lab's "negative" policy only: `GetFileAttributesExW` and
