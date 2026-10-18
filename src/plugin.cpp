@@ -25,6 +25,7 @@ void OnGameReady(const char*, const void*, void*) {
     sb::ReportTokenDictProfile();
     sb::ReportTokenDictCache();
     sb::ReportRangeProfile();
+    sb::ReportRangeWitness();
 }
 
 }  // namespace
@@ -77,6 +78,7 @@ extern "C" ANVIL_PLUGIN_EXPORT AnvilResult anvil_plugin_load(const AnvilHost* ho
         {"token_dict_cache", sb::InstallTokenDictCache},  // same call site as token_dict_profile: enable one of them
         {"token_dict_profile", sb::InstallTokenDictProfile},  // diagnostic, off unless EU4SB_TOKEN_DICT_PROFILE=on
         {"range_profile", sb::InstallRangeProfile},  // diagnostic, off unless EU4SB_RANGE_PROFILE=on
+        {"range_witness", sb::InstallRangeWitness},  // hooks 0x3526B0 too: enable range_profile or range_witness, not both
     };
     std::string summary;
     for (const auto& m : modules) {

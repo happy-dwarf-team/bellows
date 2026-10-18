@@ -22,6 +22,7 @@ bool InstallZipProfile(const Build& build, Mode mode);  // diagnostic
 bool InstallTokenDictProfile(const Build& build, Mode mode);  // diagnostic
 bool InstallTokenDictCache(const Build& build, Mode mode);
 bool InstallRangeProfile(const Build& build, Mode mode);  // diagnostic
+bool InstallRangeWitness(const Build& build, Mode mode);
 
 // Stops learning and saves the access profile (call on the game-ready event).
 void FinishOpenWarmup();
@@ -42,5 +43,6 @@ void ReportZipProfile();
 void ReportTokenDictProfile();
 void ReportTokenDictCache();
 void ReportRangeProfile();
+void ReportRangeWitness();
 
 }  // namespace sb

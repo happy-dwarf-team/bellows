@@ -59,6 +59,15 @@ struct Build {
     // provinces), the province-to-province distance, and the pointer to the game root object
     // (current date at +0x1DD0)
     uint32_t range_min_distance_fn, province_distance_fn, game_root;
+
+    // range_witness: the call of the range check in 0x3520D0, the map object (coordinates at
+    // [+0x6C0] + id * 0x230 + 0x7C), the straight-line distance, the range bonus check and its
+    // global value, and the two float constants of the walk's sqrt scaling
+    uint32_t range_witness_site, map_global, map_line_fn, range_bonus_fn, range_bonus_global;
+    uint32_t range_scale_const, range_offset_const;
+    // second walk (related countries): their range bonus check and the two getters the walk
+    // falls back to when the country has no modifier object at +0x1420
+    uint32_t related_bonus_fn, related_bonus_default_a, related_bonus_default_b;
 };
 
 inline constexpr Build kBuilds[] = {
@@ -76,6 +85,9 @@ inline constexpr Build kBuilds[] = {
         0x46, 0x48, 0x50, 0x58,
         0x2326720, 0x6E4880, 0x170EA12, 0x170D47E, 0x242B8A0,
         0x3526B0, 0x2D2520, 0x233FE78,
+        0x35214C, 0x233FED8, 0x88A390, 0x3F14A0, 0x233E0BC,
+        0x1DC1938, 0x1D99D94,
+        0x7ACEC0, 0x798DC0, 0x7A73C0,
     },
 };
 
