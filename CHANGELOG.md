@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.7.0](https://github.com/happy-dwarf-team/bellows/compare/v0.6.0...v0.7.0) (2026-10-18)
+
+
+### Features
+
+* **range_profile:** diagnostic counters for the country range check ([#22](https://github.com/happy-dwarf-team/bellows/issues/22)) ([2d3cb86](https://github.com/happy-dwarf-team/bellows/commit/2d3cb86beff06a5191b6d519f29c16f26325abec))
+* **range_witness:** on by default ([#25](https://github.com/happy-dwarf-team/bellows/issues/25)) ([5193824](https://github.com/happy-dwarf-team/bellows/commit/5193824ce35686a2f761e5144381ec997427ab26))
+
+
+### Performance
+
+* **range_witness:** answer the country range check from the last in-range province ([#24](https://github.com/happy-dwarf-team/bellows/issues/24)) ([2ea17d4](https://github.com/happy-dwarf-team/bellows/commit/2ea17d4bc525042a57f9ea51e67c90b43ecb9eb5))
+
 ## [0.6.0](https://github.com/happy-dwarf-team/bellows/compare/v0.5.0...v0.6.0) (2026-10-16)
 
 
