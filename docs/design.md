@@ -278,8 +278,14 @@ Tongs-driven year 1720 at speed 5; lab `docs/simulation-profile.md`):
   on an event pause): −7.0 s (−25.5%), no overlap. Main-thread CPU 19.1 s
   instead of 25.5 s per year.
 
-Open: a full `verify` session with the second walk, other saves and later
-dates, and other country sizes; until then the module is off by default.
+- `verify`, one session from 17 March 1719 to 1 January 1727 (both walks, the
+  game driven year by year at speed 5, two event pauses resumed): 1,106,039
+  checks, 1,021,812 witness answers, 0 disagreements; in 1,016,682 the
+  original stopped at the witness and wrote the same value, 0 different.
+
+On by default since then, like `token_dict_cache` (kept out of the written
+`config.toml`, so existing files get it too). Still open: other saves, mod
+sets and much later dates.
 
 ### attr_cache
 

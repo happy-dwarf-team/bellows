@@ -16,6 +16,8 @@ int main() {
     assert(c.mode("mimalloc") == sb::Mode::On && c.mode("metascript_subst") == sb::Mode::On);
     assert(c.mode("trigger_intern") == sb::Mode::On && c.mode("attr_cache") == sb::Mode::Off);  // attr_cache off by default
     assert(c.mode("token_dict_cache") == sb::Mode::On);  // on by default, also for config files that do not list it
+    assert(c.mode("range_witness") == sb::Mode::On);     // same
+    assert(c.mode("range_profile") == sb::Mode::Off);    // diagnostic
     assert(fs::exists(dir / "config.toml"));
     // The written default parses to the same values.
     c = sb::LoadConfig(dir);
