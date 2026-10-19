@@ -1,0 +1,294 @@
+# Every game address Bellows uses, declared once (Anvil design §5.2). Anvil
+# verifies each symbol against eu4.exe before loading bellows.dll and skips the
+# plugin on any other build or on any mismatch; `anvil gen` turns this file into
+# symbols.gen.hpp (sym::<name>). The bytes, targets and offsets were validated
+# in the lab (Ghidra + byte checks) on the Steam build below; the symbols that
+# only carry `values` prove a global or a struct offset the modules use.
+# After a change run `anvil check plugin --exe <eu4.exe>` and commit symbols.lock.
+build = "eu4-1.37.5-steam-win64"
+
+# --- PhysFS, exported by eu4.exe (verifypath_listing, exists_index) -----------
+
+[symbol.physfs_set_error_code]
+export = "PHYSFS_setErrorCode"
+signature = "void (int code)"
+
+[symbol.physfs_get_last_error_code]
+export = "PHYSFS_getLastErrorCode"
+signature = "int ()"
+
+[symbol.physfs_get_write_dir]
+export = "PHYSFS_getWriteDir"
+signature = "const char* ()"
+
+[symbol.physfs_get_search_path]
+export = "PHYSFS_getSearchPath"
+signature = "char** ()"
+
+[symbol.physfs_free_list]
+export = "PHYSFS_freeList"
+signature = "void (void* list)"
+
+[symbol.physfs_get_mount_point]
+export = "PHYSFS_getMountPoint"
+signature = "const char* (const char* dir)"
+
+[symbol.physfs_symbolic_links_permitted]
+export = "PHYSFS_symbolicLinksPermitted"
+signature = "int ()"
+
+# --- verifypath_listing --------------------------------------------------------
+
+[symbol.verifypath_stat_call]
+rva = 0x19FB7F4
+bytes = "41 FF 51 68 8B E8"            # call [r9+68h]; mov ebp,eax
+memory = "code"
+note = "PhysFS verifyPath: the archiver's stat call and the copy of its result; replaced as a block"
+
+[symbol.dir_archiver_stat]
+rva = 0x1C1D808
+memory = "read"
+points_to = 0x1A07080
+note = "PhysFS DIR archiver function table (0x1C1D7A0) + 0x68: its stat"
+
+# --- exists_index --------------------------------------------------------------
+
+[symbol.fs_exists_slot]
+rva = 0x1D9C998
+memory = "read"
+points_to = 0x15CCE80
+note = "file-system object vtable 0x1D9C968, slot +0x30: does a virtual file exist"
+
+[symbol.fs_exists]
+rva = 0x15CCE80
+bytes = "48 83 EC 28 48 83 7A 18 10 72 03 48 8B 12 48 85 D2 74 18 80 3A 00 74 13"
+memory = "code"
+signature = "bool (void* self, const void* name)"
+note = "thin wrapper around PHYSFS_exists"
+
+# --- trigger_intern ------------------------------------------------------------
+
+[symbol.trigger_intern_args_a]
+rva = 0x205C09
+bytes = "48 8B D7 48 8B C8"            # mov rdx,rdi; mov rcx,rax
+memory = "code"
+note = "the arguments of trigger_intern_call_a: (singleton, node)"
+
+[symbol.trigger_intern_call_a]
+rva = 0x205C0F
+bytes = "E8 CC 58 99 00 48 89 47 58"   # call 0xB9B4E0 (intern); mov [rdi+58h],rax
+memory = "code"
+note = "loading tail, first registry list: node+0x58 = intern(singleton, node)"
+
+[symbol.trigger_intern_args_b]
+rva = 0x205C39
+bytes = "48 8B D7 48 8B C8"            # mov rdx,rdi; mov rcx,rax
+memory = "code"
+note = "the arguments of trigger_intern_call_b"
+
+[symbol.trigger_intern_call_b]
+rva = 0x205C3F
+bytes = "E8 9C 58 99 00 48 89 47 58"   # call 0xB9B4E0 (intern); mov [rdi+58h],rax
+memory = "code"
+note = "loading tail, second registry list"
+
+[symbol.trigger_registry_load]
+rva = 0x205BAA
+bytes = "48 8B 0D 5F A4 13 02"         # mov rcx,[rip -> 0x2340010]
+memory = "code"
+values.trigger_registry = { at = 3, rip_relative = 7, type = "const uintptr_t" }
+note = "loading tail: the trigger registry global the walk reads"
+
+# --- metascript_subst ----------------------------------------------------------
+
+[symbol.metascript_args_a]
+rva = 0xDB0908
+bytes = "4C 8B C6 48 8B D7"            # mov r8,rsi; mov rdx,rdi
+memory = "code"
+note = "the arguments of metascript_call_a: (text, arguments, tokens)"
+
+[symbol.metascript_call_a]
+rva = 0xDB090E
+bytes = "E8 ED 0E 00 00"               # call 0xDB1800 ($param$ substitution)
+memory = "code"
+note = "first call of the substitution in 0xDB0860"
+
+[symbol.metascript_args_b]
+rva = 0xDB0961
+bytes = "4C 8B C6 48 8B D7"            # mov r8,rsi; mov rdx,rdi
+memory = "code"
+note = "the arguments of metascript_call_b"
+
+[symbol.metascript_call_b]
+rva = 0xDB0967
+bytes = "E8 94 0E 00 00"               # call 0xDB1800
+memory = "code"
+note = "second call of the substitution in 0xDB0860"
+
+[symbol.string_assign]
+rva = 0x95110
+bytes = "48 89 5C 24 10 48 89 6C 24 18 56 57 41 57"
+memory = "code"
+signature = "void* (void* text, const char* data, size_t size)"
+note = "the game's std::string assign(data, size)"
+
+# --- PhysFS ZIP archiver (ram_prefetch, zip_profile) ---------------------------
+
+[symbol.zip_open_archive_slot]
+rva = 0x1C1D8C0
+memory = "read"
+points_to = 0x1A073F0
+note = "ZIP archiver table (0x1C1D890) + 0x30: openArchive"
+
+[symbol.zip_open_read_slot]
+rva = 0x1C1D8D0
+memory = "read"
+points_to = 0x1A07580
+note = "ZIP archiver table + 0x40: openRead"
+
+[symbol.zip_close_archive_slot]
+rva = 0x1C1D900
+memory = "read"
+points_to = 0x1A073B0
+note = "ZIP archiver table + 0x70: closeArchive"
+
+[symbol.tinfl_decompress]
+rva = 0x1A08470
+bytes = "48 89 5C 24 20 55 56 57 41 54 41 55 41 56 41 57"
+memory = "code"
+signature = "int (void* state, const uint8_t* in, size_t* in_size, uint8_t* out_start, uint8_t* out_next, size_t* out_size, unsigned flags)"
+note = "miniz tinfl_decompress (pure; the caller owns the state)"
+
+[symbol.zip_io_read_slot]
+rva = 0x1C1D850
+memory = "read"
+points_to = 0x1A07A10
+note = "ZIP Io template (0x1C1D840) + 0x10: read"
+
+[symbol.mz_inflate_call]
+rva = 0x1A0B6CB
+bytes = "E8 00 CA FF FF"               # call 0x1A080D0 (mz_inflate)
+memory = "code"
+note = "the call of mz_inflate outside the ZIP Io read"
+
+# --- token_dict_cache, token_dict_profile --------------------------------------
+
+[symbol.token_lookup_tokenizer_args]
+rva = 0x170EA08
+bytes = "48 8B D6 48 8D 0D 0E 7D C1 00"   # mov rdx,rsi; lea rcx,[rip -> 0x2326720]
+memory = "code"
+values.token_dict = { at = 6, rip_relative = 10, type = "const unsigned char" }
+note = "the arguments of token_lookup_tokenizer_call: (keyword dictionary, key)"
+
+[symbol.token_lookup_tokenizer_call]
+rva = 0x170EA12
+bytes = "E8 69 5E FD FE 48 85 C0"      # call 0x6E4880 (lookup); test rax,rax
+memory = "code"
+note = "the script tokenizer's keyword lookup"
+
+[symbol.token_lookup_get_or_add_args]
+rva = 0x170D477
+bytes = "48 8D 0D A2 92 C1 00"         # lea rcx,[rip -> 0x2326720], the same dictionary
+memory = "code"
+note = "the dictionary argument of token_lookup_get_or_add_call"
+
+[symbol.token_lookup_get_or_add_call]
+rva = 0x170D47E
+bytes = "E8 FD 73 FD FE 48 85 C0"      # call 0x6E4880; test rax,rax
+memory = "code"
+note = "the get-or-add lookup"
+
+[symbol.token_dynamic_tokens]
+rva = 0x170D48F
+bytes = "48 8B 0D 12 E4 D1 00 48 2B 0D 03 E4 D1 00"   # mov rcx,[end]; sub rcx,[begin]
+memory = "code"
+values.token_dynamic_end = { at = 3, rip_relative = 7, type = "const uintptr_t" }
+values.token_dynamic_begin = { at = 10, rip_relative = 14, type = "const uintptr_t" }
+note = "get-or-add: the vector of tokens added at run time"
+
+# --- range_profile, range_witness ----------------------------------------------
+
+[symbol.root_and_date]
+rva = 0x14321FC
+bytes = "48 8B 05 75 DC F0 00 8B 98 D0 1D 00 00"   # mov rax,[root]; mov ebx,[rax+1DD0h]
+memory = "code"
+values.game_root = { at = 3, rip_relative = 7, type = "const unsigned char* const" }
+values.date_offset = { at = 9, size = 4 }
+note = "the game root object and its current date (int32 hours since year -5000)"
+
+[symbol.range_min_distance]
+rva = 0x3526B0
+bytes = "4C 89 4C 24 20 48 89 54 24 10 48 89 4C 24 08"
+memory = "code"
+signature = "int* (void* country, int* out, void* province, void* arg4, int* threshold)"
+note = "the country range check: minimum distance from the country's provinces"
+
+[symbol.province_distance]
+rva = 0x2D2520
+bytes = "4C 89 4C 24 20 4C 89 44 24 18 48 89 54 24 10 48 89 4C 24 08"
+memory = "code"
+signature = "void* (void* out, void* a2, void* a3, void* a4, uintptr_t a5, uintptr_t a6, uintptr_t a7)"
+note = "province-to-province distance"
+
+[symbol.range_check_call]
+rva = 0x35214C
+bytes = "E8 5F 05 00 00"               # call 0x3526B0
+memory = "code"
+note = "0x3520D0 (is the province within the country's range): the call of the range check"
+
+[symbol.range_walk_scale]
+rva = 0x35272E
+bytes = "F3 0F 10 35 02 F2 A6 01 F3 0F 10 3D 56 76 A4 01"   # movss xmm6,[scale]; movss xmm7,[offset]
+memory = "code"
+values.range_scale = { at = 4, rip_relative = 8, type = "const float" }
+values.range_offset = { at = 12, rip_relative = 16, type = "const float" }
+note = "the walk's sqrt scaling of the straight-line distance"
+
+[symbol.range_walk_map]
+rva = 0x3527D5
+bytes = "4C 8B 05 FC D6 FE 01"         # mov r8,[map]
+memory = "code"
+values.map_global = { at = 3, rip_relative = 7, type = "const unsigned char* const" }
+note = "the walk's map object (coordinates at [+0x6C0] + id * 0x230 + 0x7C)"
+
+[symbol.range_walk_bonus]
+rva = 0x352899
+bytes = "8B 3D 1D B8 FE 01"            # mov edi,[bonus]
+memory = "code"
+values.range_bonus_global = { at = 2, rip_relative = 6, type = "const int" }
+note = "the walk's range bonus value"
+
+[symbol.map_line]
+rva = 0x88A390
+bytes = "40 53 48 81 EC 80 00 00 00 41 8B D8 4C 8B DA"
+memory = "code"
+signature = "int (const int* a, const int* b, int width, int height, uint64_t flag)"
+note = "straight-line distance between two map coordinates"
+
+[symbol.range_bonus]
+rva = 0x3F14A0
+bytes = "40 53 48 83 EC 20 48 8B 99 20 14 00 00"
+memory = "code"
+signature = "bool (void* country)"
+note = "the country's range bonus check"
+
+[symbol.related_bonus]
+rva = 0x7ACEC0
+bytes = "48 89 5C 24 08 57 48 83 EC 60 48 8B F9"
+memory = "code"
+signature = "bool (void* modifiers)"
+note = "the range bonus check of the second walk (related countries)"
+
+[symbol.related_bonus_default_a]
+rva = 0x798DC0
+bytes = "40 53 48 83 EC 40"
+memory = "code"
+signature = "unsigned char* ()"
+note = "getter the second walk falls back to when the country has no modifier object at +0x1420"
+
+[symbol.related_bonus_default_b]
+rva = 0x7A73C0
+bytes = "48 89 5C 24 20 55 56 57 48 83 EC 20"
+memory = "code"
+signature = "unsigned char* ()"
+note = "second fallback getter"

@@ -6,8 +6,8 @@
 // the game's opens are serialized by PhysFS, so ~11.5 k first opens put ~50 s
 // on the critical path of a cold start. Worker threads open and immediately
 // close each listed file with the game's parameters, earliest-needed first,
-// outside the PhysFS lock; nothing is read or changed. Workers stop at the
-// ready marker.
+// outside the PhysFS lock; nothing is read or changed. Workers stop when the
+// game is ready.
 //
 // List choice (key = game build + hash of dlc_load.json):
 //   1. <data>/profiles/<key>.txt — learned on previous starts with this mod set;
@@ -46,7 +46,8 @@ std::int64_t g_startQpc = 0;
 std::int64_t g_frequency = 1;
 unsigned g_threads = 8;
 
-CreateFileWFn g_realCreateFileW = nullptr;
+CreateFileWFn g_realCreateFileW = nullptr;  // the rest of the import's chain
+anvil::FunctionHook<HANDLE(LPCWSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES, DWORD, DWORD, HANDLE)> g_createFileHook;
 LearnRecord* g_learn = nullptr;
 volatile LONG g_learnNext = 0;
 volatile LONG g_learnStopped = 0;
@@ -181,7 +182,7 @@ DWORD WINAPI Starter(LPVOID) {
 
 namespace sb {
 
-bool InstallOpenWarmup(const Build& build, Mode mode) {
+bool InstallOpenWarmup(anvil::Host& host, Mode mode) {
     if (mode == Mode::Off) return false;
     wchar_t exe[MAX_PATH * 2] = {};
     const DWORD length = GetModuleFileNameW(nullptr, exe, static_cast<DWORD>(std::size(exe)));
@@ -189,34 +190,35 @@ bool InstallOpenWarmup(const Build& build, Mode mode) {
     try {
         g_gameDir = new std::wstring(exe, length);
         g_gameDir->resize(g_gameDir->find_last_of(L'\\'));
-        g_dataDir = new std::wstring(context().host->data_dir(context().self));
-        g_pluginDir = new std::wstring(context().host->plugin_dir(context().self));
+        g_dataDir = new std::wstring(host.data_dir().wstring());
+        g_pluginDir = new std::wstring(host.plugin_dir().wstring());
         g_paths = new std::vector<std::wstring>();
         g_paths->reserve(16384);
     } catch (...) {
         return false;
     }
-    g_buildId = build.id;
+    g_buildId = host.game().build_id;  // set: symbols.toml names the build
     g_learn = static_cast<LearnRecord*>(
         VirtualAlloc(nullptr, sizeof(LearnRecord) * kLearnCapacity, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
     if (g_learn != nullptr) {
-        void* original = nullptr;
-        const AnvilResult r = context().host->replace_import(context().self, "KERNEL32.dll", "CreateFileW",
-                                                             reinterpret_cast<void*>(&SB_LearnCreateFileW), &original);
-        if (r == ANVIL_OK) {
-            g_realCreateFileW = reinterpret_cast<CreateFileWFn>(original);
+        try {
+            host.replace_import(g_createFileHook, "KERNEL32.dll", "CreateFileW", &SB_LearnCreateFileW);
+            g_realCreateFileW = g_createFileHook.next_pointer();
             InterlockedExchange(&EU4SB_OpenWarmupLearn.mode, 1);
-        } else {
-            Log(ANVIL_LOG_WARNING, "open_warmup: learning off, CreateFileW import refused (%s)", ResultName(r));
+        } catch (const anvil::Error& e) {
+            Log(ANVIL_LOG_WARNING, "open_warmup: learning off (%s)", e.what());
         }
     }
     HANDLE starter = CreateThread(nullptr, 0, &Starter, nullptr, 0, nullptr);
-    if (starter == nullptr) return false;
+    if (starter == nullptr) {
+        g_createFileHook.remove();
+        return false;
+    }
     CloseHandle(starter);
     return true;
 }
 
-// Called on the game-ready event: stop learning and save the merged profile.
+// Called after the game-ready event: stop learning and save the merged profile.
 void FinishOpenWarmup() {
     if (g_learn == nullptr || EU4SB_OpenWarmupLearn.mode == 0 || g_profileTarget == nullptr) return;
     InterlockedExchange(&g_learnStopped, 1);

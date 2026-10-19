@@ -7,14 +7,16 @@
 // stat slot (call [r9+68h]) only to learn: did the stat succeed, is the entry a
 // symlink (filetype 2), and on failure is the error PHYSFS_ERR_NOT_FOUND (0xb).
 //
-// The call site is redirected (byte-checked, through Anvil) to a stub that
-// calls SB_VerifyPathStat. For the directory archiver it answers from
+// The call and the following `mov ebp,eax` are replaced as one block (Anvil
+// replace_block on the declared symbol verifypath_stat_call): the callback
+// calls SB_VerifyPathStat with the call's arguments and writes its result to
+// eax and ebp. For the directory archiver it answers from
 // once-read directory listings exactly as the platform stat would for
 // verifyPath's purposes: existing directory/junction -> rc 1, filetype 1;
 // existing file -> rc 1, filetype 0; missing name or directory -> rc 0 with
 // PHYSFS_setErrorCode(0xb). Symbolic links, other reparse points, unusual
 // spellings, non-directory archives, unreadable listings, a disabled module
-// and anything after the ready marker go to the original stat. Every 256th
+// and anything after the game is ready go to the original stat. Every 256th
 // answer is compared with the original; a disagreement disables the module
 // ("verify" mode compares every answer). Assumes game and mod files do not
 // change while the game starts.
@@ -26,8 +28,8 @@
 
 namespace {
 
-constexpr unsigned char kSiteBytes[6] = {0x41, 0xFF, 0x51, 0x68, 0x8B, 0xE8};  // call [r9+68h]; mov ebp,eax
 constexpr int kPhysfsNotFound = 0xB;
+constexpr std::size_t kArchiverStat = 0x68;  // the stat slot of a PhysFS archiver function table
 
 using StatFn = int (*)(void*, const char*, void*);
 using SetErrorFn = void (*)(int);
@@ -214,7 +216,7 @@ bool Disabled() noexcept {
 
 extern "C" int SB_VerifyPathStat(void* opaque, const char* name, void* statOut, const void* funcs) {
     sb::Increment(&EU4SB_VerifyPathStats.requests);
-    const auto original = *reinterpret_cast<const StatFn*>(static_cast<const unsigned char*>(funcs) + 0x68);
+    const auto original = *reinterpret_cast<const StatFn*>(static_cast<const unsigned char*>(funcs) + kArchiverStat);
     try {
         Kind kind = Kind::Unknown;
         const Answer answer = (Disabled() || reinterpret_cast<uintptr_t>(funcs) != g_dirArchiver || g_listings == nullptr)
@@ -269,52 +271,30 @@ extern "C" int SB_VerifyPathStat(void* opaque, const char* name, void* statOut, 
 
 namespace sb {
 
-bool InstallVerifyPathListing(const Build& build, Mode mode) {
+bool InstallVerifyPathListing(anvil::Host& host, Mode mode) {
     if (mode == Mode::Off) return false;
-    HMODULE image = reinterpret_cast<HMODULE>(context().image_base);
-    g_setError = reinterpret_cast<SetErrorFn>(GetProcAddress(image, "PHYSFS_setErrorCode"));
-    g_getError = reinterpret_cast<GetErrorFn>(GetProcAddress(image, "PHYSFS_getLastErrorCode"));
-    g_getWriteDir = reinterpret_cast<GetWriteDirFn>(GetProcAddress(image, "PHYSFS_getWriteDir"));
-    if (!g_setError || !g_getError || !g_getWriteDir) {
-        Log(ANVIL_LOG_WARNING, "verifypath: PhysFS exports not found; module off");
-        return false;
-    }
-    if (*AtRva<uintptr_t>(build.dir_archiver + 0x68) != context().image_base + build.dir_stat) {
-        Log(ANVIL_LOG_WARNING, "verifypath: unexpected DIR archiver stat entry; module off");
-        return false;
-    }
+    g_setError = host.function(sym::physfs_set_error_code);
+    g_getError = host.function(sym::physfs_get_last_error_code);
+    g_getWriteDir = host.function(sym::physfs_get_write_dir);
     try {
         g_listings = new std::unordered_map<std::wstring, std::shared_ptr<const Listing>>();
     } catch (...) {
         return false;
     }
-    g_dirArchiver = context().image_base + build.dir_archiver;
+    // Anvil verified that the table's stat slot points to the DIR archiver's stat.
+    g_dirArchiver = reinterpret_cast<uintptr_t>(host.address(sym::dir_archiver_stat)) - kArchiverStat;
     g_verifyAll = mode == Mode::Verify;
 
-    // Stub: sub rsp,28h; call [rip+16h] (slot at +0x20); add rsp,28h; mov ebp,eax; ret
-    const AnvilHost* host = context().host;
-    auto* stub = static_cast<unsigned char*>(host->alloc_near_image(context().self, 0x28));
-    if (stub == nullptr) {
-        Log(ANVIL_LOG_WARNING, "verifypath: no memory near the image; module off");
-        return false;
-    }
-    const unsigned char code[] = {0x48, 0x83, 0xEC, 0x28, 0xFF, 0x15, 0x16, 0x00, 0x00, 0x00,
-                                  0x48, 0x83, 0xC4, 0x28, 0x8B, 0xE8, 0xC3};
-    std::memset(stub, 0xCC, 0x28);
-    std::memcpy(stub, code, sizeof(code));
-    const uintptr_t target = reinterpret_cast<uintptr_t>(&SB_VerifyPathStat);
-    std::memcpy(stub + 0x20, &target, sizeof(target));
-    FlushInstructionCache(GetCurrentProcess(), stub, 0x28);
-
-    const uintptr_t site = context().image_base + build.verifypath_site;
-    unsigned char call[6] = {0xE8, 0, 0, 0, 0, 0x90};
-    const auto rel = static_cast<std::int32_t>(reinterpret_cast<intptr_t>(stub) - static_cast<intptr_t>(site + 5));
-    std::memcpy(call + 1, &rel, sizeof(rel));
-    const AnvilResult r = host->patch_bytes(context().self, build.verifypath_site, kSiteBytes, call, sizeof(call));
-    if (r != ANVIL_OK) {
-        Log(ANVIL_LOG_WARNING, "verifypath: call site refused (%s); module off", ResultName(r));
-        return false;
-    }
+    // The block is `call [r9+68h]` (stat(opaque = rcx, name = rdx, stat = r8),
+    // r9 = the archiver's function table) and `mov ebp,eax`. The callback runs
+    // instead and the game resumes after the block; the call's volatile
+    // registers are free at that point, as after any call.
+    host.replace_block(sym::verifypath_stat_call, [](anvil::Cpu& cpu) {
+            const int rc = SB_VerifyPathStat(reinterpret_cast<void*>(cpu.rcx), reinterpret_cast<const char*>(cpu.rdx),
+                                             reinterpret_cast<void*>(cpu.r8), reinterpret_cast<const void*>(cpu.r9));
+            cpu.rax = static_cast<std::uint32_t>(rc);
+            cpu.rbp = static_cast<std::uint32_t>(rc);  // mov ebp,eax zero-extends
+        }).release();  // kept for the process
     InterlockedExchange(&EU4SB_VerifyPathStats.mode, 1);
     InterlockedExchange(&EU4SB_VerifyPathStats.initialized, 1);
     return true;

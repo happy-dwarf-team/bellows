@@ -7,11 +7,12 @@
 // the whole search path with several GetFileAttributesExW calls (~5 s of CPU
 // during database loading in the lab).
 //
-// This module replaces that vtable slot (byte-checked through Anvil). A query
+// This module swaps that vtable slot (Anvil swap_pointer on the declared slot
+// fs_exists_slot; the original's first bytes are declared too). A query
 // is answered "exists" only when the path is found in a once-read listing of a
 // *directory* entry of the PhysFS search path mounted at "/". Everything else
 // (archives such as DLC zips, unusual spellings, symlinks, other mount points,
-// a disabled index, after the ready marker) goes to the original function, so
+// a disabled index, after the game is ready) goes to the original function, so
 // a "not found" is never invented. Every 256th positive answer is checked
 // against the original ("verify": every one); a mismatch disables the index.
 #include "modules.hpp"
@@ -22,10 +23,6 @@
 #include <vector>
 
 namespace {
-
-constexpr unsigned char kOriginalExistsPrefix[] = {
-    0x48, 0x83, 0xEC, 0x28, 0x48, 0x83, 0x7A, 0x18, 0x10, 0x72, 0x03, 0x48,
-    0x8B, 0x12, 0x48, 0x85, 0xD2, 0x74, 0x18, 0x80, 0x3A, 0x00, 0x74, 0x13};
 
 using ExistsFn = bool (*)(void*, const void*);
 using GetSearchPathFn = char** (*)();
@@ -54,7 +51,9 @@ struct State {
     volatile LONG64 positiveSequence = 0;
 };
 
-ExistsFn g_originalExists = nullptr;
+// The rest of the slot's chain (the original function unless another plugin
+// swapped the slot too); Anvil rewrites it while the chain changes.
+anvil::PointerSwap<bool(void*, const void*)> g_existsSlot;
 State* g_state = nullptr;
 GetSearchPathFn g_getSearchPath = nullptr;
 FreeListFn g_freeList = nullptr;
@@ -269,14 +268,14 @@ extern "C" bool SB_FileExists(void* self, const void* name) {
             name == nullptr || !ReadMsvcString(name, text, length) || !SplitVirtualPath(text, length, parts)) {
             sb::Increment(&EU4SB_ExistsStats.skips);
             SetLastError(priorError);
-            return g_originalExists(self, name);
+            return g_existsSlot.previous()(self, name);
         }
         InitOnceExecuteOnce(&g_initOnce, InitializeState, nullptr, nullptr);
         State* state = g_state;
         if (state == nullptr || state->roots.empty()) {
             sb::Increment(&EU4SB_ExistsStats.skips);
             SetLastError(priorError);
-            return g_originalExists(self, name);
+            return g_existsSlot.previous()(self, name);
         }
         bool found = false;
         for (std::size_t root = 0; root < state->roots.size() && !found; ++root) {
@@ -285,12 +284,12 @@ extern "C" bool SB_FileExists(void* self, const void* name) {
         SetLastError(priorError);
         if (!found) {
             sb::Increment(&EU4SB_ExistsStats.misses);
-            return g_originalExists(self, name);
+            return g_existsSlot.previous()(self, name);
         }
         const LONG64 sequence = InterlockedIncrement64(&state->positiveSequence);
         if (g_verifyAll || (sequence & 255) == 0) {
             sb::Increment(&EU4SB_ExistsStats.verifications);
-            if (!g_originalExists(self, name)) {
+            if (!g_existsSlot.previous()(self, name)) {
                 sb::Increment(&EU4SB_ExistsStats.mismatches);
                 if (!g_verifyAll) InterlockedExchange(&EU4SB_ExistsStats.cacheDisabled, 1);
                 SetLastError(priorError);
@@ -303,39 +302,21 @@ extern "C" bool SB_FileExists(void* self, const void* name) {
     } catch (...) {
         sb::Increment(&EU4SB_ExistsStats.skips);
         SetLastError(priorError);
-        return g_originalExists(self, name);
+        return g_existsSlot.previous()(self, name);
     }
 }
 
 namespace sb {
 
-bool InstallExistsIndex(const Build& build, Mode mode) {
+bool InstallExistsIndex(anvil::Host& host, Mode mode) {
     if (mode == Mode::Off) return false;
-    HMODULE image = reinterpret_cast<HMODULE>(context().image_base);
-    g_getSearchPath = reinterpret_cast<GetSearchPathFn>(GetProcAddress(image, "PHYSFS_getSearchPath"));
-    g_freeList = reinterpret_cast<FreeListFn>(GetProcAddress(image, "PHYSFS_freeList"));
-    g_getMountPoint = reinterpret_cast<GetMountPointFn>(GetProcAddress(image, "PHYSFS_getMountPoint"));
-    g_symlinksPermitted = reinterpret_cast<SymlinksPermittedFn>(GetProcAddress(image, "PHYSFS_symbolicLinksPermitted"));
-    g_getWriteDir = reinterpret_cast<GetWriteDirFn>(GetProcAddress(image, "PHYSFS_getWriteDir"));
-    if (!g_getSearchPath || !g_freeList || !g_getMountPoint || !g_getWriteDir) {
-        Log(ANVIL_LOG_WARNING, "exists_index: PhysFS exports not found; module off");
-        return false;
-    }
-    const auto* code = AtRva<const unsigned char>(build.fs_exists_original);
-    if (std::memcmp(code, kOriginalExistsPrefix, sizeof(kOriginalExistsPrefix)) != 0) {
-        Log(ANVIL_LOG_WARNING, "exists_index: unexpected code at the original function; module off");
-        return false;
-    }
-    g_originalExists = reinterpret_cast<ExistsFn>(const_cast<unsigned char*>(code));
+    g_getSearchPath = host.function(sym::physfs_get_search_path);
+    g_freeList = host.function(sym::physfs_free_list);
+    g_getMountPoint = host.function(sym::physfs_get_mount_point);
+    g_symlinksPermitted = host.function(sym::physfs_symbolic_links_permitted);
+    g_getWriteDir = host.function(sym::physfs_get_write_dir);
     g_verifyAll = mode == Mode::Verify;
-    const uintptr_t expected = reinterpret_cast<uintptr_t>(code);
-    const uintptr_t replacement = reinterpret_cast<uintptr_t>(&SB_FileExists);
-    const AnvilResult r = context().host->patch_bytes(context().self, build.fs_vtable_exists_slot, &expected,
-                                                       &replacement, sizeof(uintptr_t));
-    if (r != ANVIL_OK) {
-        Log(ANVIL_LOG_WARNING, "exists_index: vtable slot refused (%s); module off", ResultName(r));
-        return false;
-    }
+    host.swap(g_existsSlot, sym::fs_exists_slot, &SB_FileExists);
     InterlockedExchange(&EU4SB_ExistsStats.mode, 1);
     return true;
 }

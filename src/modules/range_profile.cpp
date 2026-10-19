@@ -25,20 +25,17 @@ using MinDistanceFn = int* (*)(void* country, int* out, void* province, void* ar
 using DistanceFn = void* (*)(void* out, void* a2, void* a3, void* a4, std::uintptr_t a5, std::uintptr_t a6,
                              std::uintptr_t a7);
 
-// First instructions of 0x3526B0: mov [rsp+20h],r9; mov [rsp+10h],rdx; mov [rsp+8],rcx
-constexpr unsigned char kMinDistancePrologue[] = {0x4C, 0x89, 0x4C, 0x24, 0x20, 0x48, 0x89, 0x54,
-                                                  0x24, 0x10, 0x48, 0x89, 0x4C, 0x24, 0x08};
-// First instructions of 0x2D2520: mov [rsp+20h],r9; mov [rsp+18h],r8; mov [rsp+10h],rdx; mov [rsp+8],rcx
-constexpr unsigned char kDistancePrologue[] = {0x4C, 0x89, 0x4C, 0x24, 0x20, 0x4C, 0x89, 0x44, 0x24, 0x18,
-                                               0x48, 0x89, 0x54, 0x24, 0x10, 0x48, 0x89, 0x4C, 0x24, 0x08};
 constexpr std::size_t kProvinceId = 0x20;  // int16 province id in the province object
 constexpr std::size_t kCountryId = 0x24;   // int16 tag index in the country object
-constexpr std::size_t kRootDate = 0x1DD0;  // int32 hours since year -5000 (game root object)
 constexpr DWORD kWriteEveryMs = 5000;
 
-MinDistanceFn g_minDistance = nullptr;
+// Both functions are declared with their first instructions in symbols.toml.
+anvil::HookOf<sym::range_min_distance> g_minDistanceHook;
+anvil::HookOf<sym::province_distance> g_distanceHook;
+MinDistanceFn g_minDistance = nullptr;  // the rest of each hook's chain
 DistanceFn g_distance = nullptr;
-const void* const* g_rootGlobal = nullptr;
+const unsigned char* const* g_rootGlobal = nullptr;
+std::size_t g_rootDate = 0;  // int32 hours since year -5000 in the game root object
 std::uintptr_t g_imageBase = 0;
 
 SRWLOCK g_lock = SRWLOCK_INIT;
@@ -51,9 +48,9 @@ thread_local int t_depth = 0;          // nesting of 0x3526B0 on this thread
 thread_local int t_distanceCalls = 0;  // 0x2D2520 calls inside the outermost 0x3526B0
 
 int GameDay() noexcept {
-    const void* root = *g_rootGlobal;
+    const unsigned char* root = *g_rootGlobal;
     if (root == nullptr) return 0;
-    const std::int32_t raw = sb::Read<std::int32_t>(root, kRootDate);
+    const std::int32_t raw = sb::Read<std::int32_t>(root, g_rootDate);
     return static_cast<int>((static_cast<std::int64_t>(raw) - 43'800'000) / 24);
 }
 
@@ -134,33 +131,25 @@ __declspec(dllexport) sb::Stats EU4SB_RangeProfileStats = SB_STATS_INIT;
 
 namespace sb {
 
-bool InstallRangeProfile(const Build& build, Mode mode) {
+bool InstallRangeProfile(anvil::Host& host, Mode mode) {
     if (mode == Mode::Off) return false;
     try {
         g_stats = new RangeStats();
-        g_dir = new std::wstring(context().host->data_dir(context().self));
+        g_dir = new std::wstring(host.data_dir().wstring());
     } catch (...) {
         return false;
     }
-    g_imageBase = context().image_base;
-    g_rootGlobal = AtRva<const void* const>(build.game_root);
-    void* original = nullptr;
-    AnvilResult r = context().host->hook_function(context().self, build.range_min_distance_fn, kMinDistancePrologue,
-                                                   sizeof kMinDistancePrologue,
-                                                   reinterpret_cast<void*>(&MinDistanceDetour), &original);
-    if (r != ANVIL_OK) {
-        Log(ANVIL_LOG_WARNING, "range_profile: cannot hook the range check (%s); module off", ResultName(r));
-        return false;
-    }
-    g_minDistance = reinterpret_cast<MinDistanceFn>(original);
-    r = context().host->hook_function(context().self, build.province_distance_fn, kDistancePrologue, sizeof kDistancePrologue,
-                                      reinterpret_cast<void*>(&DistanceDetour), &original);
-    if (r != ANVIL_OK) {
-        // The first hook only observes; leaving it in place is harmless, but say what is missing.
-        Log(ANVIL_LOG_WARNING, "range_profile: cannot hook the province distance (%s); distance counts stay 0",
-            ResultName(r));
-    } else {
-        g_distance = reinterpret_cast<DistanceFn>(original);
+    g_imageBase = host.game().image_base;
+    g_rootGlobal = host.data(sym::game_root);
+    g_rootDate = static_cast<std::size_t>(host.value(sym::root_and_date, "date_offset"));
+    host.hook(g_minDistanceHook, sym::range_min_distance, &MinDistanceDetour);
+    g_minDistance = g_minDistanceHook.next_pointer();
+    try {
+        host.hook(g_distanceHook, sym::province_distance, &DistanceDetour);
+        g_distance = g_distanceHook.next_pointer();
+    } catch (const anvil::Error& e) {
+        // The first hook only observes; keeping it is harmless, but say what is missing.
+        Log(ANVIL_LOG_WARNING, "range_profile: distance counts stay 0 (%s)", e.what());
     }
     HANDLE thread = CreateThread(nullptr, 0, WriterThread, nullptr, 0, nullptr);
     if (thread != nullptr) {
@@ -169,8 +158,8 @@ bool InstallRangeProfile(const Build& build, Mode mode) {
     }
     InterlockedExchange(&EU4SB_RangeProfileStats.mode, 1);
     InterlockedExchange(&EU4SB_RangeProfileStats.initialized, 1);
-    Log(ANVIL_LOG_INFO, "range_profile: observing 0x%X and 0x%X; counters in range_profile*.tsv every %u s",
-        build.range_min_distance_fn, build.province_distance_fn, kWriteEveryMs / 1000);
+    Log(ANVIL_LOG_INFO, "range_profile: observing the range check and the province distance; counters in "
+        "range_profile*.tsv every %u s", kWriteEveryMs / 1000);
     return true;
 }
 

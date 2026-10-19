@@ -10,12 +10,13 @@
 // For tokens that are sorted, non-overlapping and inside the text, and for
 // NUL-free text and values, that equals one forward pass: text[0:s0] + value0 +
 // text[e0:s1] + ... + text[en:]. Both call sites are redirected (Anvil
-// redirect_call + byte checks) to SB_MetascriptSubst, which checks those
+// redirect_call on the declared sites, the argument set-up declared too) to
+// SB_MetascriptSubst / SB_MetascriptSubstB, which check those
 // preconditions, builds the result once and stores it with the game's own
 // string assign. Anything else goes to the original. "verify" = compute ours,
 // run the original, compare (the game keeps the original's result); "on" =
 // ours, every 256th call compared (on a mismatch the original's result stays
-// and the module disables itself). Not used after the ready marker.
+// and the module disables itself). Not used once the game is ready.
 #include "modules.hpp"
 
 #include <string>
@@ -34,16 +35,20 @@ constexpr std::size_t kTokenEnd = 0x24;
 using SubstFn = void (*)(void*, void*, void*, void*);
 using AssignFn = void* (*)(void*, const char*, std::size_t);
 
-SubstFn g_original = nullptr;
+// The rest of each call site's chain (the game's substitution unless another
+// plugin redirected the site too).
+SubstFn g_original = nullptr;   // first site
+SubstFn g_originalB = nullptr;  // second site
+anvil::FunctionHook<void(void*, void*, void*, void*)> g_siteA, g_siteB;
 AssignFn g_assign = nullptr;
 bool g_verifyOnly = false;
 volatile LONG64 g_sequence = 0;
 volatile LONG64 g_ticksTotal = 0;
 volatile LONG64 g_ticksOriginal = 0;
 
-void CallOriginal(void* unused, void* text, void* arguments, void* tokens) {
+void CallOriginal(SubstFn original, void* unused, void* text, void* arguments, void* tokens) {
     sb::ScopedTicks t(&g_ticksOriginal);
-    g_original(unused, text, arguments, tokens);
+    original(unused, text, arguments, tokens);
 }
 
 // MSVC std::string: buffer/pointer +0x00, size +0x10, capacity +0x18 (SSO when capacity < 16).
@@ -134,7 +139,9 @@ bool Disabled() noexcept {
 
 }  // namespace
 
-extern "C" void SB_MetascriptSubst(void* unused, void* text, void* arguments, void* tokens) {
+namespace {
+
+void Subst(SubstFn original, void* unused, void* text, void* arguments, void* tokens) {
     sb::ScopedTicks total(&g_ticksTotal);
     sb::Increment(&EU4SB_MetascriptStats.requests);
     std::string result;
@@ -149,13 +156,13 @@ extern "C" void SB_MetascriptSubst(void* unused, void* text, void* arguments, vo
     }
     if (!ours) {
         sb::Increment(&EU4SB_MetascriptStats.skips);
-        CallOriginal(unused, text, arguments, tokens);
+        CallOriginal(original, unused, text, arguments, tokens);
         return;
     }
     const LONG64 sequence = InterlockedIncrement64(&g_sequence);
     if (g_verifyOnly || (sequence & 255) == 1) {
         sb::Increment(&EU4SB_MetascriptStats.verifications);
-        CallOriginal(unused, text, arguments, tokens);
+        CallOriginal(original, unused, text, arguments, tokens);
         if (!Equal(StringView(text), View{result.data(), result.size()})) {
             sb::Increment(&EU4SB_MetascriptStats.mismatches);
             if (!g_verifyOnly) InterlockedExchange(&EU4SB_MetascriptStats.cacheDisabled, 1);
@@ -171,31 +178,30 @@ extern "C" void SB_MetascriptSubst(void* unused, void* text, void* arguments, vo
     InterlockedExchangeAdd64(&EU4SB_MetascriptStats.duplicateKeys, used);
 }
 
+}  // namespace
+
+extern "C" void SB_MetascriptSubst(void* unused, void* text, void* arguments, void* tokens) {
+    Subst(g_original, unused, text, arguments, tokens);
+}
+extern "C" void SB_MetascriptSubstB(void* unused, void* text, void* arguments, void* tokens) {
+    Subst(g_originalB, unused, text, arguments, tokens);
+}
+
 namespace sb {
 
-bool InstallMetascriptSubst(const Build& build, Mode mode) {
+bool InstallMetascriptSubst(anvil::Host& host, Mode mode) {
     if (mode == Mode::Off) return false;
-    // Each site: "mov r8,rsi; mov rdx,rdi; call <subst>".
-    for (uint32_t site : build.metascript_sites) {
-        const unsigned char* bytes = AtRva<const unsigned char>(site - 6);
-        const unsigned char before[6] = {0x4C, 0x8B, 0xC6, 0x48, 0x8B, 0xD7};
-        if (std::memcmp(bytes, before, sizeof(before)) != 0) {
-            Log(ANVIL_LOG_WARNING, "metascript_subst: unexpected code around call site; module off");
-            return false;
-        }
-    }
-    g_original = reinterpret_cast<SubstFn>(AtRva<unsigned char>(build.metascript_subst_fn));
-    g_assign = reinterpret_cast<AssignFn>(AtRva<unsigned char>(build.string_assign_fn));
+    // Each site (declared with its set-up): "mov r8,rsi; mov rdx,rdi; call <subst>".
+    g_assign = host.function(sym::string_assign);
     g_verifyOnly = mode == Mode::Verify;
-    const AnvilHost* host = context().host;
-    for (uint32_t site : build.metascript_sites) {
-        const AnvilResult r = host->redirect_call(context().self, site, build.metascript_subst_fn,
-                                                  reinterpret_cast<void*>(&SB_MetascriptSubst));
-        if (r != ANVIL_OK) {
-            Log(ANVIL_LOG_WARNING, "metascript_subst: call site refused (%s)", ResultName(r));
-            return false;
-        }
-    }
+    Undo undo;
+    host.redirect(g_siteA, sym::metascript_call_a, &SB_MetascriptSubst);
+    undo.add(g_siteA);
+    host.redirect(g_siteB, sym::metascript_call_b, &SB_MetascriptSubstB);
+    undo.add(g_siteB);
+    g_original = g_siteA.next_pointer();
+    g_originalB = g_siteB.next_pointer();
+    undo.keep();
     InterlockedExchange(&EU4SB_MetascriptStats.mode, g_verifyOnly ? 2 : 1);
     InterlockedExchange(&EU4SB_MetascriptStats.initialized, 1);
     return true;

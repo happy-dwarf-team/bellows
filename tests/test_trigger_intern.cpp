@@ -357,9 +357,9 @@ int main() {
         assert(g_reference.count(text));
     }
 
-    static volatile unsigned char ready = 0;
+    volatile LONG& ready = sb::g_gameReady;  // set by the anvil-game ready event in the plugin
+    ready = 0;
     static volatile std::uintptr_t registrySlot = Registry(registry.size(), 0);
-    sb::context().ready_marker = &ready;
     g_original = &MockOriginal;
     g_registrySlot = &registrySlot;
     g_state = new State();

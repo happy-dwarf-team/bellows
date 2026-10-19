@@ -126,47 +126,70 @@ extern "C" SIZE_T WINAPI SB_HeapSize(HANDLE heap, DWORD flags, LPCVOID pointer) 
 
 namespace sb {
 
-bool InstallMimalloc(const Build& build, Mode mode) {
+namespace {
+
+anvil::FunctionHook<LPVOID(HANDLE, DWORD, SIZE_T)> g_allocHook;
+anvil::FunctionHook<BOOL(HANDLE, DWORD, LPVOID)> g_freeHook;
+anvil::FunctionHook<LPVOID(HANDLE, DWORD, LPVOID, SIZE_T)> g_reAllocHook;
+anvil::FunctionHook<SIZE_T(HANDLE, DWORD, LPCVOID)> g_sizeHook;
+
+// The pointer eu4.exe's import slot of KERNEL32.dll!<function> holds now, or 0.
+uintptr_t ImportSlotValue(const char* function) {
+    auto* base = reinterpret_cast<const unsigned char*>(anvil::Host{}.game().image_base);
+    const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(base);
+    const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS64*>(base + dos->e_lfanew);
+    const auto& dir = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
+    if (dir.VirtualAddress == 0) return 0;
+    for (auto* desc = reinterpret_cast<const IMAGE_IMPORT_DESCRIPTOR*>(base + dir.VirtualAddress); desc->Name != 0; ++desc) {
+        if (_stricmp(reinterpret_cast<const char*>(base + desc->Name), "KERNEL32.dll") != 0) continue;
+        const auto* names = reinterpret_cast<const IMAGE_THUNK_DATA64*>(
+            base + (desc->OriginalFirstThunk ? desc->OriginalFirstThunk : desc->FirstThunk));
+        const auto* slots = reinterpret_cast<const IMAGE_THUNK_DATA64*>(base + desc->FirstThunk);
+        for (; names->u1.AddressOfData != 0; ++names, ++slots) {
+            if (IMAGE_SNAP_BY_ORDINAL64(names->u1.Ordinal)) continue;
+            const auto* byName = reinterpret_cast<const IMAGE_IMPORT_BY_NAME*>(base + names->u1.AddressOfData);
+            if (std::strcmp(reinterpret_cast<const char*>(byName->Name), function) == 0) {
+                return static_cast<uintptr_t>(slots->u1.Function);
+            }
+        }
+    }
+    return 0;
+}
+
+}  // namespace
+
+bool InstallMimalloc(anvil::Host& host, Mode mode) {
     if (mode == Mode::Off) return false;
     HMODULE kernel32 = GetModuleHandleW(L"kernel32.dll");
     if (kernel32 == nullptr) return false;
-    struct Slot {
-        uint32_t rva;
-        const char* name;
-        void* replacement;
-        void** original;
-    } slots[] = {
-        // HeapAlloc last: until it is switched no mimalloc block exists, so the
-        // other three hooks only forward and a partial install stays correct.
-        {build.heap_free_iat, "HeapFree", reinterpret_cast<void*>(&SB_HeapFree), reinterpret_cast<void**>(&g_realFree)},
-        {build.heap_realloc_iat, "HeapReAlloc", reinterpret_cast<void*>(&SB_HeapReAlloc),
-         reinterpret_cast<void**>(&g_realReAlloc)},
-        {build.heap_size_iat, "HeapSize", reinterpret_cast<void*>(&SB_HeapSize), reinterpret_cast<void**>(&g_realSize)},
-        {build.heap_alloc_iat, "HeapAlloc", reinterpret_cast<void*>(&SB_HeapAlloc), reinterpret_cast<void**>(&g_realAlloc)},
-    };
-    // All four slots must hold exactly the kernel32 export before any is replaced.
-    uintptr_t expected[4] = {};
-    for (int i = 0; i < 4; ++i) {
-        expected[i] = reinterpret_cast<uintptr_t>(GetProcAddress(kernel32, slots[i].name));
-        if (expected[i] == 0 || *AtRva<uintptr_t>(slots[i].rva) != expected[i]) {
-            Log(ANVIL_LOG_WARNING, "mimalloc: IAT slot of %s is not the kernel32 export; module off", slots[i].name);
+    // All four import slots must still hold exactly the kernel32 export (no
+    // other hook in between) before any is replaced: mimalloc must own every
+    // block it frees.
+    for (const char* name : {"HeapAlloc", "HeapFree", "HeapReAlloc", "HeapSize"}) {
+        const uintptr_t expected = reinterpret_cast<uintptr_t>(GetProcAddress(kernel32, name));
+        if (expected == 0 || ImportSlotValue(name) != expected) {
+            Log(ANVIL_LOG_WARNING, "mimalloc: import slot of %s is not the kernel32 export; module off", name);
             return false;
         }
-        *slots[i].original = reinterpret_cast<void*>(expected[i]);
     }
     g_processHeap = GetProcessHeap();
     mi_process_init();
-    const AnvilHost* host = context().host;
-    for (int i = 0; i < 4; ++i) {
-        const uintptr_t replacement = reinterpret_cast<uintptr_t>(slots[i].replacement);
-        const AnvilResult r = host->patch_bytes(context().self, slots[i].rva, &expected[i], &replacement, sizeof(uintptr_t));
-        if (r != ANVIL_OK) {
-            // Slots already replaced only forward (HeapAlloc was not switched),
-            // so the game keeps using kernel32; the module counts as off.
-            Log(ANVIL_LOG_WARNING, "mimalloc: patching %s refused (%s); module off", slots[i].name, ResultName(r));
-            return false;
-        }
-    }
+    Undo undo;
+    // Anvil enables the four together when load() returns, at the entry point
+    // (only the main thread runs game code); HeapAlloc is still requested last.
+    host.replace_import(g_freeHook, "KERNEL32.dll", "HeapFree", &SB_HeapFree);
+    undo.add(g_freeHook);
+    host.replace_import(g_reAllocHook, "KERNEL32.dll", "HeapReAlloc", &SB_HeapReAlloc);
+    undo.add(g_reAllocHook);
+    host.replace_import(g_sizeHook, "KERNEL32.dll", "HeapSize", &SB_HeapSize);
+    undo.add(g_sizeHook);
+    host.replace_import(g_allocHook, "KERNEL32.dll", "HeapAlloc", &SB_HeapAlloc);
+    undo.add(g_allocHook);
+    g_realFree = g_freeHook.next_pointer();
+    g_realReAlloc = g_reAllocHook.next_pointer();
+    g_realSize = g_sizeHook.next_pointer();
+    g_realAlloc = g_allocHook.next_pointer();
+    undo.keep();
     InterlockedExchange(&EU4SB_MimallocStats.mode, 1);
     InterlockedExchange(&EU4SB_MimallocStats.initialized, 1);
     return true;

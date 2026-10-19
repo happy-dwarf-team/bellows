@@ -1,9 +1,11 @@
 #pragma once
 
-// Shared plumbing for the modules: the Anvil host, counters in the lab's
-// 80-byte layout, the ready marker and small memory helpers.
+// Shared plumbing for the modules: counters in the lab's 80-byte layout, the
+// game-ready flag, the log, the undo list of a module's changes and small
+// memory helpers. The Anvil host is anvil::Host{} (anvil.hpp), usable on any
+// thread once the plugin is loading.
 
-#include <anvil/anvil_plugin.h>
+#include <anvil/anvil.hpp>
 
 #include <windows.h>
 
@@ -11,7 +13,9 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <functional>
 #include <string>
+#include <vector>
 
 namespace sb {
 
@@ -41,25 +45,12 @@ inline void Increment(volatile LONG64* value) noexcept { InterlockedIncrement64(
 
 enum class Mode { Off, On, Verify };
 
-struct Context {
-    const AnvilHost* host = nullptr;
-    AnvilPlugin* self = nullptr;
-    uintptr_t image_base = 0;
-    uint32_t image_size = 0;
-    volatile const uint8_t* ready_marker = nullptr;  // becomes 1 when the game finished initializing
-};
+// 1 once anvil-game published its ready event (the game finished
+// initializing, the main menu is up). A plain volatile read: aligned 32-bit
+// loads are atomic on x64, and the hot paths read it on every call.
+inline volatile LONG g_gameReady = 0;
 
-Context& context();
-
-inline bool ReadyReached() noexcept {
-    const auto* marker = context().ready_marker;
-    return marker != nullptr && *marker == 1;
-}
-
-template <typename T>
-inline T* AtRva(uint32_t rva) noexcept {
-    return reinterpret_cast<T*>(context().image_base + rva);
-}
+inline bool ReadyReached() noexcept { return g_gameReady != 0; }
 
 template <typename T>
 inline T Read(const void* base, std::size_t offset) noexcept {
@@ -88,6 +79,30 @@ struct ScopedTicks {
 void Log(AnvilLogLevel level, const char* format, ...);
 void LogStats(const char* name, const Stats& stats);
 
-const char* ResultName(AnvilResult result);
+// The changes one module requested so far. A refused change throws
+// anvil::Error out of the module's Install; on the way out the destructor
+// removes the module's earlier changes (staged, so the game never saw them),
+// and the other modules stay. keep() once every change is in.
+class Undo {
+public:
+    Undo() = default;
+    Undo(const Undo&) = delete;
+    Undo& operator=(const Undo&) = delete;
+    ~Undo() {
+        for (auto step = steps_.rbegin(); step != steps_.rend(); ++step) (*step)();
+    }
+
+    // An anvil::FunctionHook or anvil::PointerSwap (a global of the module).
+    template <class H> void add(H& hook) {
+        steps_.push_back([&hook] { hook.remove(); });
+    }
+    void add(anvil::Change& change) {
+        steps_.push_back([&change] { change.reset(); });
+    }
+    void keep() noexcept { steps_.clear(); }
+
+private:
+    std::vector<std::function<void()>> steps_;
+};
 
 }  // namespace sb
