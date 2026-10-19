@@ -1,6 +1,6 @@
 # Bellows — design
 
-Status: draft 2 (2026-10-15). Decisions marked **D** are agreed; **Q** are open.
+Status: draft 3 (2026-10-20; §6b: plugin API 2 for Anvil 1.0). Decisions marked **D** are agreed; **Q** are open.
 Background, measurements and reverse-engineering notes come from the private
 research repository (`eu4-engine-lab`); this repository contains production
 code only.
@@ -12,7 +12,8 @@ code only.
 - Same effect as the lab build: game state, logs and loaded content identical
   to vanilla; only time changes.
 - No game file is modified; all changes are in-memory patches through the
-  Anvil host API, each verified against expected bytes before applying.
+  Anvil host API on symbols declared in `plugin/symbols.toml`, which Anvil
+  verifies against the game before the plugin loads.
 - Every module can be switched off individually; any failure turns that
   module off and the game continues.
 
@@ -36,19 +37,20 @@ not shipped in release builds; they may exist behind a build flag.
 
 - The lab build patched a copy of `eu4.exe` (added import, miniz call sites)
   and ran it from a folder of junctions. In the plugin every executable change
-  becomes a runtime patch through `AnvilHost` (`patch_bytes`,
-  `redirect_call`, `replace_import`, `hook_function`); stubs come from the
-  host's trampoline allocator instead of `int3` padding inside `eu4.exe`.
-- Configuration moves from environment variables to
-  `anvil/data/bellows/config.toml` (module switches, worker counts,
-  verify modes). Environment variables stay as overrides for the lab harness.
+  becomes a runtime change through the Anvil host (plugin API 2: call
+  redirects, import replacements, pointer swaps, function hooks and one block
+  replacement); Anvil owns the stubs.
+- Configuration: Anvil settings (`plugin/settings.toml`; the player's values
+  in `anvil/data/bellows/settings.toml`, `ANVIL_BELLOWS_<NAME>` overrides for
+  the lab harness). Up to 0.7.0 it was `anvil/data/bellows/config.toml` and
+  `EU4SB_<NAME>` (§6b).
 - Writable data lives in `anvil/data/bellows/`. The prefetch
   manifest and the warm-up list become one **access profile** (see §3a)
   instead of a lab-generated manifest.
-- The ready marker comes from `AnvilHost.game` / `on_game_ready`; modules stop
-  their start-up behaviour at that point exactly as in the lab.
-- Build identity: `game_builds = ["eu4-1.37.5-steam-win64"]`; all addresses are
-  kept in one per-build table so a future port touches one file.
+- Readiness comes from the `anvil-game` plugin (`anvil-game.ready`); modules
+  stop their start-up behaviour at that point as in the lab.
+- Build identity: `build` of `plugin/symbols.toml`; every address and expected
+  byte is declared there once, so a future port touches that file.
 
 ## 3a. Access profiles: shipped base layer + learning per mod set (D)
 
@@ -73,7 +75,7 @@ mod.
    the mods override, plus each mod's layer — without a learning start. A mod
    update changes its key; the old layer is used, validated by file size and
    time, until the new one is learned.
-4. Memory budget for prefetch (default 1 GB, `[ram_prefetch] budget_mb`; the lab used 2 GB) and prefetch order
+4. Memory budget for prefetch (default 1 GB, setting `ram_prefetch_budget_mb`; the lab used 2 GB) and prefetch order
    = first-use order.
 
 Start with 1 and 2; keep the source attribution from day one so 3 needs no
@@ -85,9 +87,9 @@ format change.
   (compute both, keep the game's result, count mismatches) and on (sampled
   comparison every 256th call, disable on mismatch).
 - Startup caches answer only what is provably identical and fall back to the
-  original otherwise; all switch off at the ready marker.
-- Counters per module are written to the plugin's section of `anvil.log` at
-  the ready marker (requests, hits, fallbacks, mismatches).
+  original otherwise; all switch off when the game is ready (`anvil-game.ready`).
+- Counters per module are written to the plugin's section of `anvil.log` once
+  the game is ready (requests, hits, fallbacks, mismatches).
 
 ## 5. Testing (D)
 
@@ -425,6 +427,67 @@ the mod-script errors already seen without the plugin. `sb-load-1`: the
 was unchanged after both sessions, and the game folder was clean.
 
 Still open: the cold start with the plugin.
+
+## 6b. Plugin API 2 for Anvil 1.0 (D)
+
+Bellows moved to Anvil's plugin API 2 (Anvil design §5, §8, §9, §11) before
+Anvil 1.0 and is released together with it; API 1 is gone, so this release
+needs Anvil 1.0 (`api = 2`, `anvil = ">=1.0.0"`, `affects_gameplay = false`).
+
+- **Symbols.** `plugin/symbols.toml` replaces `src/build.hpp`: 44 symbols for
+  `eu4-1.37.5-steam-win64`, each with the bytes the module used to check
+  itself. PhysFS functions are `export` symbols instead of `GetProcAddress`.
+  Globals and struct offsets the modules read come from `values` on code that
+  uses them: the game root and its date offset, the trigger registry, the
+  keyword dictionary and the run-time token vector, the range walk's map
+  object, bonus value and its two float constants (the values equal the RVAs
+  of `build.hpp`). The ZIP entry offsets (0x46, 0x48, 0x50, 0x58) and the other
+  struct layouts stay constants in code. `plugin/symbols.lock` comes from
+  `anvil check plugin --exe <eu4.exe>` on the Steam 1.37.5 executable (SHA-256
+  `9AD3EFE1…771A`); CI checks that it matches `symbols.toml`.
+- **Verification moved to Anvil.** Anvil checks every symbol before the DLL
+  loads; a mismatch skips the whole plugin with the symbol and byte in the log.
+  Up to 0.7.0 a mismatch turned one module off.
+- **Changes** (C++ wrapper `anvil.hpp`): IAT slots → `replace_import`; the
+  `exists_index` vtable slot and the ZIP archiver/Io slots → `swap_pointer`
+  (each call reads the chain's `previous`); call sites → `redirect_call`
+  with one detour per site, so each passes on through its own `next`; range
+  hooks → `hook_function` with typed `HookOf<sym::…>`. The verifyPath stub
+  (`alloc_near_image` + `patch_bytes` over `call [r9+68h]; mov ebp,eax`) is a
+  `replace_block` on the 6-byte block: the callback calls `SB_VerifyPathStat`
+  with rcx/rdx/r8/r9 and writes eax and ebp.
+- **One module fails alone.** Changes requested in `load()` are staged and
+  enabled together after it returns. A refused change throws `anvil::Error`
+  out of that module's `Install`; its `sb::Undo` removes the changes the module
+  had already requested, and the other modules load.
+- **Readiness.** `[[dependencies]] anvil-game ^1`: the `anvil-game.ready`
+  handler sets `sb::g_gameReady` (the hot paths read it like the old marker
+  byte) and starts a thread for the profiles and the report, since the event
+  runs on the game's main thread.
+- **Settings.** `plugin/settings.toml`: one enum per module (`on`/`off`, plus
+  `verify` where the module has it) and `ram_prefetch_budget_mb` (int,
+  64–8192), all `restart = true`. Overrides are `ANVIL_BELLOWS_<NAME>`; a set
+  `EU4SB_<NAME>` is reported in the log with its replacement.
+- **Migration of `config.toml`.** Anvil reads the player's settings before the
+  plugin loads, so on the first start after the update the plugin itself
+  moves `anvil/data/bellows/config.toml`: values that differ from the defaults
+  go to `settings.toml` (written atomically; only when it does not exist yet),
+  old spellings (`1`, `true`, upper case) are normalized, `verify` for a module
+  without it becomes `on`, invalid entries are left out with a log line, and
+  the old file is renamed to `config.toml.migrated`. The migrated values also
+  apply to that start unless an `ANVIL_BELLOWS_<NAME>` variable overrides them.
+  Limit: a setting changed in the overlay later in that same session would
+  rewrite the player's file from what Anvil read at start-up (the overlay is
+  not in Anvil 1.0).
+- **Build.** The `AnvilPlugin` CMake package (`anvil_add_plugin`, `anvil gen`,
+  the plugin folder in `build/plugin/bellows/`). Until Anvil 1.0 is released
+  the package is built from the Anvil sources at a pinned commit of `main`
+  (`SB_ANVIL_COMMIT`); [#28](https://github.com/happy-dwarf-team/bellows/issues/28)
+  switches to the release's SDK archive.
+- **Not run in the game yet** at the time of the port: unit tests, a load test
+  of `bellows.dll` against a stand-in host (`tests/test_plugin_load.cpp`), and
+  `anvil check --game` on a copy of `eu4.exe` (Bellows after `anvil-game`, no
+  overlap).
 
 ## 7. Open questions (Q)
 

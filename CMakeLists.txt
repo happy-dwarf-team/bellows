@@ -1,10 +1,10 @@
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 3.28)
 # version.txt holds the version; release-please bumps it together with plugin/plugin.toml.
 file(STRINGS version.txt SB_VERSION_TEXT LIMIT_COUNT 1 REGEX "^[0-9]+\\.[0-9]+\\.[0-9]+$")
 if(NOT SB_VERSION_TEXT)
     message(FATAL_ERROR "version.txt must hold a MAJOR.MINOR.PATCH version")
 endif()
-file(STRINGS plugin/plugin.toml SB_MANIFEST_VERSION REGEX "^version = \"[^\"]*\"$")
+file(STRINGS plugin/plugin.toml SB_MANIFEST_VERSION LIMIT_COUNT 1 REGEX "^version = \"[^\"]*\"$")
 if(NOT SB_MANIFEST_VERSION STREQUAL "version = \"${SB_VERSION_TEXT}\"")
     message(FATAL_ERROR "plugin/plugin.toml (${SB_MANIFEST_VERSION}) does not match version.txt (${SB_VERSION_TEXT})")
 endif()
@@ -37,10 +37,35 @@ FetchContent_Declare(mimalloc
     GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(tomlplusplus mimalloc)
 
-add_library(sb_core STATIC
+# The Anvil SDK: the AnvilPlugin CMake package (anvil_add_plugin, the headers,
+# anvil.exe for `anvil gen` and `anvil check`).
+#   - An unpacked SDK archive: -DAnvilPlugin_DIR=<sdk>/cmake.
+#   - Otherwise the package is built from the Anvil sources at SB_ANVIL_COMMIT
+#     (a commit of main with plugin API 2); only anvil.exe is compiled. A local
+#     checkout replaces the download: -DFETCHCONTENT_SOURCE_DIR_ANVIL=<anvil>.
+# TODO(#28): once Anvil 1.0 is released, fetch its SDK archive instead
+# (FetchContent_Declare(anvil_sdk URL .../v1.0.0/anvil-sdk-windows-x64.zip URL_HASH SHA256=...)).
+set(SB_ANVIL_COMMIT ab8f7e699b408e94f117f2b8d5f89e19773d0114)
+if(AnvilPlugin_DIR)
+    find_package(AnvilPlugin REQUIRED)
+else()
+    set(ANVIL_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(ANVIL_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(ANVIL_BUILD_BENCH OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(anvil
+        GIT_REPOSITORY https://github.com/happy-dwarf-team/anvil.git
+        GIT_TAG ${SB_ANVIL_COMMIT}
+        EXCLUDE_FROM_ALL)
+    FetchContent_MakeAvailable(anvil)
+endif()
+
+# bellows.dll and its folder <build>/plugin/bellows/ (plugin.toml, symbols.toml,
+# settings.toml, the DLL), laid out by the package; `anvil gen` writes
+# symbols.gen.hpp (sym::) and settings.gen.hpp (cfg::) at build time.
+set(SB_SOURCES
     src/common.cpp
     src/rename.cpp
-    src/config.cpp
+    src/settings.cpp
     src/modules/access_profile.cpp
     src/modules/attr_cache.cpp
     src/modules/zip_profile.cpp
@@ -56,40 +81,69 @@ add_library(sb_core STATIC
     src/modules/range_witness.cpp
     src/modules/trigger_intern.cpp
     src/modules/verifypath_listing.cpp)
-target_include_directories(sb_core PUBLIC third_party src)
-target_link_libraries(sb_core PUBLIC tomlplusplus::tomlplusplus mimalloc-static shell32 ole32 uuid)
-target_compile_definitions(sb_core PUBLIC WIN32_LEAN_AND_MEAN NOMINMAX)
-if(MSVC)
-    target_compile_options(sb_core PUBLIC /W4 /utf-8 /permissive- /EHsc)
-endif()
-
 # File version shown in the DLL's Properties, from the same version.txt.
 configure_file(src/version.rc.in ${CMAKE_CURRENT_BINARY_DIR}/sb_version.rc @ONLY)
-add_library(bellows SHARED src/plugin.cpp ${CMAKE_CURRENT_BINARY_DIR}/sb_version.rc)
-target_link_libraries(bellows PRIVATE sb_core)
-# Keep every module's exported counters even though nothing in the DLL references them.
+anvil_add_plugin(bellows PLUGIN_DIR plugin
+    SOURCES src/plugin.cpp ${SB_SOURCES} ${CMAKE_CURRENT_BINARY_DIR}/sb_version.rc)
+target_include_directories(bellows PRIVATE src)
+target_link_libraries(bellows PRIVATE tomlplusplus::tomlplusplus mimalloc-static shell32 ole32 uuid)
+target_compile_definitions(bellows PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
 if(MSVC)
+    target_compile_options(bellows PRIVATE /EHsc)
+    # Keep every module's exported counters even though nothing in the DLL references them.
     target_link_options(bellows PRIVATE /OPT:NOREF)
+endif()
+# The shipped profiles next to the DLL, as in the release package.
+add_custom_command(TARGET bellows POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/plugin/profiles
+        ${CMAKE_BINARY_DIR}/plugin/bellows/profiles
+    VERBATIM)
+
+# anvil.exe of the SDK, for CI (`anvil check --format github`): its path in
+# <build>/anvil-tool-<config>.txt.
+get_property(SB_ANVIL_TOOL GLOBAL PROPERTY ANVIL_SDK_TOOL)
+if(TARGET ${SB_ANVIL_TOOL})
+    file(GENERATE OUTPUT ${CMAKE_BINARY_DIR}/anvil-tool-$<CONFIG>.txt CONTENT "$<TARGET_FILE:${SB_ANVIL_TOOL}>")
+else()
+    file(GENERATE OUTPUT ${CMAKE_BINARY_DIR}/anvil-tool-$<CONFIG>.txt CONTENT "${SB_ANVIL_TOOL}")
 endif()
 
 if(SB_BUILD_TESTS)
     enable_testing()
-    foreach(test rename trigger_intern token_dict_cache metascript_subst config access_profile path_rules zip_reader range_stats range_witness)
-        add_executable(test_${test} tests/test_${test}.cpp src/common.cpp src/config.cpp src/rename.cpp src/modules/access_profile.cpp src/modules/zip_reader.cpp)
-        target_include_directories(test_${test} PRIVATE third_party src)
+    foreach(test rename trigger_intern token_dict_cache metascript_subst settings access_profile path_rules zip_reader range_stats range_witness)
+        add_executable(test_${test} tests/test_${test}.cpp src/common.cpp src/settings.cpp src/rename.cpp
+            src/modules/access_profile.cpp src/modules/zip_reader.cpp)
+        # The SDK headers and the generated symbols.gen.hpp / settings.gen.hpp of the plugin.
+        target_include_directories(test_${test} PRIVATE src $<TARGET_PROPERTY:bellows,INCLUDE_DIRECTORIES>)
+        add_dependencies(test_${test} bellows)
         target_link_libraries(test_${test} PRIVATE tomlplusplus::tomlplusplus shell32 ole32 uuid)
-        target_compile_definitions(test_${test} PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+        target_compile_definitions(test_${test} PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX
+            SB_SETTINGS_SCHEMA="${CMAKE_CURRENT_SOURCE_DIR}/plugin/settings.toml")
         if(MSVC)
             # /UNDEBUG: the tests use assert(), which Release would compile out.
             target_compile_options(test_${test} PRIVATE /utf-8 /permissive- /EHsc /UNDEBUG)
         endif()
         add_test(NAME ${test} COMMAND test_${test})
     endforeach()
+    # bellows.dll's anvil_plugin_load against a stand-in host (tests/test_plugin_load.cpp).
+    add_executable(test_plugin_load tests/test_plugin_load.cpp)
+    target_include_directories(test_plugin_load PRIVATE $<TARGET_PROPERTY:bellows,INCLUDE_DIRECTORIES>)
+    add_dependencies(test_plugin_load bellows)
+    if(MSVC)
+        target_compile_options(test_plugin_load PRIVATE /utf-8 /permissive- /EHsc /UNDEBUG)
+    endif()
+    foreach(scenario ok refuse)
+        add_test(NAME plugin_load_${scenario}
+            COMMAND test_plugin_load $<TARGET_FILE:bellows> ${CMAKE_BINARY_DIR}/plugin/bellows ${scenario})
+    endforeach()
+    # plugin/symbols.lock matches plugin/symbols.toml and the last `anvil check --exe`
+    # on the real eu4.exe was clean; also checks plugin.toml and settings.toml.
+    add_test(NAME symbols_lock COMMAND ${SB_ANVIL_TOOL} check ${CMAKE_CURRENT_SOURCE_DIR}/plugin)
 endif()
 
-# Plugin folder layout: <prefix>/bellows/{plugin.toml, bellows.dll, LICENSE}
+# Plugin folder layout: <prefix>/bellows/{plugin.toml, symbols.toml, settings.toml, bellows.dll, profiles/, LICENSE}
 install(TARGETS bellows RUNTIME DESTINATION bellows COMPONENT plugin)
-install(FILES plugin/plugin.toml LICENSE DESTINATION bellows COMPONENT plugin)
+install(FILES plugin/plugin.toml plugin/symbols.toml plugin/settings.toml LICENSE DESTINATION bellows COMPONENT plugin)
 install(DIRECTORY plugin/profiles DESTINATION bellows COMPONENT plugin)
 # Third-party code compiled into the DLL (MIT): ship its license texts.
 install(FILES ${mimalloc_SOURCE_DIR}/LICENSE DESTINATION bellows/third-party RENAME mimalloc-LICENSE.txt COMPONENT plugin)

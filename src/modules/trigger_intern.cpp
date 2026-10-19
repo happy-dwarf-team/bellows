@@ -9,17 +9,19 @@
 // In 1.37.5 with the tested mods the map is empty, so 2.35 M calls each build a
 // key only to find nothing.
 //
-// Both call sites are redirected (Anvil redirect_call + byte checks around the
-// call) to SB_TriggerIntern: an empty map answers 0 immediately. Otherwise the
-// map keys and their substructures get canonical ids by hash-consing (id +
-// sorted unique child ids) in a flat table built with the index. A node's shape
-// is only looked up there (memoized per inner node pointer): a shape outside the
-// table, or a node with such a child, is "foreign" and answers 0, since a key
-// consists solely of key substructures and so cannot equal it.
+// Both call sites are redirected (Anvil redirect_call on the declared call
+// sites; the instructions around each call are declared too) to
+// SB_TriggerIntern / SB_TriggerInternB: an empty map answers 0 immediately.
+// Otherwise the map keys and their substructures get canonical ids by
+// hash-consing (id + sorted unique child ids) in a flat table built with the
+// index. A node's shape is only looked up there (memoized per inner node
+// pointer): a shape outside the table, or a node with such a child, is
+// "foreign" and answers 0, since a key consists solely of key substructures and
+// so cannot equal it.
 // "verify" = compute both, return the original's value, count mismatches;
 // "on" = return the index answer, compare every 256th call and disable on a
-// mismatch. A changed map size or registry, an unexpected shape, the ready
-// marker or any exception send the call to the original.
+// mismatch. A changed map size or registry, an unexpected shape, the game
+// being ready or any exception send the call to the original.
 #include "modules.hpp"
 
 #include <algorithm>
@@ -187,8 +189,12 @@ struct State {
     bool usable = false;
 };
 
-InternFn g_original = nullptr;
-volatile std::uintptr_t* g_registrySlot = nullptr;
+// The rest of each call site's chain (the game's intern unless another plugin
+// redirected the site too).
+InternFn g_original = nullptr;   // first site
+InternFn g_originalB = nullptr;  // second site
+anvil::FunctionHook<std::uint64_t(void*, void*)> g_siteA, g_siteB;
+volatile const std::uintptr_t* g_registrySlot = nullptr;
 bool g_verifyOnly = false;
 SRWLOCK g_lock = SRWLOCK_INIT;
 State* g_state = nullptr;
@@ -225,9 +231,9 @@ void NoteCall() noexcept {
 // QPC ticks from the first to the last timed call entry.
 LONG64 CallSpan() noexcept { return g_lastCall - g_firstCall; }
 
-std::uint64_t CallOriginal(void* singleton, void* node) {
+std::uint64_t CallOriginal(InternFn original, void* singleton, void* node) {
     sb::ScopedTicks t(&g_ticksOriginal);
-    return g_original(singleton, node);
+    return original(singleton, node);
 }
 
 }  // namespace
@@ -371,12 +377,14 @@ bool Disabled() noexcept {
 
 }  // namespace
 
-extern "C" std::uint64_t SB_TriggerIntern(void* singleton, void* node) {
+namespace {
+
+std::uint64_t Intern(InternFn original, void* singleton, void* node) {
     NoteCall();
     Bump(&EU4SB_TriggerInternStats.requests);
     if (Disabled() || g_state == nullptr || singleton == nullptr) {
         sb::Increment(&EU4SB_TriggerInternStats.skips);
-        return CallOriginal(singleton, node);
+        return CallOriginal(original, singleton, node);
     }
     std::uint64_t answer = 0;
     std::uint64_t sequence = 0;
@@ -386,7 +394,7 @@ extern "C" std::uint64_t SB_TriggerIntern(void* singleton, void* node) {
         if (EU4SB_TriggerInternStats.readyDisabled != 0) {
             ReleaseSRWLockExclusive(&g_lock);
             sb::Increment(&EU4SB_TriggerInternStats.skips);
-            return CallOriginal(singleton, node);
+            return CallOriginal(original, singleton, node);
         }
         try {
             State& state = Prepare(singleton);
@@ -405,11 +413,11 @@ extern "C" std::uint64_t SB_TriggerIntern(void* singleton, void* node) {
     } catch (...) {
         InterlockedExchange(&EU4SB_TriggerInternStats.cacheDisabled, 1);
         sb::Increment(&EU4SB_TriggerInternStats.skips);
-        return CallOriginal(singleton, node);
+        return CallOriginal(original, singleton, node);
     }
     if (g_verifyOnly || (sequence & 255) == 1) {
         sb::Increment(&EU4SB_TriggerInternStats.verifications);
-        const std::uint64_t actual = CallOriginal(singleton, node);
+        const std::uint64_t actual = CallOriginal(original, singleton, node);
         if (actual != answer) {
             sb::Increment(&EU4SB_TriggerInternStats.mismatches);
             if (!g_verifyOnly) InterlockedExchange(&EU4SB_TriggerInternStats.cacheDisabled, 1);
@@ -421,39 +429,32 @@ extern "C" std::uint64_t SB_TriggerIntern(void* singleton, void* node) {
     return answer;
 }
 
+}  // namespace
+
+extern "C" std::uint64_t SB_TriggerIntern(void* singleton, void* node) { return Intern(g_original, singleton, node); }
+extern "C" std::uint64_t SB_TriggerInternB(void* singleton, void* node) { return Intern(g_originalB, singleton, node); }
+
 namespace sb {
 
-bool InstallTriggerIntern(const Build& build, Mode mode) {
+bool InstallTriggerIntern(anvil::Host& host, Mode mode) {
     if (mode == Mode::Off) return false;
-    // Each site: "mov rdx,rdi; mov rcx,rax; call <intern>" followed by "mov [rdi+58h],rax".
-    for (uint32_t site : build.trigger_sites) {
-        const unsigned char* bytes = AtRva<const unsigned char>(site - 6);
-        const unsigned char before[6] = {0x48, 0x8B, 0xD7, 0x48, 0x8B, 0xC8};
-        const unsigned char after[4] = {0x48, 0x89, 0x47, 0x58};
-        if (std::memcmp(bytes, before, sizeof(before)) != 0 || std::memcmp(bytes + 11, after, sizeof(after)) != 0) {
-            Log(ANVIL_LOG_WARNING, "trigger_intern: unexpected code around call site; module off");
-            return false;
-        }
-    }
+    // Each site (declared with the code around it): "mov rdx,rdi; mov rcx,rax;
+    // call <intern>; mov [rdi+58h],rax".
     try {
         g_state = new State();
     } catch (...) {
         return false;
     }
-    g_original = reinterpret_cast<InternFn>(AtRva<unsigned char>(build.trigger_intern_fn));
-    g_registrySlot = AtRva<std::uintptr_t>(build.trigger_registry);
+    g_registrySlot = host.data(sym::trigger_registry);
     g_verifyOnly = mode == Mode::Verify;
-    const AnvilHost* host = context().host;
-    for (uint32_t site : build.trigger_sites) {
-        const AnvilResult r = host->redirect_call(context().self, site, build.trigger_intern_fn,
-                                                  reinterpret_cast<void*>(&SB_TriggerIntern));
-        if (r != ANVIL_OK) {
-            // A redirected first site with a refused second one is still correct:
-            // both targets compute the same values.
-            Log(ANVIL_LOG_WARNING, "trigger_intern: call site refused (%s)", ResultName(r));
-            return false;
-        }
-    }
+    Undo undo;
+    host.redirect(g_siteA, sym::trigger_intern_call_a, &SB_TriggerIntern);
+    undo.add(g_siteA);
+    host.redirect(g_siteB, sym::trigger_intern_call_b, &SB_TriggerInternB);
+    undo.add(g_siteB);
+    g_original = g_siteA.next_pointer();
+    g_originalB = g_siteB.next_pointer();
+    undo.keep();
     InterlockedExchange(&EU4SB_TriggerInternStats.mode, g_verifyOnly ? 2 : 1);
     InterlockedExchange(&EU4SB_TriggerInternStats.initialized, 1);
     return true;

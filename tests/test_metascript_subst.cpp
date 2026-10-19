@@ -167,8 +167,8 @@ std::string RunModule(Case& c) {
 }  // namespace
 
 int main() {
-    static volatile unsigned char ready = 0;
-    sb::context().ready_marker = &ready;
+    volatile LONG& ready = sb::g_gameReady;  // set by the anvil-game ready event in the plugin
+    ready = 0;
     g_original = &MockOriginal;
     g_assign = &MockAssign;
     std::mt19937 rng(77);

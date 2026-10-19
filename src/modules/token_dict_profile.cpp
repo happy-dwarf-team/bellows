@@ -4,8 +4,9 @@
 // The tokenizer (0x170E700) looks every word token up in a global
 // case-insensitive ternary search tree (object 0x2326720, root at +0x08) via
 // 0x6E4880; "get or add" (0x170D410) does the same before adding a dynamic
-// token. Both call sites are redirected (byte checks around the call) to a
-// wrapper that calls the original and counts calls per thread, key lengths,
+// token. Both call sites are redirected (Anvil redirect_call; the code around
+// each call is declared too) to a wrapper that calls the original (the rest
+// of that site's chain) and counts calls per thread, key lengths,
 // hits and per-key frequencies. Nothing is changed. At the ready report the
 // tree is walked once (node count, word count, lookup depth per word) and
 // two files are written to the data directory for an offline benchmark:
@@ -37,7 +38,8 @@ constexpr std::size_t kNodeHi = 0x18;
 constexpr std::size_t kNodeEq = 0x20;
 constexpr std::size_t kDictRoot = 0x08;
 
-LookupFn g_lookup = nullptr;
+LookupFn g_lookup[kSites] = {};  // the rest of each redirected call's chain
+anvil::FunctionHook<void*(void*, const char*)> g_sites[kSites];
 void* g_dict = nullptr;
 const void* const volatile* g_dynamicBegin = nullptr;  // vector<record*> of tokens added at run time
 const void* const volatile* g_dynamicEnd = nullptr;
@@ -65,6 +67,7 @@ struct GrowthPoint {
 std::vector<GrowthPoint>* g_growth = nullptr;
 LONG64 g_startTicks = 0;
 bool g_done = false;  // set at the ready report; later calls are only forwarded
+std::wstring* g_dir = nullptr;  // the data directory, for the files of the report
 
 ThreadRow* Row() noexcept {
     const LONG tid = static_cast<LONG>(GetCurrentThreadId());
@@ -83,7 +86,7 @@ LONG64 DynamicTokens() noexcept {
 }
 
 void* Record(int site, void* dict, const char* key) {
-    void* value = g_lookup(dict, key);
+    void* value = g_lookup[site](dict, key);
     if (g_done || key == nullptr) return value;
     const LONG64 n = InterlockedIncrement64(&g_calls[site]);
     if (value != nullptr) InterlockedIncrement64(&g_hits[site]);
@@ -155,54 +158,30 @@ __declspec(dllexport) sb::Stats EU4SB_TokenDictStats = SB_STATS_INIT;
 
 namespace sb {
 
-bool InstallTokenDictProfile(const Build& build, Mode mode) {
+bool InstallTokenDictProfile(anvil::Host& host, Mode mode) {
     if (mode == Mode::Off) return false;
     // Tokenizer: "mov rdx,rsi; lea rcx,[dict]; call lookup; test rax,rax"
-    // get-or-add: "lea rcx,[dict]; call lookup; test rax,rax"
-    const uintptr_t dict = context().image_base + build.token_dict;
-    auto leaTarget = [](uint32_t leaRva) {
-        const auto* p = AtRva<const unsigned char>(leaRva);
-        std::int32_t disp;
-        std::memcpy(&disp, p + 3, 4);
-        return reinterpret_cast<uintptr_t>(p) + 7 + disp;
-    };
-    const unsigned char movRdx[3] = {0x48, 0x8B, 0xD6};
-    const unsigned char lea[3] = {0x48, 0x8D, 0x0D};
-    const unsigned char testRax[3] = {0x48, 0x85, 0xC0};
-    const uint32_t sites[kSites] = {build.token_lookup_tokenizer_site, build.token_lookup_get_or_add_site};
-    for (uint32_t site : sites) {
-        if (std::memcmp(AtRva<const unsigned char>(site - 7), lea, 3) != 0 || leaTarget(site - 7) != dict ||
-            std::memcmp(AtRva<const unsigned char>(site + 5), testRax, 3) != 0) {
-            Log(ANVIL_LOG_WARNING, "token_dict_profile: unexpected code around call site; module off");
-            return false;
-        }
-    }
-    if (std::memcmp(AtRva<const unsigned char>(build.token_lookup_tokenizer_site - 10), movRdx, 3) != 0) {
-        Log(ANVIL_LOG_WARNING, "token_dict_profile: unexpected code before the tokenizer call; module off");
-        return false;
-    }
+    // get-or-add: "lea rcx,[dict]; call lookup; test rax,rax"; both declared.
     try {
         g_keys = new std::unordered_map<std::string, KeyStat>();
         g_keys->reserve(1 << 16);
         g_growth = new std::vector<GrowthPoint>();
         g_growth->reserve(kMaxGrowthPoints);
+        g_dir = new std::wstring(host.data_dir().wstring());
     } catch (...) {
         return false;
     }
-    g_lookup = reinterpret_cast<LookupFn>(AtRva<unsigned char>(build.token_lookup_fn));
-    g_dict = reinterpret_cast<void*>(dict);
-    g_dynamicBegin = AtRva<const void* const>(build.token_dynamic_vector);
-    g_dynamicEnd = AtRva<const void* const>(build.token_dynamic_vector + 8);
+    g_dict = const_cast<unsigned char*>(host.data(sym::token_dict));
+    g_dynamicBegin = reinterpret_cast<const void* const*>(host.data(sym::token_dynamic_begin));
+    g_dynamicEnd = reinterpret_cast<const void* const*>(host.data(sym::token_dynamic_end));
     g_startTicks = Ticks();
-    void* const targets[kSites] = {reinterpret_cast<void*>(&SB_TokenLookupTokenizer), reinterpret_cast<void*>(&SB_TokenLookupGetOrAdd)};
-    for (int i = 0; i < kSites; ++i) {
-        const AnvilResult r = context().host->redirect_call(context().self, sites[i], build.token_lookup_fn, targets[i]);
-        if (r != ANVIL_OK) {
-            // A redirected first site is harmless: the wrapper only counts.
-            Log(ANVIL_LOG_WARNING, "token_dict_profile: call site refused (%s)", ResultName(r));
-            return false;
-        }
-    }
+    Undo undo;
+    host.redirect(g_sites[0], sym::token_lookup_tokenizer_call, &SB_TokenLookupTokenizer);
+    undo.add(g_sites[0]);
+    host.redirect(g_sites[1], sym::token_lookup_get_or_add_call, &SB_TokenLookupGetOrAdd);
+    undo.add(g_sites[1]);
+    for (int i = 0; i < kSites; ++i) g_lookup[i] = g_sites[i].next_pointer();
+    undo.keep();
     InterlockedExchange(&EU4SB_TokenDictStats.mode, 1);
     InterlockedExchange(&EU4SB_TokenDictStats.initialized, 1);
     return true;
@@ -261,7 +240,7 @@ void ReportTokenDictProfile() {
             tree.nodes, tree.words, tree.words ? static_cast<double>(tree.depthSum) / tree.words : 0.0, tree.maxDepth,
             weightedCount ? static_cast<double>(weighted) / weightedCount : 0.0);
 
-        const std::wstring dir = context().host->data_dir(context().self);
+        const std::wstring& dir = *g_dir;
         std::ofstream keys(dir + L"\\token_dict_keys.tsv", std::ios::binary);
         keys << "count\thit\tkey\n";
         for (const auto& [key, stat] : *g_keys) keys << stat.count << '\t' << (stat.hit ? 1 : 0) << '\t' << key << '\n';

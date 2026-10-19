@@ -5,7 +5,8 @@
 // case-insensitive ternary search tree (object 0x2326720, root at +0x08) via
 // 0x6E4880: one CRT tolower and one tree node per character, ~17 nodes per
 // successful lookup over ~8.7 M lookups per start. The tokenizer's call site
-// is redirected (byte checks around the call) to SB_TokenDictCache, which
+// is redirected (Anvil redirect_call; the code around the call, including the
+// dictionary's address, is declared too) to SB_TokenDictCache, which
 // answers from a per-thread open-addressing cache keyed by the token with
 // ASCII letters lowercased (other bytes unchanged, so only spellings the tree
 // itself treats as equal share an entry). A miss calls the original and
@@ -19,7 +20,7 @@
 //   lookup that produced it.
 // "verify" = compute both, return the original's value, count mismatches;
 // "on" = return the cache answer, compare every 256th call per thread and
-// disable on a mismatch. The ready marker sends calls to the original.
+// disable on a mismatch. Once the game is ready, calls go to the original.
 // Caches are per thread (no locked instructions on the hot path) and are
 // kept until the process exits; their counters are summed at the report.
 #include "modules.hpp"
@@ -34,7 +35,8 @@ constexpr std::size_t kDictRoot = 0x08;
 constexpr std::size_t kMaxKey = 255;     // longer keys go to the original
 constexpr std::size_t kInitialSlots = 1024;
 
-LookupFn g_lookup = nullptr;
+LookupFn g_lookup = nullptr;  // the rest of the redirected call's chain
+anvil::FunctionHook<void*(void*, const char*)> g_site;
 const void* g_dict = nullptr;
 const uintptr_t volatile* g_dynamicBegin = nullptr;
 const uintptr_t volatile* g_dynamicEnd = nullptr;
@@ -223,39 +225,21 @@ void* SB_TokenDictCache(void* dict, const char* key) {
 
 namespace sb {
 
-bool InstallTokenDictCache(const Build& build, Mode mode) {
+bool InstallTokenDictCache(anvil::Host& host, Mode mode) {
     if (mode == Mode::Off) return false;
-    // "mov rdx,rsi; lea rcx,[dict]; call lookup; test rax,rax"
-    const uint32_t site = build.token_lookup_tokenizer_site;
-    const auto* lea = AtRva<const unsigned char>(site - 7);
-    std::int32_t disp;
-    std::memcpy(&disp, lea + 3, 4);
-    const uintptr_t dict = context().image_base + build.token_dict;
-    const unsigned char movRdx[3] = {0x48, 0x8B, 0xD6};
-    const unsigned char leaRcx[3] = {0x48, 0x8D, 0x0D};
-    const unsigned char testRax[3] = {0x48, 0x85, 0xC0};
-    if (std::memcmp(lea - 3, movRdx, 3) != 0 || std::memcmp(lea, leaRcx, 3) != 0 ||
-        reinterpret_cast<uintptr_t>(lea) + 7 + disp != dict || std::memcmp(AtRva<const unsigned char>(site + 5), testRax, 3) != 0) {
-        Log(ANVIL_LOG_WARNING, "token_dict_cache: unexpected code around the tokenizer call; module off");
-        return false;
-    }
+    // "mov rdx,rsi; lea rcx,[dict]; call lookup; test rax,rax", all declared.
     try {
         g_caches = new std::vector<Cache*>();
         g_caches->reserve(64);
     } catch (...) {
         return false;
     }
-    g_lookup = reinterpret_cast<LookupFn>(AtRva<unsigned char>(build.token_lookup_fn));
-    g_dict = reinterpret_cast<const void*>(dict);
-    g_dynamicBegin = AtRva<const uintptr_t>(build.token_dynamic_vector);
-    g_dynamicEnd = AtRva<const uintptr_t>(build.token_dynamic_vector + 8);
+    g_dict = host.data(sym::token_dict);
+    g_dynamicBegin = host.data(sym::token_dynamic_begin);
+    g_dynamicEnd = host.data(sym::token_dynamic_end);
     g_verifyOnly = mode == Mode::Verify;
-    const AnvilResult r = context().host->redirect_call(context().self, site, build.token_lookup_fn,
-                                                        reinterpret_cast<void*>(&SB_TokenDictCache));
-    if (r != ANVIL_OK) {
-        Log(ANVIL_LOG_WARNING, "token_dict_cache: call site refused (%s); module off", ResultName(r));
-        return false;
-    }
+    host.redirect(g_site, sym::token_lookup_tokenizer_call, &SB_TokenDictCache);
+    g_lookup = g_site.next_pointer();
     InterlockedExchange(&EU4SB_TokenDictCacheStats.mode, g_verifyOnly ? 2 : 1);
     InterlockedExchange(&EU4SB_TokenDictCacheStats.initialized, 1);
     return true;

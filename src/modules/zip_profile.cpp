@@ -1,21 +1,23 @@
 // Diagnostic (off by default): time spent reading ZIP members through PhysFS,
-// per thread, until the ready marker. It bounds what ram_prefetch can take off
+// per thread, until the game is ready. It bounds what ram_prefetch can take off
 // the critical path (lab docs: docs/startup-ram-prototype.md).
 //
 // Wraps the read slot of the ZIP archiver's Io template (copied into every Io
-// the archiver opens) and the second mz_inflate call site outside it. Nothing
-// is changed: each wrapper calls the original and adds elapsed QPC time.
+// the archiver opens; Anvil swap_pointer) and the second mz_inflate call site
+// outside it (redirect_call). Nothing is changed: each wrapper calls the
+// original and adds elapsed QPC time.
 #include "modules.hpp"
 
 namespace {
 
-using ReadFn = std::int64_t (*)(void*, void*, std::uint64_t);
 using InflateFn = int (*)(void*, int);
 
 constexpr int kThreads = 48;
 
-ReadFn g_read = nullptr;
-InflateFn g_inflate = nullptr;
+// The rest of the slot's chain, read on each call (Anvil rewrites it while the chain changes).
+anvil::PointerSwap<std::int64_t(void*, void*, std::uint64_t)> g_readSlot;
+anvil::FunctionHook<int(void*, int)> g_inflateHook;
+InflateFn g_inflate = nullptr;  // the rest of the redirected call's chain
 DWORD g_mainThread = 0;
 
 struct ThreadRow {
@@ -38,9 +40,9 @@ ThreadRow* Row() noexcept {
 }  // namespace
 
 extern "C" std::int64_t SB_ProfileZipRead(void* io, void* buffer, std::uint64_t length) {
-    if (sb::ReadyReached()) return g_read(io, buffer, length);
+    if (sb::ReadyReached()) return g_readSlot.previous()(io, buffer, length);
     const LONG64 start = sb::Ticks();
-    const std::int64_t result = g_read(io, buffer, length);
+    const std::int64_t result = g_readSlot.previous()(io, buffer, length);
     if (ThreadRow* row = Row()) {
         InterlockedExchangeAdd64(&row->readTicks, sb::Ticks() - start);
         InterlockedIncrement64(&row->readCalls);
@@ -62,26 +64,21 @@ extern "C" int SB_ProfileInflate(void* stream, int flush) {
 
 namespace sb {
 
-bool InstallZipProfile(const Build& build, Mode mode) {
+bool InstallZipProfile(anvil::Host& host, Mode mode) {
     if (mode == Mode::Off) return false;
     g_mainThread = GetCurrentThreadId();
-    const AnvilHost* host = context().host;
-    const uintptr_t expected = context().image_base + build.zip_read_fn;
-    const uintptr_t replacement = reinterpret_cast<uintptr_t>(&SB_ProfileZipRead);
-    AnvilResult r = host->patch_bytes(context().self, build.zip_io_read_slot, &expected, &replacement, sizeof(uintptr_t));
-    if (r != ANVIL_OK) {
-        Log(ANVIL_LOG_WARNING, "zip_profile: Io read slot refused (%s)", ResultName(r));
-        return false;
+    host.swap(g_readSlot, sym::zip_io_read_slot, &SB_ProfileZipRead);
+    try {
+        host.redirect(g_inflateHook, sym::mz_inflate_call, &SB_ProfileInflate);
+        g_inflate = g_inflateHook.next_pointer();
+    } catch (const anvil::Error& e) {
+        Log(ANVIL_LOG_WARNING, "zip_profile: inflate not timed (%s)", e.what());
     }
-    g_read = reinterpret_cast<ReadFn>(expected);
-    g_inflate = reinterpret_cast<InflateFn>(AtRva<unsigned char>(build.mz_inflate_fn));
-    r = host->redirect_call(context().self, build.mz_inflate_other_site, build.mz_inflate_fn, reinterpret_cast<void*>(&SB_ProfileInflate));
-    if (r != ANVIL_OK) Log(ANVIL_LOG_WARNING, "zip_profile: inflate site refused (%s)", ResultName(r));
     return true;
 }
 
 void ReportZipProfile() {
-    if (g_read == nullptr) return;
+    if (!g_readSlot.active()) return;
     for (const auto& row : g_rows) {
         if (row.tid == 0) break;
         if (row.readCalls == 0 && row.inflateCalls == 0) continue;

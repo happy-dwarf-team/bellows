@@ -23,12 +23,12 @@ commits of hidden types alone never start one and ship with the next release.
 
 Scopes: the module name (`ram_prefetch`, `attr_cache`, `open_warmup`,
 `exists_index`, `trigger_intern`, `metascript_subst`, `mimalloc_heap`,
-`verifypath_listing`, `zip_reader`, …), `config`, `plugin` (manifest,
-packaging), `profiles`. A module that is off by default and changes game
-behaviour when enabled is still a `feat`; say so in the description. Breaking
-changes (a config key renamed or removed, a different Anvil requirement) take
-`!` and a `BREAKING CHANGE:` paragraph; before 1.0.0 they bump the minor
-version.
+`verifypath_listing`, `zip_reader`, …), `settings`, `symbols`, `plugin`
+(manifest, packaging), `profiles`. A module that is off by default and changes
+game behaviour when enabled is still a `feat`; say so in the description.
+Breaking changes (a setting renamed or removed, a different Anvil
+requirement) take `!` and a `BREAKING CHANGE:` paragraph; before 1.0.0 they
+bump the minor version.
 
 Performance claims in a pull request follow the measurement rules of the lab:
 same save/mod set, interleaved runs, median and spread, and what was not
@@ -54,3 +54,45 @@ cmake -S . -B build -G "Visual Studio 17 2022" -A x64
 cmake --build build --config Release
 ctest --test-dir build -C Release --output-on-failure
 ```
+
+The build uses the Anvil SDK's CMake package: `anvil_add_plugin` reads
+`plugin/plugin.toml`, runs `anvil gen` on `plugin/symbols.toml`
+(`symbols.gen.hpp`, `sym::<name>`) and `plugin/settings.toml`
+(`settings.gen.hpp`, `cfg::<name>`), and lays out `build/plugin/bellows/`.
+Until Anvil 1.0 ships its SDK archive the package is built from the Anvil
+sources at `SB_ANVIL_COMMIT` (`CMakeLists.txt`); move that commit forward on
+purpose, in its own pull request
+([#28](https://github.com/happy-dwarf-team/bellows/issues/28) replaces it
+with the release archive). `-DFETCHCONTENT_SOURCE_DIR_ANVIL=<anvil>` builds
+against a local Anvil checkout instead, `-DAnvilPlugin_DIR=<sdk>/cmake`
+against an unpacked SDK archive.
+
+The code uses the C++ wrapper (`anvil/anvil.hpp`): typed symbols, so a
+detour that does not match the `signature` in `symbols.toml` does not
+compile, and `anvil::Error` for a refused change, which `sb::Undo` turns into
+"this module off" (see `src/common.hpp`). Detours the game calls directly
+must not throw.
+
+`ctest` also loads `bellows.dll` against a stand-in host
+(`tests/test_plugin_load.cpp`) and runs `anvil check plugin` (the schemas and
+`symbols.lock`).
+
+## Game addresses
+
+Every address, expected byte, pointer target and export the modules use is
+declared once in `plugin/symbols.toml`; a module refers to it as
+`sym::<name>`. Anvil verifies the whole file before it loads the DLL and skips
+the plugin on any mismatch, so a symbol is declared only with bytes validated
+in the lab. Prefer `values` on code that reads a global or an offset over
+writing the number in C++ again.
+
+After a change to `plugin/symbols.toml`, run the check against the real game
+(it only reads `eu4.exe`) and commit the rewritten `plugin/symbols.lock`:
+
+```powershell
+build\_deps\anvil-build\Release\anvil.exe check plugin --exe "<EU4>\eu4.exe"
+```
+
+(with `-DAnvilPlugin_DIR`, `anvil.exe` is in the SDK's `bin/`;
+`build/anvil-tool-Release.txt` names the one the build uses). CI fails when
+`symbols.lock` does not match `symbols.toml`.

@@ -11,7 +11,7 @@
 // redirected here: the witness province is checked first with the game's own functions and
 // the same formula; only when it no longer qualifies does the original walk run (and a new
 // witness is looked up). Mode verify always runs the original and compares the answers.
-#include "../config.hpp"
+#include "../settings.hpp"
 #include "modules.hpp"
 #include "range_witness_core.hpp"
 
@@ -41,7 +41,6 @@ constexpr std::size_t kProvinceFlags = 0x958;   // byte, bit 0x10 checked by the
 constexpr std::size_t kProvinceListBegin = 0x490, kProvinceListEnd = 0x498;  // qwords, id in bits 32-47
 constexpr std::size_t kMapRecords = 0x6C0, kMapRecordStride = 0x230, kMapCoord = 0x7C;
 constexpr std::size_t kMapWidth = 0x28, kMapHeight = 0x2C, kMapIntegerFlag = 0x31;
-constexpr std::size_t kRootDate = 0x1DD0;            // int32 hours since year -5000
 constexpr std::size_t kRootCountries = 0x1CE8;       // country*[], index = relation index
 constexpr std::size_t kCountryRelations = 0x1510;    // begin/end of 0x48-byte relation records
 constexpr std::size_t kRelationStride = 0x48;
@@ -50,24 +49,24 @@ constexpr std::size_t kRelationList = 0x128, kRelationListCount = 0x134;  // (in
 constexpr std::size_t kRelationFlagHolder = 0x40, kRelationFlag = 0x11F;
 constexpr std::size_t kCountryModifiers = 0x1420;
 
-const sb::Build* g_build = nullptr;
 sb::Mode g_mode = sb::Mode::Off;
-MinDistanceFn g_original = nullptr;
+anvil::FunctionHook<int*(void*, int*, void*, void*, int*)> g_site;
+MinDistanceFn g_original = nullptr;  // the rest of the redirected call's chain
 DistanceFn g_distance = nullptr;
 LineFn g_line = nullptr;
 BonusFn g_bonus = nullptr;
 RelatedBonusFn g_relatedBonus = nullptr;
 GetterFn g_defaultA = nullptr, g_defaultB = nullptr;
 float g_scale = 0, g_offset = 0;
-
-template <typename T>
-T Global(uint32_t rva) {
-    return sb::Read<T>(sb::AtRva<const unsigned char>(rva), 0);
-}
+// Globals the walk itself reads (values of symbols.toml, taken from its code).
+const unsigned char* const* g_root = nullptr;
+const unsigned char* const* g_map = nullptr;
+const int* g_bonusValue = nullptr;
+std::size_t g_rootDate = 0;  // int32 hours since year -5000 in the game root object
 
 // SEH-guarded parts; no C++ objects with destructors inside __try.
 bool EligibleUnguarded(void* country, std::int32_t province) {
-    const auto* root = Global<const unsigned char*>(g_build->game_root);
+    const auto* root = *g_root;
     const auto* provinces = sb::Read<const unsigned char*>(root, kRootProvinces);
     const auto* p = provinces + static_cast<std::int64_t>(province) * kProvinceStride;
     if ((sb::Read<std::uint8_t>(p, kProvinceFlags) & 0x10) == 0) return false;
@@ -108,14 +107,14 @@ void* RelatedUnguarded(void* country, std::int32_t index) {
         const auto* entry = sb::Read<const unsigned char*>(it, 8);
         if (entry == nullptr) return nullptr;
         if (sb::Read<std::uint8_t>(sb::Read<const unsigned char*>(entry, kRelationFlagHolder), kRelationFlag) == 0) return nullptr;
-        const auto* root = Global<const unsigned char*>(g_build->game_root);
+        const auto* root = *g_root;
         return sb::Read<void*>(sb::Read<const unsigned char*>(root, kRootCountries), static_cast<std::size_t>(index) * 8);
     }
     return nullptr;
 }
 
 bool ValueUnguarded(void* country, bool related, std::int32_t province, void* target, std::int64_t* value) {
-    const auto* root = Global<const unsigned char*>(g_build->game_root);
+    const auto* root = *g_root;
     auto* provinceObj = const_cast<unsigned char*>(sb::Read<const unsigned char*>(root, kRootProvinces)) +
                         static_cast<std::int64_t>(province) * kProvinceStride;
     alignas(16) unsigned char buffer[64] = {};
@@ -125,7 +124,7 @@ bool ValueUnguarded(void* country, bool related, std::int32_t province, void* ta
     const std::int32_t targetId = sb::Read<std::int32_t>(target, kProvinceId);
     int line = 0;
     if (provinceId != targetId) {
-        const auto* map = Global<const unsigned char*>(g_build->map_global);
+        const auto* map = *g_map;
         const auto* records = sb::Read<const unsigned char*>(map, kMapRecords);
         const int a = sb::Read<int>(records + static_cast<std::int64_t>(static_cast<std::int16_t>(targetId)) * kMapRecordStride, kMapCoord);
         const int b = sb::Read<int>(records + static_cast<std::int64_t>(static_cast<std::int16_t>(provinceId)) * kMapRecordStride, kMapCoord);
@@ -143,7 +142,7 @@ bool ValueUnguarded(void* country, bool related, std::int32_t province, void* ta
     }
     const int nearest = byPath < line ? byPath : line;
     const bool bonus = related ? RelatedBonus(country) : g_bonus(country);
-    const int divisor = bonus ? Global<int>(g_build->range_bonus_global) + 1000 : 1000;
+    const int divisor = bonus ? *g_bonusValue + 1000 : 1000;
     *value = static_cast<std::int64_t>(nearest) * 1000 / divisor;
     return true;
 }
@@ -174,8 +173,8 @@ struct Game {
         }
     }
     std::int32_t Day() {
-        const auto* root = Global<const unsigned char*>(g_build->game_root);
-        return root == nullptr ? 0 : static_cast<std::int32_t>((static_cast<std::int64_t>(sb::Read<std::int32_t>(root, kRootDate)) - 43'800'000) / 24);
+        const auto* root = *g_root;
+        return root == nullptr ? 0 : static_cast<std::int32_t>((static_cast<std::int64_t>(sb::Read<std::int32_t>(root, g_rootDate)) - 43'800'000) / 24);
     }
     bool Value(void* c, bool related, std::int32_t p, void* t, std::int64_t* v) {
         __try {
@@ -262,37 +261,31 @@ __declspec(dllexport) sb::Stats EU4SB_RangeWitnessStats = SB_STATS_INIT;
 
 namespace sb {
 
-bool InstallRangeWitness(const Build& build, Mode mode) {
+bool InstallRangeWitness(anvil::Host& host, Mode mode) {
     if (mode == Mode::Off) return false;
-    // The redirected call must still be the plain "call 0x3526B0" in 0x3520D0.
-    const unsigned char call[1] = {0xE8};
-    if (std::memcmp(AtRva<const unsigned char>(build.range_witness_site), call, 1) != 0) {
-        Log(ANVIL_LOG_WARNING, "range_witness: unexpected code at the call site; module off");
-        return false;
-    }
+    // The redirected call is the plain "call 0x3526B0" in 0x3520D0 (declared).
     try {
         g_engine = new WitnessEngine<Game>();
-        g_dir = new std::wstring(context().host->data_dir(context().self));
+        g_dir = new std::wstring(host.data_dir().wstring());
     } catch (...) {
         return false;
     }
-    g_build = &build;
     g_mode = mode;
-    g_original = reinterpret_cast<MinDistanceFn>(AtRva<unsigned char>(build.range_min_distance_fn));
-    g_distance = reinterpret_cast<DistanceFn>(AtRva<unsigned char>(build.province_distance_fn));
-    g_line = reinterpret_cast<LineFn>(AtRva<unsigned char>(build.map_line_fn));
-    g_bonus = reinterpret_cast<BonusFn>(AtRva<unsigned char>(build.range_bonus_fn));
-    g_relatedBonus = reinterpret_cast<RelatedBonusFn>(AtRva<unsigned char>(build.related_bonus_fn));
-    g_defaultA = reinterpret_cast<GetterFn>(AtRva<unsigned char>(build.related_bonus_default_a));
-    g_defaultB = reinterpret_cast<GetterFn>(AtRva<unsigned char>(build.related_bonus_default_b));
-    g_scale = Global<float>(build.range_scale_const);
-    g_offset = Global<float>(build.range_offset_const);
-    const AnvilResult r = context().host->redirect_call(context().self, build.range_witness_site, build.range_min_distance_fn,
-                                                        reinterpret_cast<void*>(&SB_RangeWitness));
-    if (r != ANVIL_OK) {
-        Log(ANVIL_LOG_WARNING, "range_witness: call site refused (%s); module off", ResultName(r));
-        return false;
-    }
+    // The walk calls 0x2D2520 with six arguments; the symbol declares the seven range_profile forwards.
+    g_distance = reinterpret_cast<DistanceFn>(host.address(sym::province_distance));
+    g_line = host.function(sym::map_line);
+    g_bonus = host.function(sym::range_bonus);
+    g_relatedBonus = host.function(sym::related_bonus);
+    g_defaultA = host.function(sym::related_bonus_default_a);
+    g_defaultB = host.function(sym::related_bonus_default_b);
+    g_scale = *host.data(sym::range_scale);
+    g_offset = *host.data(sym::range_offset);
+    g_root = host.data(sym::game_root);
+    g_map = host.data(sym::map_global);
+    g_bonusValue = host.data(sym::range_bonus_global);
+    g_rootDate = static_cast<std::size_t>(host.value(sym::root_and_date, "date_offset"));
+    host.redirect(g_site, sym::range_check_call, &SB_RangeWitness);
+    g_original = g_site.next_pointer();
     HANDLE thread = CreateThread(nullptr, 0, WriterThread, nullptr, 0, nullptr);
     if (thread != nullptr) {
         SetThreadDescription(thread, L"bellows range_witness writer");

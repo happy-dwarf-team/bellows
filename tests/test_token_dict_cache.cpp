@@ -105,8 +105,8 @@ int main() {
     g_dynamicBegin = &g_vector[0];
     g_dynamicEnd = &g_vector[1];
     g_caches = new std::vector<Cache*>();
-    static volatile unsigned char ready = 0;
-    sb::context().ready_marker = &ready;
+    volatile LONG& ready = sb::g_gameReady;  // set by the anvil-game ready event in the plugin
+    ready = 0;
 
     // Static words (empty word = a node with char 0, as in the game's tree).
     const char* words[] = {"not", "yes", "no", "has_country_flag", "clr_country_flag", "key", "type", "estate", "size",

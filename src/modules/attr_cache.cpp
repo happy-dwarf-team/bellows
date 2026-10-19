@@ -6,7 +6,7 @@
 // Anvil replace_import) that fails with ERROR_FILE_NOT_FOUND or
 // ERROR_PATH_NOT_FOUND for a path inside the game folder or an enabled mod's
 // folder is remembered, and the same query is answered "not found" from memory
-// until the ready marker. Existing paths always go to the real API: a positive
+// until the game is ready. Existing paths always go to the real API: a positive
 // cache was rejected in the lab (a DLC folder's LastAccessTime changed during
 // start-up). Paths outside those roots (user folder, PhysFS write directory)
 // or with a saves/logs/cache/tmp component are never remembered. Assumes that
@@ -35,8 +35,10 @@ using MissingMap = std::unordered_map<std::wstring, DWORD>;
 
 constexpr DWORD kPathChars = 1024;
 
-AttributesExWFn g_realExW = nullptr;
+AttributesExWFn g_realExW = nullptr;  // the rest of each import's chain
 AttributesAFn g_realA = nullptr;
+anvil::FunctionHook<BOOL(LPCWSTR, GET_FILEEX_INFO_LEVELS, LPVOID)> g_exWHook;
+anvil::FunctionHook<DWORD(LPCSTR)> g_aHook;
 bool g_verifyOnly = false;
 std::vector<std::wstring>* g_roots = nullptr;
 MissingMap* g_missingExW = nullptr;  // separate maps: the A and W spellings convert differently
@@ -60,7 +62,7 @@ extern "C" {
 // (outside the roots, other info level, unusual spelling), duplicateKeys =
 // paths remembered, verifications / mismatches = comparisons with the real
 // API, mode = 1 on / 2 verify, cacheDisabled = off after a mismatch,
-// readyDisabled = off at the ready marker.
+// readyDisabled = off once the game is ready.
 __declspec(dllexport) sb::Stats EU4SB_AttrCacheStats = SB_STATS_INIT;
 }
 
@@ -260,7 +262,7 @@ void AddRoot(std::vector<std::wstring>& roots, const std::wstring& folder) {
 
 namespace sb {
 
-bool InstallAttrCache(const Build&, Mode mode) {
+bool InstallAttrCache(anvil::Host& host, Mode mode) {
     if (mode == Mode::Off) return false;
     wchar_t exe[MAX_PATH * 2] = {};
     const DWORD length = GetModuleFileNameW(nullptr, exe, static_cast<DWORD>(std::size(exe)));
@@ -282,22 +284,13 @@ bool InstallAttrCache(const Build&, Mode mode) {
         return false;
     }
     g_verifyOnly = mode == Mode::Verify;
-    const AnvilHost* host = context().host;
-    void* original = nullptr;
-    AnvilResult r = host->replace_import(context().self, "KERNEL32.dll", "GetFileAttributesExW",
-                                         reinterpret_cast<void*>(&SB_GetFileAttributesExW), &original);
-    if (r != ANVIL_OK) {
-        Log(ANVIL_LOG_WARNING, "attr_cache: GetFileAttributesExW import refused (%s); module off", ResultName(r));
-        return false;
-    }
-    g_realExW = reinterpret_cast<AttributesExWFn>(original);
-    r = host->replace_import(context().self, "KERNEL32.dll", "GetFileAttributesA",
-                             reinterpret_cast<void*>(&SB_GetFileAttributesA), &original);
-    if (r == ANVIL_OK) {
-        g_realA = reinterpret_cast<AttributesAFn>(original);
-    } else {
-        Log(ANVIL_LOG_WARNING, "attr_cache: GetFileAttributesA import refused (%s); only the W import cached",
-            ResultName(r));
+    host.replace_import(g_exWHook, "KERNEL32.dll", "GetFileAttributesExW", &SB_GetFileAttributesExW);
+    g_realExW = g_exWHook.next_pointer();
+    try {
+        host.replace_import(g_aHook, "KERNEL32.dll", "GetFileAttributesA", &SB_GetFileAttributesA);
+        g_realA = g_aHook.next_pointer();
+    } catch (const anvil::Error& e) {
+        Log(ANVIL_LOG_WARNING, "attr_cache: only the W import cached (%s)", e.what());
     }
     InterlockedExchange(&EU4SB_AttrCacheStats.mode, g_verifyOnly ? 2 : 1);
     InterlockedExchange(&EU4SB_AttrCacheStats.initialized, 1);

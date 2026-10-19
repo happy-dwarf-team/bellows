@@ -3,9 +3,20 @@ name = "Bellows"
 version = "0.7.0"
 authors = ["Happy Dwarf Team"]
 description = "Faster Europa Universalis IV start-up without changing game files or game behaviour."
-api = 1
-anvil = ">=0.2.0"
+api = 2
+anvil = ">=1.0.0"
 entry = "bellows.dll"
+# Early: mimalloc must replace the heap imports before the game's C runtime
+# allocates, and the warm-up threads must run ahead of the game.
 phase = "early"
+symbols = "symbols.toml"   # the game build comes from here
+settings = "settings.toml"
+# The modules give the game's own answers faster; none changes the simulation.
 affects_gameplay = false
-game_builds = ["eu4-1.37.5-steam-win64"]
+issues = "https://github.com/happy-dwarf-team/bellows/issues"
+repository = "https://github.com/happy-dwarf-team/bellows"
+
+# Readiness (the main menu is up): the modules stop and save their profiles.
+[[dependencies]]
+id = "anvil-game"
+version = "^1"

@@ -1,16 +1,20 @@
-// Bellows — Anvil plugin entry point.
-#include "build.hpp"
+// Bellows: the Anvil plugin (API 2, C++ wrapper anvil.hpp).
 #include "common.hpp"
-#include "config.hpp"
 #include "modules/modules.hpp"
 #include "rename.hpp"
+#include "settings.hpp"
 
+#include <anvil/anvil_game.h>
+
+#include "settings.gen.hpp"  // cfg::<name>, written by anvil gen from plugin/settings.toml
+
+#include <cctype>
 #include <filesystem>
 #include <string>
 
 namespace {
 
-void OnGameReady(const char*, const void*, void*) {
+DWORD WINAPI FinishAfterReady(void*) {
     sb::FinishOpenWarmup();
     sb::FinishRamPrefetch();
     sb::ReportMimalloc();
@@ -26,70 +30,114 @@ void OnGameReady(const char*, const void*, void*) {
     sb::ReportTokenDictCache();
     sb::ReportRangeProfile();
     sb::ReportRangeWitness();
+    return 0;
 }
+
+// anvil-game publishes its ready event on the game's main thread. The modules
+// stop at once; saving the profiles waits for the workers (up to seconds), so
+// it runs on a thread of its own, as it did on Anvil's watcher thread before.
+void OnGameReady() {
+    if (InterlockedExchange(&sb::g_gameReady, 1) != 0) return;
+    HANDLE thread = CreateThread(nullptr, 0, &FinishAfterReady, nullptr, 0, nullptr);
+    if (thread != nullptr) {
+        SetThreadDescription(thread, L"bellows ready report");
+        CloseHandle(thread);
+    } else {
+        FinishAfterReady(nullptr);
+    }
+}
+
+// True when ANVIL_BELLOWS_<NAME> is set: Anvil applied it over the player's
+// file, so a value migrated from config.toml must not replace it.
+bool Overridden(const std::string& name) {
+    std::string variable = "ANVIL_BELLOWS_";
+    for (char c : name) variable += static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+    return GetEnvironmentVariableA(variable.c_str(), nullptr, 0) != 0;
+}
+
+struct Module {
+    const char* name;  // also the setting's name in plugin/settings.toml
+    AnvilSetting setting;
+    bool (*install)(anvil::Host&, sb::Mode);
+    sb::Mode mode = sb::Mode::Off;
+};
+
+struct Bellows : anvil::Plugin {
+    void load(anvil::Host& host) override {
+        const std::filesystem::path plugin_dir = host.plugin_dir();
+        const std::filesystem::path data_dir = host.data_dir();
+        if (sb::FormerPluginInstalled(plugin_dir)) {
+            sb::Log(ANVIL_LOG_INFO, "anvil/plugins/eu4-startup-boost (the former name of Bellows, plugin API 1) is "
+                                    "still installed; Anvil does not load it, so the folder can be deleted");
+        }
+        if (const std::string note = sb::MigrateFormerData(data_dir); !note.empty()) {
+            sb::Log(ANVIL_LOG_INFO, "%s", note.c_str());
+        }
+        for (const auto& note : sb::FormerEnvironmentNotes()) sb::Log(ANVIL_LOG_WARNING, "%s", note.c_str());
+
+        Module modules[] = {
+            {"mimalloc", cfg::mimalloc.id, sb::InstallMimalloc},  // first: before the game's runtime allocates
+            {"open_warmup", cfg::open_warmup.id, sb::InstallOpenWarmup},  // early: its threads must run ahead of the game
+            {"ram_prefetch", cfg::ram_prefetch.id, sb::InstallRamPrefetch},  // early as well: workers decode ahead of the game
+            {"verifypath_listing", cfg::verifypath_listing.id, sb::InstallVerifyPathListing},
+            {"exists_index", cfg::exists_index.id, sb::InstallExistsIndex},
+            {"trigger_intern", cfg::trigger_intern.id, sb::InstallTriggerIntern},
+            {"metascript_subst", cfg::metascript_subst.id, sb::InstallMetascriptSubst},
+            {"attr_cache", cfg::attr_cache.id, sb::InstallAttrCache},
+            {"zip_profile", cfg::zip_profile.id, sb::InstallZipProfile},  // diagnostic, off by default
+            // token_dict_cache and token_dict_profile redirect the same call: both chain, the profile then counts
+            // only the cache's misses.
+            {"token_dict_cache", cfg::token_dict_cache.id, sb::InstallTokenDictCache},
+            {"token_dict_profile", cfg::token_dict_profile.id, sb::InstallTokenDictProfile},  // diagnostic
+            {"range_profile", cfg::range_profile.id, sb::InstallRangeProfile},  // diagnostic
+            // range_witness answers before 0x3526B0 runs: range_profile then sees only the walks it still makes.
+            {"range_witness", cfg::range_witness.id, sb::InstallRangeWitness},
+        };
+        // The values Anvil validated (defaults, the player's file, ANVIL_BELLOWS_* overrides).
+        for (auto& m : modules) {
+            const char* text = host.c_api().setting_string(host.self(), m.setting);
+            m.mode = sb::ParseMode(text != nullptr ? text : "").value_or(sb::Mode::Off);
+        }
+        std::int64_t budget = cfg::ram_prefetch_budget_mb.get();
+
+        // First start after the update from config.toml: its values apply now too.
+        const sb::Migration migration = sb::MigrateConfigFile(data_dir, plugin_dir / "settings.toml");
+        for (const auto& note : migration.notes) sb::Log(ANVIL_LOG_WARNING, "%s", note.c_str());
+        for (const auto& value : migration.values) {
+            if (Overridden(value.name)) continue;
+            if (value.name == "ram_prefetch_budget_mb") {
+                budget = std::stoll(value.literal);
+                continue;
+            }
+            for (auto& m : modules) {
+                if (value.name != m.name) continue;
+                // The literal is a quoted option name.
+                m.mode = sb::ParseMode(value.literal.substr(1, value.literal.size() - 2)).value_or(m.mode);
+            }
+        }
+        sb::SetRamPrefetchBudget(static_cast<std::uint64_t>(budget));
+
+        std::string summary;
+        for (const auto& m : modules) {
+            bool active = false;
+            try {
+                active = m.install(host, m.mode);
+            } catch (const std::exception& e) {
+                // Mostly anvil::Error: Anvil refused a change (and logged why). The module's
+                // sb::Undo removed its other changes; the other modules stay.
+                sb::Log(ANVIL_LOG_WARNING, "%s: %s; module off", m.name, e.what());
+            }
+            summary += std::string(summary.empty() ? "" : ", ") + m.name + "=" +
+                       (active ? sb::ModeName(m.mode) : (m.mode == sb::Mode::Off ? "off" : "FAILED"));
+        }
+        sb::Log(ANVIL_LOG_INFO, "modules: %s", summary.c_str());
+
+        // The plugin.toml dependency makes anvil-game load first (both are early).
+        host.subscribe(ANVIL_GAME_EVENT_READY, [] { OnGameReady(); });
+        // A failed module only turns itself off: load() returns normally.
+    }
+};
 
 }  // namespace
 
-extern "C" ANVIL_PLUGIN_EXPORT AnvilResult anvil_plugin_load(const AnvilHost* host, AnvilPlugin* self) {
-    if (host == nullptr || host->api_version != ANVIL_API_VERSION || host->size < sizeof(AnvilHost)) {
-        return ANVIL_ERROR_UNSUPPORTED;
-    }
-    sb::Context& c = sb::context();
-    c.host = host;
-    c.self = self;
-    const sb::Build* build = sb::FindBuild(host->game->build_id);
-    if (build == nullptr) {
-        sb::Log(ANVIL_LOG_WARNING, "game build %s is not supported; nothing changed",
-                host->game->build_id ? host->game->build_id : "unknown");
-        return ANVIL_ERROR_UNSUPPORTED;
-    }
-    c.image_base = host->game->image_base;
-    c.image_size = host->game->image_size;
-    c.ready_marker = sb::AtRva<const uint8_t>(build->ready_marker);
-
-    if (sb::FormerPluginInstalled(std::filesystem::path(host->plugin_dir(self)))) {
-        sb::Log(ANVIL_LOG_ERROR,
-                "EU4 Startup Boost (the former name of Bellows) is still installed; nothing changed. "
-                "Delete the anvil/plugins/eu4-startup-boost folder to use Bellows.");
-        return ANVIL_ERROR_UNSUPPORTED;
-    }
-    const std::filesystem::path data_dir(host->data_dir(self));
-    if (const std::string note = sb::MigrateFormerData(data_dir); !note.empty()) {
-        sb::Log(ANVIL_LOG_INFO, "%s", note.c_str());
-    }
-
-    const sb::Config config = sb::LoadConfig(data_dir);
-    sb::SetRamPrefetchBudget(config.ram_prefetch_budget_mb);
-    for (const auto& note : config.notes) sb::Log(ANVIL_LOG_WARNING, "%s", note.c_str());
-
-    struct Entry {
-        const char* name;
-        bool (*install)(const sb::Build&, sb::Mode);
-    } const modules[] = {
-        {"mimalloc", sb::InstallMimalloc},  // first: before the game's runtime allocates
-        {"open_warmup", sb::InstallOpenWarmup},  // early: its threads must run ahead of the game
-        {"ram_prefetch", sb::InstallRamPrefetch},  // early as well: workers decode ahead of the game
-        {"verifypath_listing", sb::InstallVerifyPathListing},
-        {"exists_index", sb::InstallExistsIndex},
-        {"trigger_intern", sb::InstallTriggerIntern},
-        {"metascript_subst", sb::InstallMetascriptSubst},
-        {"attr_cache", sb::InstallAttrCache},
-        {"zip_profile", sb::InstallZipProfile},  // diagnostic, off unless EU4SB_ZIP_PROFILE=on
-        {"token_dict_cache", sb::InstallTokenDictCache},  // same call site as token_dict_profile: enable one of them
-        {"token_dict_profile", sb::InstallTokenDictProfile},  // diagnostic, off unless EU4SB_TOKEN_DICT_PROFILE=on
-        {"range_profile", sb::InstallRangeProfile},  // diagnostic, off unless EU4SB_RANGE_PROFILE=on
-        {"range_witness", sb::InstallRangeWitness},  // hooks 0x3526B0 too: enable range_profile or range_witness, not both
-    };
-    std::string summary;
-    for (const auto& m : modules) {
-        const sb::Mode mode = config.mode(m.name);
-        const bool active = m.install(*build, mode);
-        summary += std::string(summary.empty() ? "" : ", ") + m.name + "=" +
-                   (active ? sb::ModeName(mode) : (mode == sb::Mode::Off ? "off" : "FAILED"));
-    }
-    sb::Log(ANVIL_LOG_INFO, "modules: %s", summary.c_str());
-    if (host->game->ready_signal_known) {
-        host->subscribe(self, ANVIL_EVENT_GAME_READY, OnGameReady, nullptr);
-    }
-    return ANVIL_OK;  // a failed module only turns itself off
-}
+ANVIL_PLUGIN(Bellows)

@@ -8,15 +8,15 @@
 // need — in first-use order from an access profile — into immutable buffers;
 // when the game opens such a member, its Io is wrapped and served from the
 // buffer. Hooks: OpenArchive / OpenRead / CloseArchive slots of the ZIP
-// archiver table (Anvil patch_bytes with the expected pointers).
+// archiver table (Anvil swap_pointer on the declared slots).
 //
 // Safety (as in the lab): a buffer is published only after the local header
 // matches the central directory and the CRC-32 of the whole output matches;
 // at open, the game's own entry (method, CRC, sizes) must match too, otherwise
 // the module turns itself off. Anything not ready, not in the profile or not
 // supported goes through the game's original Io. "verify" additionally reads
-// the original bytes for every read and compares. Prefetch stops at the ready
-// marker; Ios already wrapped keep their buffer until the game destroys them.
+// the original bytes for every read and compares. Prefetch stops when the game
+// is ready; Ios already wrapped keep their buffer until the game destroys them.
 //
 // Differences from the lab: prefetch starts when the plugin loads (not when
 // the game mounts each archive); a buffer leaves the memory budget once the
@@ -73,11 +73,15 @@ using OpenReadFn = Io* (*)(void*, const char*);
 using CloseArchiveFn = void (*)(void*);
 using TinflFn = int (*)(void*, const std::uint8_t*, std::size_t*, std::uint8_t*, std::uint8_t*, std::size_t*, unsigned);
 
-OpenArchiveFn g_openArchive = nullptr;
-OpenReadFn g_openRead = nullptr;
-CloseArchiveFn g_closeArchive = nullptr;
+// The rest of each slot's chain (the archiver's own function unless another
+// plugin swapped the slot too), read on each call: Anvil rewrites it while the
+// chain changes.
+anvil::PointerSwap<void*(Io*, const char*, int, int*)> g_openArchiveSlot;
+anvil::PointerSwap<Io*(void*, const char*)> g_openReadSlot;
+anvil::PointerSwap<void(void*)> g_closeArchiveSlot;
 TinflFn g_tinfl = nullptr;
-std::uint32_t g_offMethod = 0, g_offCrc = 0, g_offCompressed = 0, g_offUncompressed = 0;
+// The game's ZIP entry (eu4.exe 1.37.5, lab): method, CRC-32, compressed and uncompressed size.
+constexpr std::size_t g_offMethod = 0x46, g_offCrc = 0x48, g_offCompressed = 0x50, g_offUncompressed = 0x58;
 bool g_verify = false;
 const char* g_buildId = nullptr;
 std::wstring* g_gameDir = nullptr;
@@ -85,7 +89,7 @@ std::wstring* g_dataDir = nullptr;
 std::wstring* g_pluginDir = nullptr;
 std::wstring* g_profileTarget = nullptr;
 volatile LONG g_listSource = 0;  // 1 learned, 2 shipped base layer
-std::atomic<bool> g_off{false};   // disabled after a mismatch or at the ready marker
+std::atomic<bool> g_off{false};   // disabled after a mismatch or once the game is ready
 
 // ---- Buffers and the prefetch backend ---------------------------------------
 struct Buffer {
@@ -447,7 +451,7 @@ void Learn(const std::string& storedArchive, const char* member) {
 
 // ---- Archiver hooks ------------------------------------------------------------
 extern "C" void* SB_ZipOpenArchive(Io* io, const char* name, int forWriting, int* claimed) {
-    void* archive = g_openArchive(io, name, forWriting, claimed);
+    void* archive = g_openArchiveSlot.previous()(io, name, forWriting, claimed);
     const DWORD error = GetLastError();
     if (archive != nullptr && name != nullptr && Active()) {
         try {
@@ -464,7 +468,7 @@ extern "C" void* SB_ZipOpenArchive(Io* io, const char* name, int forWriting, int
 }
 
 extern "C" Io* SB_ZipOpenRead(void* archive, const char* name) {
-    Io* io = g_openRead(archive, name);
+    Io* io = g_openReadSlot.previous()(archive, name);
     const DWORD error = GetLastError();
     if (io != nullptr && Active()) {
         try {
@@ -506,7 +510,7 @@ extern "C" void SB_ZipCloseArchive(void* archive) {
     g_opened->erase(archive);
     ReleaseSRWLockExclusive(&g_archiveLock);
     SetLastError(error);
-    g_closeArchive(archive);
+    g_closeArchiveSlot.previous()(archive);
 }
 
 namespace {
@@ -585,7 +589,7 @@ namespace sb {
 
 void SetRamPrefetchBudget(std::uint64_t megabytes) { g_budgetBytes = megabytes << 20; }
 
-bool InstallRamPrefetch(const Build& build, Mode mode) {
+bool InstallRamPrefetch(anvil::Host& host, Mode mode) {
     if (mode == Mode::Off) return false;
     wchar_t exe[MAX_PATH * 2] = {};
     const DWORD length = GetModuleFileNameW(nullptr, exe, static_cast<DWORD>(std::size(exe)));
@@ -593,8 +597,8 @@ bool InstallRamPrefetch(const Build& build, Mode mode) {
     try {
         g_gameDir = new std::wstring(exe, length);
         g_gameDir->resize(g_gameDir->find_last_of(L'\\'));
-        g_dataDir = new std::wstring(context().host->data_dir(context().self));
-        g_pluginDir = new std::wstring(context().host->plugin_dir(context().self));
+        g_dataDir = new std::wstring(host.data_dir().wstring());
+        g_pluginDir = new std::wstring(host.plugin_dir().wstring());
         g_opened = new std::unordered_map<void*, OpenedArchive>();
         g_learned = new std::vector<std::wstring>();
         g_learnedSet = new std::unordered_set<std::wstring>();
@@ -602,39 +606,17 @@ bool InstallRamPrefetch(const Build& build, Mode mode) {
     } catch (...) {
         return false;
     }
-    g_buildId = build.id;
+    g_buildId = host.game().build_id;  // set: symbols.toml names the build
     g_verify = mode == Mode::Verify;
-    g_tinfl = reinterpret_cast<TinflFn>(AtRva<unsigned char>(build.tinfl_decompress_fn));
-    g_offMethod = build.zip_entry_method;
-    g_offCrc = build.zip_entry_crc;
-    g_offCompressed = build.zip_entry_compressed;
-    g_offUncompressed = build.zip_entry_uncompressed;
-
-    struct Slot {
-        uint32_t slot, target;
-        void* replacement;
-        void** original;
-    } const slots[] = {
-        {build.zip_open_archive_slot, build.zip_open_archive_fn, reinterpret_cast<void*>(&SB_ZipOpenArchive),
-         reinterpret_cast<void**>(&g_openArchive)},
-        {build.zip_open_read_slot, build.zip_open_read_fn, reinterpret_cast<void*>(&SB_ZipOpenRead),
-         reinterpret_cast<void**>(&g_openRead)},
-        {build.zip_close_archive_slot, build.zip_close_archive_fn, reinterpret_cast<void*>(&SB_ZipCloseArchive),
-         reinterpret_cast<void**>(&g_closeArchive)},
-    };
-    // Originals first: the game may call a hook as soon as its slot is written.
-    for (const auto& s : slots) *s.original = reinterpret_cast<void*>(context().image_base + s.target);
-    const AnvilHost* host = context().host;
-    for (const auto& s : slots) {
-        const uintptr_t expected = context().image_base + s.target;
-        const uintptr_t replacement = reinterpret_cast<uintptr_t>(s.replacement);
-        const AnvilResult r = host->patch_bytes(context().self, s.slot, &expected, &replacement, sizeof(uintptr_t));
-        if (r != ANVIL_OK) {
-            Log(ANVIL_LOG_WARNING, "ram_prefetch: archiver slot refused (%s); module off", ResultName(r));
-            g_off.store(true);  // slots already written only forward to the originals
-            return false;
-        }
-    }
+    g_tinfl = host.function(sym::tinfl_decompress);
+    Undo undo;
+    host.swap(g_openArchiveSlot, sym::zip_open_archive_slot, &SB_ZipOpenArchive);
+    undo.add(g_openArchiveSlot);
+    host.swap(g_openReadSlot, sym::zip_open_read_slot, &SB_ZipOpenRead);
+    undo.add(g_openReadSlot);
+    host.swap(g_closeArchiveSlot, sym::zip_close_archive_slot, &SB_ZipCloseArchive);
+    undo.add(g_closeArchiveSlot);
+    undo.keep();
     InterlockedExchange(&EU4SB_RamPrefetchStats.mode, g_verify ? 2 : 1);
     InterlockedExchange(&EU4SB_RamPrefetchStats.initialized, 1);
     HANDLE starter = CreateThread(nullptr, 0, &Starter, nullptr, 0, nullptr);
@@ -642,7 +624,7 @@ bool InstallRamPrefetch(const Build& build, Mode mode) {
     return true;
 }
 
-// Called on the game-ready event: stop the workers, free unused buffers, save the profile.
+// Called after the game-ready event: stop the workers, free unused buffers, save the profile.
 void FinishRamPrefetch() {
     if (g_learned == nullptr) return;
     g_off.store(true);
