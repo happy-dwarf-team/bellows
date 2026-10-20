@@ -47,7 +47,7 @@ publish the draft on GitHub: that makes the release public, rebuilds the
 website and, when it is turned on, publishes the Steam Workshop mod (see the
 README, [Steam Workshop](README.md#steam-workshop)).
 
-Do not edit `version.txt`, the manifest `version` or `CHANGELOG.md` by hand;
+Do not edit `version.txt`, the manifest or descriptor `version` or `CHANGELOG.md` by hand;
 CMake refuses to configure when `version.txt` and `plugin/plugin.toml`
 disagree. To force a version, put `Release-As: x.y.z` in a commit body.
 
