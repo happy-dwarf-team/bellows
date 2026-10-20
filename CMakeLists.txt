@@ -39,24 +39,20 @@ FetchContent_MakeAvailable(tomlplusplus mimalloc)
 
 # The Anvil SDK: the AnvilPlugin CMake package (anvil_add_plugin, the headers,
 # anvil.exe for `anvil gen` and `anvil check`).
-#   - An unpacked SDK archive: -DAnvilPlugin_DIR=<sdk>/cmake.
-#   - Otherwise the package is built from the Anvil sources at SB_ANVIL_COMMIT
-#     (a commit of main with plugin API 2); only anvil.exe is compiled. A local
-#     checkout replaces the download: -DFETCHCONTENT_SOURCE_DIR_ANVIL=<anvil>.
-# TODO(#28): once Anvil 1.0 is released, fetch its SDK archive instead
-# (FetchContent_Declare(anvil_sdk URL .../v1.0.0/anvil-sdk-windows-x64.zip URL_HASH SHA256=...)).
-set(SB_ANVIL_COMMIT ab8f7e699b408e94f117f2b8d5f89e19773d0114)
+#   - By default the SDK archive of the Anvil release SB_ANVIL_VERSION, checked
+#     against SB_ANVIL_SDK_SHA256 (the release's SHA256SUMS.txt). A newer
+#     release changes both, on purpose, in its own pull request.
+#   - An unpacked SDK archive, or an SDK installed from a local Anvil checkout
+#     (`cmake --install <anvil build> --component sdk`): -DAnvilPlugin_DIR=<sdk>/cmake.
+set(SB_ANVIL_VERSION 1.0.0)
+set(SB_ANVIL_SDK_SHA256 e8ca738da4ead81f17e8e548447057c8f2b1df0529c7b00185a2f531d4ea89fe)
 if(AnvilPlugin_DIR)
     find_package(AnvilPlugin REQUIRED)
 else()
-    set(ANVIL_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-    set(ANVIL_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-    set(ANVIL_BUILD_BENCH OFF CACHE BOOL "" FORCE)
-    FetchContent_Declare(anvil
-        GIT_REPOSITORY https://github.com/happy-dwarf-team/anvil.git
-        GIT_TAG ${SB_ANVIL_COMMIT}
-        EXCLUDE_FROM_ALL)
-    FetchContent_MakeAvailable(anvil)
+    FetchContent_Declare(anvil_sdk
+        URL https://github.com/happy-dwarf-team/anvil/releases/download/v${SB_ANVIL_VERSION}/anvil-sdk-windows-x64.zip
+        URL_HASH SHA256=${SB_ANVIL_SDK_SHA256})
+    FetchContent_MakeAvailable(anvil_sdk)
 endif()
 
 # bellows.dll and its folder <build>/plugin/bellows/ (plugin.toml, symbols.toml,

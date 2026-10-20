@@ -59,13 +59,11 @@ The build uses the Anvil SDK's CMake package: `anvil_add_plugin` reads
 `plugin/plugin.toml`, runs `anvil gen` on `plugin/symbols.toml`
 (`symbols.gen.hpp`, `sym::<name>`) and `plugin/settings.toml`
 (`settings.gen.hpp`, `cfg::<name>`), and lays out `build/plugin/bellows/`.
-Until Anvil 1.0 ships its SDK archive the package is built from the Anvil
-sources at `SB_ANVIL_COMMIT` (`CMakeLists.txt`); move that commit forward on
-purpose, in its own pull request
-([#28](https://github.com/happy-dwarf-team/bellows/issues/28) replaces it
-with the release archive). `-DFETCHCONTENT_SOURCE_DIR_ANVIL=<anvil>` builds
-against a local Anvil checkout instead, `-DAnvilPlugin_DIR=<sdk>/cmake`
-against an unpacked SDK archive.
+The package is the SDK archive of the Anvil release `SB_ANVIL_VERSION`,
+checked against `SB_ANVIL_SDK_SHA256` (`CMakeLists.txt`); move to a newer
+release on purpose, in its own pull request. `-DAnvilPlugin_DIR=<sdk>/cmake`
+builds against an unpacked SDK archive instead, or against an SDK installed
+from a local Anvil checkout (`cmake --install <anvil build> --component sdk`).
 
 The code uses the C++ wrapper (`anvil/anvil.hpp`): typed symbols, so a
 detour that does not match the `signature` in `symbols.toml` does not
