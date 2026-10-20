@@ -38,12 +38,16 @@ measured.
 
 [release-please](https://github.com/googleapis/release-please) maintains a
 `chore(main): release x.y.z` pull request that bumps `version.txt`, the
-`version` in `plugin/plugin.toml` and `CHANGELOG.md`. Merging it tags `vX.Y.Z`
-and creates the GitHub release; the release workflow then builds the tag and
-attaches `bellows-windows-x64.zip` (the `bellows/` plugin
-folder) and `SHA256SUMS.txt` with a build provenance attestation.
+`version` in `plugin/plugin.toml` and `workshop/descriptor.mod`, and
+`CHANGELOG.md`. Merging it tags `vX.Y.Z` and creates a **draft** GitHub
+release; the release workflow then builds the tag and attaches
+`bellows-windows-x64.zip` (the `bellows/` plugin folder) and `SHA256SUMS.txt`
+with a build provenance attestation to the draft. Once they are attached,
+publish the draft on GitHub: that makes the release public, rebuilds the
+website and, when it is turned on, publishes the Steam Workshop mod (see the
+README, [Steam Workshop](README.md#steam-workshop)).
 
-Do not edit `version.txt`, the manifest `version` or `CHANGELOG.md` by hand;
+Do not edit `version.txt`, the manifest or descriptor `version` or `CHANGELOG.md` by hand;
 CMake refuses to configure when `version.txt` and `plugin/plugin.toml`
 disagree. To force a version, put `Release-As: x.y.z` in a commit body.
 
