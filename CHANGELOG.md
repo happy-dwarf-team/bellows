@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.8.0](https://github.com/happy-dwarf-team/bellows/compare/v0.7.0...v0.8.0) (2026-10-20)
+
+
+### ⚠ BREAKING CHANGES
+
+* Bellows now needs Anvil 1.0 (plugin API 2, anvil >= 1.0.0, the anvil-game plugin); Anvil 0.2 no longer loads it. config.toml and the EU4SB_<NAME> variables are no longer read: settings live in anvil/data/bellows/settings.toml (migrated from config.toml on the first start) and the overrides are ANVIL_BELLOWS_<NAME>.
+
+### Features
+
+* migrate to Anvil plugin API 2 ([#29](https://github.com/happy-dwarf-team/bellows/issues/29)) ([49fbd69](https://github.com/happy-dwarf-team/bellows/commit/49fbd698e2f3fb1b3fb51d5775e96e55a292c1df)), closes [#27](https://github.com/happy-dwarf-team/bellows/issues/27)
+
+
+### Build
+
+* take the Anvil SDK from the 1.0.0 release ([#31](https://github.com/happy-dwarf-team/bellows/issues/31)) ([7112b43](https://github.com/happy-dwarf-team/bellows/commit/7112b43dcc60742ada166d8a071fa8431e6f8b13)), closes [#28](https://github.com/happy-dwarf-team/bellows/issues/28)
+
 ## [0.7.0](https://github.com/happy-dwarf-team/bellows/compare/v0.6.0...v0.7.0) (2026-10-18)
 
 
