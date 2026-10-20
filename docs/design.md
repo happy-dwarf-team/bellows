@@ -480,10 +480,9 @@ needs Anvil 1.0 (`api = 2`, `anvil = ">=1.0.0"`, `affects_gameplay = false`).
   rewrite the player's file from what Anvil read at start-up (the overlay is
   not in Anvil 1.0).
 - **Build.** The `AnvilPlugin` CMake package (`anvil_add_plugin`, `anvil gen`,
-  the plugin folder in `build/plugin/bellows/`). Until Anvil 1.0 is released
-  the package is built from the Anvil sources at a pinned commit of `main`
-  (`SB_ANVIL_COMMIT`); [#28](https://github.com/happy-dwarf-team/bellows/issues/28)
-  switches to the release's SDK archive.
+  the plugin folder in `build/plugin/bellows/`), from the SDK archive of a
+  pinned Anvil release (`SB_ANVIL_VERSION` with its SHA-256; 1.0.0 since
+  [#28](https://github.com/happy-dwarf-team/bellows/issues/28)).
 - **Not run in the game yet** at the time of the port: unit tests, a load test
   of `bellows.dll` against a stand-in host (`tests/test_plugin_load.cpp`), and
   `anvil check --game` on a copy of `eu4.exe` (Bellows after `anvil-game`, no

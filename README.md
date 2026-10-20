@@ -115,12 +115,11 @@ cmake --install build --config Release --component plugin --prefix dist
 ```
 
 The plugin folder as Anvil loads it is `build/plugin/bellows/`. The Anvil SDK
-(the `AnvilPlugin` CMake package, its headers and `anvil.exe`) is built from
-the Anvil sources at the commit `SB_ANVIL_COMMIT` in `CMakeLists.txt` until
-Anvil 1.0 ships the SDK archive
-([#28](https://github.com/happy-dwarf-team/bellows/issues/28)). Use a local
-Anvil checkout with `-DFETCHCONTENT_SOURCE_DIR_ANVIL=<anvil>`, or an unpacked
-SDK archive with `-DAnvilPlugin_DIR=<sdk>/cmake`. After changing
+(the `AnvilPlugin` CMake package, its headers and `anvil.exe`) is the SDK
+archive of the Anvil release `SB_ANVIL_VERSION` in `CMakeLists.txt` (1.0.0),
+downloaded by the first configure and checked against its SHA-256. Use an
+unpacked SDK archive, or one installed from a local Anvil checkout, with
+`-DAnvilPlugin_DIR=<sdk>/cmake`. After changing
 `plugin/symbols.toml`, see [CONTRIBUTING.md](CONTRIBUTING.md#game-addresses).
 
 Contributions, the commit convention and the release process: see
