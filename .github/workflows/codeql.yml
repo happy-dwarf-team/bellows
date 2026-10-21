@@ -4,12 +4,28 @@ name: codeql
 # Windows, as in build.yml, so CodeQL sees the code as MSVC compiles it (the
 # default setup analyses it without a build on Linux, where the Windows
 # headers are missing). The workflows are analysed without a build.
-# Results go to Security -> Code scanning.
+# Results go to Security -> Code scanning. Pushes and pull requests that
+# change only documentation, release files or the Workshop page skip it; the
+# weekly run still analyses main.
 
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "**.md"
+      - docs/**
+      - LICENSE
+      - version.txt
+      - .release-please-manifest.json
+      - workshop/**
   pull_request:
+    paths-ignore:
+      - "**.md"
+      - docs/**
+      - LICENSE
+      - version.txt
+      - .release-please-manifest.json
+      - workshop/**
   schedule:
     - cron: "17 4 * * 1"
 
