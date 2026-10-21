@@ -1,9 +1,17 @@
 # Bellows
 
+[![build](https://github.com/happy-dwarf-team/bellows/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/happy-dwarf-team/bellows/actions/workflows/build.yml)
+[![Latest release](https://img.shields.io/github/v/release/happy-dwarf-team/bellows)](https://github.com/happy-dwarf-team/bellows/releases/latest)
+[![Steam Workshop](https://img.shields.io/badge/Steam%20Workshop-Bellows-1b2838?logo=steam)](https://steamcommunity.com/sharedfiles/filedetails/?id=3823747170)
+[![License: MIT](https://img.shields.io/github/license/happy-dwarf-team/bellows)](LICENSE)
+
 **Faster Europa Universalis IV start-up.** An
 [Anvil](https://github.com/happy-dwarf-team/anvil) plugin that makes the game
 start faster, without changing game files or game behaviour. Like a smith's
 bellows, it gets the forge hot sooner.
+
+**Install guide:
+[anvil.happydwarf.dev/plugins/bellows](https://anvil.happydwarf.dev/plugins/bellows/).**
 
 Formerly **EU4 Startup Boost** (plugin id `eu4-startup-boost`, up to 0.5.0);
 see [Updating from EU4 Startup Boost](#updating-from-eu4-startup-boost).
