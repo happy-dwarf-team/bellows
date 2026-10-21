@@ -10,12 +10,16 @@ see [Updating from EU4 Startup Boost](#updating-from-eu4-startup-boost).
 
 > Status: stage 2, early public releases — see
 > [Releases](https://github.com/happy-dwarf-team/bellows/releases) and
-> [CHANGELOG.md](CHANGELOG.md). The next release is a plugin for Anvil's
-> plugin API 2 and requires **Anvil 1.0** (released together with it); 0.7.0
-> and earlier need Anvil 0.2.
+> [CHANGELOG.md](CHANGELOG.md). Bellows 0.8.0 and newer is a plugin for
+> Anvil's plugin API 2 and needs **Anvil 1.0 or newer**; 0.7.0 and earlier
+> need Anvil 0.2. From 0.9.0 it is also published as a Steam Workshop mod for
+> Anvil 1.3 or newer (see [Steam Workshop](#steam-workshop)).
 > Design: [docs/design.md](docs/design.md).
 
 ## Measured
+
+These numbers were measured with EU4 Startup Boost 0.1.0 and 0.2.0, before
+the rename; modules added since then are not in them.
 
 EU4 1.37.5 (Steam, Windows 64-bit, 10 UI/graphics/music mods), warm start to
 the main menu, original `eu4.exe` with Anvil, 3 interleaved starts each:
