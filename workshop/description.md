@@ -1,29 +1,65 @@
-# Bellows
+**Your game starts in about 15 seconds instead of 35. The forge gets hot sooner.**
 
-**Faster Europa Universalis IV start-up, without changing game files or game behaviour.**
+![](https://i.imgur.com/Uf8Z21n.png)
 
-Bellows is a plugin for [Anvil](https://github.com/happy-dwarf-team/anvil), the EU4 plugin loader. It does the game's own start-up work faster: a faster memory allocator, file checks answered from directory listings, and the files and DLC archive members the game will need read ahead of it on worker threads, from a profile it learns for your mod set. In our measurements (EU4 1.37.5, 10 mods) the start to the main menu took about 15 seconds instead of 35. The game's logs are the same with and without it.
+## Overview
+EU4 spends a long time staring at its own files before you get to the main menu. Bellows helps it along: it fetches what the game is about to need before the game asks, and answers the boring questions faster. Nothing in your game is changed, it just starts sooner.
 
-This mod holds only the plugin: no game files. It does not change the game's checksum, so ironman achievements stay available.
+On our test machine (10 mods) the trip to the main menu went from about 35 seconds to about 15. Your mileage may vary, but it should not get worse.
 
-## Requirements
+![](https://i.imgur.com/Uf8Z21n.png)
 
-- EU4 1.37.5 (Steam, Windows 64-bit). On another game build Anvil skips Bellows and the game starts as usual.
-- **Anvil 1.3 or newer installed in the game folder.** The Workshop cannot install Anvil for you: follow the [Anvil install guide](https://github.com/happy-dwarf-team/anvil#install--uninstall) first.
+## Before you subscribe
+- **[Anvil](https://anvil.happydwarf.dev/) 1.3 or newer** must be installed in the game folder. Get it from [anvil.happydwarf.dev](https://anvil.happydwarf.dev/) and press Download. The Workshop can't install it for you: a dwarf has to carry it in by hand, once.
+- **EU4 1.37.5** (Steam, Windows). On any other version Bellows politely stays out of the way and the game starts as usual.
 
-## Approving the plugin
+![](https://i.imgur.com/Uf8Z21n.png)
 
-Bellows is native code, so Anvil does not load it until you approve it:
+## Getting it running
+1. Subscribe and enable Bellows in your playset.
+2. Start the game. Anvil will tell you a new plugin is waiting: press **Ctrl+Shift+F12**, open **Mods** and approve Bellows. You can also approve it before playing, in Anvil Manager.
+3. Restart. Enjoy the shorter wait.
 
-1. Subscribe, enable the mod in the launcher's playset and start the game.
-2. Anvil shows a notice: open its panel with Ctrl+Shift+F12, go to the **Mods** tab and approve Bellows. You can also approve it before you start, in Anvil Manager's **Mods** tab.
-3. Bellows loads from the next start.
+Anvil asks again after every update. Until you approve, the version you trusted before keeps working.
 
-Anvil asks again for **each new version**. Until you approve an update, the version you approved before keeps running. If you also installed Bellows by hand in anvil/plugins, that copy wins over the mod.
+![](https://i.imgur.com/Uf8Z21n.png)
 
-## Links
+## What it doesn't touch
+- No game files: the files the game checks stay the same, so ironman achievements stay available.
+- No gameplay changes, so it's fine in multiplayer.
+- Unsubscribe and it's gone. Nothing is left in your saves.
 
-- [Source, settings and releases](https://github.com/happy-dwarf-team/bellows)
-- [Report a problem](https://github.com/happy-dwarf-team/bellows/issues)
+![](https://i.imgur.com/Uf8Z21n.png)
 
-Unofficial community project, not affiliated with Paradox Interactive.
+### Alternative download
+[GitHub](https://github.com/happy-dwarf-team/bellows)
+
+![](https://i.imgur.com/Uf8Z21n.png)
+
+## FAQ
+
+### Why do I have to approve it?
+Bellows is a real program running inside your game, not just a pile of text files. Anvil makes sure nothing like that runs without your nod. Trust, but verify. Dwarf law.
+
+### My game didn't get any faster.
+Some of Bellows' tricks learn what your mod set needs during one start and pay off from the next, so give it two runs. Still slow? The **Mods** tab in Anvil's panel tells you if Bellows was skipped and why.
+
+### Does it work with big overhaul mods?
+Yes. It doesn't care what your mods contain, it only helps the game read them faster. Bigger mod sets usually gain the most.
+
+### Will it break my saves or my achievements?
+No. It changes how fast the game starts, not what the game does.
+
+### What is that little dwarf head on the thumbnail?
+If you check the mod's GitHub page, you will notice the repository belongs to Happy Dwarf Team.
+
+I like dwarves.
+I like being happy.
+I am, in fact, a happy dwarf myself.
+
+![](https://i.imgur.com/Uf8Z21n.png)
+
+## Credits
+**Anvil** for letting a dwarf into the forge.
+**mimalloc** by Microsoft for the faster memory handling.
+**Everyone who waited 35 seconds for the main menu**: never again.
