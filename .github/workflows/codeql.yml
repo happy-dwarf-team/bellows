@@ -48,11 +48,12 @@ jobs:
           languages: c-cpp
           build-mode: manual
 
+      # Only the plugin, in parallel: CodeQL did not extract the unit tests anyway.
       - name: Configure
-        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DSB_BUILD_TESTS=OFF
 
       - name: Build
-        run: cmake --build build --config Release
+        run: cmake --build build --config Release --target bellows --parallel
 
       - uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
