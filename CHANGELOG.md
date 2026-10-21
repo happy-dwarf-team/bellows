@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/happy-dwarf-team/bellows/compare/v0.8.0...v0.9.0) (2026-10-21)
+
+
+### Features
+
+* publish Bellows as a Steam Workshop mod ([#32](https://github.com/happy-dwarf-team/bellows/issues/32)) ([e7280ef](https://github.com/happy-dwarf-team/bellows/commit/e7280efd3e19db5bf789a188ef553a7ecad971c6))
+
 ## [0.8.0](https://github.com/happy-dwarf-team/bellows/compare/v0.7.0...v0.8.0) (2026-10-20)
 
 
