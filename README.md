@@ -18,24 +18,26 @@ see [Updating from EU4 Startup Boost](#updating-from-eu4-startup-boost).
 
 ## Measured
 
-These numbers were measured with EU4 Startup Boost 0.1.0 and 0.2.0, before
-the rename; modules added since then are not in them.
-
 EU4 1.37.5 (Steam, Windows 64-bit, 10 UI/graphics/music mods), warm start to
-the main menu, original `eu4.exe` with Anvil, 3 interleaved starts each:
+the main menu (`Running application` in `system.log`), original `eu4.exe`,
+Anvil 1.3.0 and Bellows 0.9.0 from the release files, Bellows with default
+settings and the profiles it learned on an earlier start, 3 interleaved
+starts each:
 
 | Setup | Starts | Median |
 | --- | --- | ---: |
-| Anvil without plugins | 34.96 / 35.50 / 34.70 s | 34.96 s |
-| Anvil + EU4 Startup Boost 0.1.0 | 15.65 / 15.38 / 15.40 s | **15.40 s** |
+| Anvil without plugins | 37.15 / 37.15 / 36.60 s | 37.15 s |
+| Anvil + anvil-game | 38.51 / 37.10 / 36.54 s | 37.10 s |
+| Anvil + anvil-game + Bellows 0.9.0 | 13.03 / 13.32 / 12.26 s | **13.03 s** |
 
-With `ram_prefetch` (0.2.0 work, separate interleaved series): 12.24 s median
-(11.98 / 12.24 / 12.50) vs 15.16 s with every other module on and
-`ram_prefetch` off; game logs identical.
+Bellows needs the standard plugin anvil-game, which on its own does not
+change the start-up time. The very first start, with the profile shipped in
+the release, took 13.61 s.
 
-The game's `setup.log`, `error.log` and `system.log` are identical with and
-without the plugin. In a verification start every module compared each of its
-answers with the game's own code: 0 differences over 3.6 million calls.
+The game's `setup.log`, `error.log` and `system.log` were byte for byte the
+same in all of these starts, with and without Bellows. With default settings
+the modules also compare a sample of their answers with the game's own code
+(about 45,700 comparisons per start): 0 differences.
 
 ## Modules
 
