@@ -205,5 +205,5 @@ run `pdx-ws session export` again.
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Bundles mimalloc (MIT, Microsoft). Unofficial
-community project, not affiliated with Paradox Interactive.
+MIT — see [LICENSE](LICENSE). Bundles mimalloc (MIT, Microsoft). Bellows is an
+unofficial community project, not affiliated with or endorsed by Paradox Interactive.
