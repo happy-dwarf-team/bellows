@@ -43,6 +43,8 @@ std::string g_scenario;
 std::wstring g_pluginDir, g_dataDir;
 AnvilEventCallback g_ready = nullptr;
 void* g_readyContext = nullptr;
+AnvilEventCallback g_session = nullptr;
+void* g_sessionContext = nullptr;
 unsigned char g_symbolMemory[256] = {};  // what address_of returns for every symbol
 
 void NeverCalled() { std::abort(); }  // what `next` and `previous` lead to: nothing runs the changes
@@ -259,6 +261,11 @@ const void* GetService(AnvilPlugin*, const char* name, uint32_t version) {
     return &g_benchmark;
 }
 AnvilResult Subscribe(AnvilPlugin*, const char* event, AnvilEventCallback callback, void* context) {
+    if (std::string(event) == ANVIL_GAME_EVENT_SESSION) {
+        g_session = callback;
+        g_sessionContext = context;
+        return ANVIL_OK;
+    }
     assert(std::string(event) == ANVIL_GAME_EVENT_READY);
     g_ready = callback;
     g_readyContext = context;
@@ -383,6 +390,14 @@ int main(int argc, char** argv) {
     g_ready(ANVIL_GAME_EVENT_READY, nullptr, g_readyContext);
     for (int i = 0; i < 100 && !Logged("trigger_intern: map size"); ++i) Sleep(50);
     assert(Logged("trigger_intern: map size"));
+
+    // mimalloc = "startup" returns freed pages at the ready event and at each session event.
+    assert(g_session != nullptr);
+    const AnvilGameSession started = {sizeof(AnvilGameSession), ANVIL_GAME_SESSION_STARTED, 0, 0};
+    g_session(ANVIL_GAME_EVENT_SESSION, &started, g_sessionContext);
+    const bool collects = g_scenario != "refuse";  // refuse: mimalloc failed
+    assert(Logged("mimalloc: freed pages returned at ready") == collects);
+    assert(Logged("mimalloc: freed pages returned at session start") == collects);
 
     // The benchmark: fields declared in load(), every call one Anvil accepts, done() at the end of the report.
     if (g_scenario == "old") {

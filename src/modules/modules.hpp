@@ -28,6 +28,11 @@ bool InstallTokenDictCache(anvil::Host& host, Mode mode);
 bool InstallRangeProfile(anvil::Host& host, Mode mode);  // diagnostic
 bool InstallRangeWitness(anvil::Host& host, Mode mode);
 
+// mimalloc = "startup": returns the pages freed since the switch to Windows
+// (on the main thread, at the game-ready and session events). Without
+// allocations from mimalloc nothing else starts its delayed purge.
+void CollectMimalloc(const char* reason);
+
 // Stops learning and saves the access profile (after the game-ready event).
 void FinishOpenWarmup();
 

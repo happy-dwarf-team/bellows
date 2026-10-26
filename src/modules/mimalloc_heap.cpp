@@ -18,9 +18,13 @@
 // of a mimalloc block moves it to the Windows heap. The save a player loads
 // later is then allocated outside mimalloc. Calls after the switch for blocks
 // mimalloc does not own are not counted as misses (that is every call).
+// Nothing allocates from mimalloc after the switch, so nothing runs its
+// delayed purge: CollectMimalloc returns the freed pages at the ready and
+// session events (the lab saw +0.37 GiB per save load without it).
 #include "modules.hpp"
 
 #include <mimalloc.h>
+#include <psapi.h>
 
 namespace {
 
@@ -218,6 +222,21 @@ bool InstallMimalloc(anvil::Host& host, Mode mode) {
     return true;
 }
 
+void CollectMimalloc(const char* reason) {
+    if (!g_startupOnly || EU4SB_MimallocStats.mode != 1) return;
+    const auto commitMiB = [] {
+        PROCESS_MEMORY_COUNTERS_EX counters{};
+        GetProcessMemoryInfo(GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&counters),
+                             sizeof(counters));
+        return static_cast<double>(counters.PrivateUsage) / (1024.0 * 1024.0);
+    };
+    const double before = commitMiB();
+    const LONG64 start = Ticks();
+    mi_collect(true);
+    Log(ANVIL_LOG_INFO, "mimalloc: freed pages returned at %s in %.1f ms, commit %.0f -> %.0f MiB", reason,
+        TicksToMs(Ticks() - start), before, commitMiB());
+}
+
 void ReportMimalloc() {
     LogStats("mimalloc", EU4SB_MimallocStats);
     bench::SetCounters("mimalloc", EU4SB_MimallocStats);
@@ -234,6 +253,7 @@ void InitMimallocForTest(Mode mode) {
     g_processHeap = GetProcessHeap();
     g_startupOnly = mode == Mode::Startup;
     mi_process_init();
+    InterlockedExchange(&EU4SB_MimallocStats.mode, 1);
 }
 #endif
 

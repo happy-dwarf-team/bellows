@@ -3,7 +3,9 @@
 #include "../src/common.hpp"
 
 #include <mimalloc.h>
+#include <psapi.h>
 
+#include <atomic>
 #include <cassert>
 #include <cstdio>
 #include <thread>
@@ -19,6 +21,7 @@ extern sb::Stats EU4SB_MimallocStats;
 
 namespace sb {
 void InitMimallocForTest(Mode mode);
+void CollectMimalloc(const char* reason);
 }
 
 namespace {
@@ -102,6 +105,46 @@ void StartupMode() {
     assert(EU4SB_MimallocStats.mismatches == 0);
 }
 
+double CommitMiB() {
+    PROCESS_MEMORY_COUNTERS_EX counters{};
+    GetProcessMemoryInfo(GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&counters), sizeof(counters));
+    return static_cast<double>(counters.PrivateUsage) / (1024.0 * 1024.0);
+}
+
+// After the switch nothing allocates from mimalloc, so blocks freed later stay committed
+// until CollectMimalloc: here ~260 MiB from threads that stay alive, freed on a thread that ends.
+void StartupModeReturnsMemory() {
+    sb::g_gameReady = 0;
+    sb::InitMimallocForTest(sb::Mode::Startup);
+    constexpr int kThreads = 4;
+    constexpr std::size_t kPerThread = 120000;
+    std::vector<std::vector<void*>> blocks(kThreads);
+    std::atomic<int> allocated{0};
+    std::atomic<bool> leave{false};
+    std::vector<std::thread> threads;
+    for (int t = 0; t < kThreads; ++t) {
+        threads.emplace_back([&, t] {
+            for (std::size_t i = 0; i < kPerThread; ++i) blocks[t].push_back(Filled(32 + (i * 37) % 900, 1));
+            ++allocated;
+            while (!leave) Sleep(1);  // alive, like the game's workers
+        });
+    }
+    while (allocated < kThreads) Sleep(1);
+    sb::g_gameReady = 1;
+    std::thread([&] {
+        for (auto& list : blocks) {
+            for (void* p : list) assert(SB_HeapFree(kHeap, 0, p));
+        }
+    }).join();
+    const double freed = CommitMiB();
+    sb::CollectMimalloc("test");
+    const double collected = CommitMiB();
+    std::printf("mimalloc_heap: commit after the frees %.0f MiB, after CollectMimalloc %.0f MiB\n", freed, collected);
+    assert(freed - collected > 150.0);
+    leave = true;
+    for (auto& thread : threads) thread.join();
+}
+
 void WholeSessionMode() {
     sb::g_gameReady = 1;
     sb::InitMimallocForTest(sb::Mode::On);
@@ -121,6 +164,7 @@ void WholeSessionMode() {
 }  // namespace
 
 int main() {
+    StartupModeReturnsMemory();
     StartupMode();
     WholeSessionMode();
     std::puts("mimalloc_heap: ok");
