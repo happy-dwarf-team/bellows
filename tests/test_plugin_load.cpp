@@ -1,8 +1,11 @@
 // bellows.dll's anvil_plugin_load against a stand-in API 2 host: the settings
 // it reads, the changes each module requests (none reaches a game: the image
 // is this test's own executable and nothing is enabled), the per-module undo
-// when Anvil refuses a change, the config.toml migration and the ready event.
-//   test_plugin_load <bellows.dll> <plugin folder> ok|refuse
+// when Anvil refuses a change, the config.toml migration, the ready event and
+// the start-up benchmark fields (a stand-in anvil.benchmark that checks every
+// call as Anvil 1.4 does; "old" is an Anvil without the service).
+//   test_plugin_load <bellows.dll> <plugin folder> ok|refuse|old
+#include <anvil/anvil_benchmark.h>
 #include <anvil/anvil_game.h>
 #include <anvil/anvil_plugin.h>
 
@@ -11,11 +14,15 @@
 
 #include <windows.h>
 
+#include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -119,7 +126,137 @@ const char* SettingString(AnvilPlugin*, AnvilSetting setting) {
 }
 AnvilResult SubscribeSetting(AnvilPlugin*, AnvilSetting, AnvilSettingCallback, void*) { return ANVIL_ERROR_WRONG_KIND; }
 AnvilResult RegisterService(AnvilPlugin*, const char*, uint32_t, const void*) { return ANVIL_OK; }
-const void* GetService(AnvilPlugin*, const char*, uint32_t) { return nullptr; }
+// --- the stand-in anvil.benchmark ---------------------------------------------
+struct BenchField {
+    uint32_t kind = 0;
+    std::vector<std::string> options;
+};
+bool g_loading = false;  // inside anvil_plugin_load
+std::map<std::string, BenchField> g_fields;
+std::map<std::string, std::string> g_values;  // field -> value as text
+std::vector<std::string> g_benchErrors;       // calls Anvil would refuse
+int g_declares = 0, g_dones = 0;
+std::string g_learning;
+bool g_openCost = false;
+
+// `group.field` or `field`, identifiers of [a-z0-9_], at most 64 characters.
+bool BenchName(const char* name) {
+    if (name == nullptr) return false;
+    const std::string text = name;
+    if (text.empty() || text.size() > ANVIL_BENCHMARK_MAX_NAME || text.front() == '.' || text.back() == '.') return false;
+    int dots = 0;
+    for (char c : text) {
+        if (c == '.') {
+            ++dots;
+        } else if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_')) {
+            return false;
+        }
+    }
+    return dots <= 1;
+}
+
+AnvilResult BenchRefuse(const std::string& why) {  // under g_mutex
+    g_benchErrors.push_back(why);
+    std::printf("benchmark refused: %s\n", why.c_str());
+    return ANVIL_ERROR_INVALID_ARGUMENT;
+}
+
+int BenchActive() { return 1; }
+AnvilResult BenchDeclare(AnvilPlugin*, const AnvilBenchmarkField* fields, uint32_t count) {
+    std::lock_guard lock(g_mutex);
+    ++g_declares;
+    if (!g_loading) return BenchRefuse("declare outside anvil_plugin_load");
+    if (g_fields.size() + count > ANVIL_BENCHMARK_MAX_FIELDS) return BenchRefuse("more than 128 fields");
+    std::map<std::string, BenchField> added;  // all or none
+    for (uint32_t i = 0; i < count; ++i) {
+        const AnvilBenchmarkField& f = fields[i];
+        const std::string name = f.name != nullptr ? f.name : "";
+        if (!BenchName(f.name)) return BenchRefuse("bad name '" + name + "'");
+        if (g_fields.contains(name) || added.contains(name)) return BenchRefuse("declared twice: " + name);
+        if (f.kind < ANVIL_BENCHMARK_INT || f.kind > ANVIL_BENCHMARK_FLAG) return BenchRefuse("bad kind: " + name);
+        if (f.unit > ANVIL_BENCHMARK_UNIT_PERCENT) return BenchRefuse("bad unit: " + name);
+        if ((f.kind == ANVIL_BENCHMARK_ENUM || f.kind == ANVIL_BENCHMARK_FLAG) && f.unit != ANVIL_BENCHMARK_UNIT_NONE) {
+            return BenchRefuse("a unit on an enum or a flag: " + name);
+        }
+        if (f.label != nullptr && std::strlen(f.label) > ANVIL_BENCHMARK_MAX_LABEL) return BenchRefuse("long label: " + name);
+        BenchField field{f.kind, {}};
+        if (f.kind == ANVIL_BENCHMARK_ENUM) {
+            if (f.options == nullptr || f.option_count == 0 || f.option_count > ANVIL_BENCHMARK_MAX_OPTIONS) {
+                return BenchRefuse("bad option list: " + name);
+            }
+            for (uint32_t k = 0; k < f.option_count; ++k) {
+                if (!BenchName(f.options[k]) || std::strchr(f.options[k], '.') != nullptr) {
+                    return BenchRefuse("bad option of " + name);
+                }
+                field.options.emplace_back(f.options[k]);
+            }
+        } else if (f.options != nullptr || f.option_count != 0) {
+            return BenchRefuse("options on a field that is not an enum: " + name);
+        }
+        added.emplace(name, std::move(field));
+    }
+    g_fields.merge(added);
+    return ANVIL_OK;
+}
+AnvilResult BenchSet(const char* field, uint32_t kind, const std::string& value) {
+    std::lock_guard lock(g_mutex);
+    const auto found = field != nullptr ? g_fields.find(field) : g_fields.end();
+    if (found == g_fields.end()) return BenchRefuse(std::string("not declared: ") + (field ? field : "(null)"));
+    if (found->second.kind != kind) return BenchRefuse(std::string("wrong kind: ") + field);
+    if (g_dones != 0) return BenchRefuse(std::string("set after done(): ") + field);
+    const auto& options = found->second.options;
+    if (kind == ANVIL_BENCHMARK_ENUM && std::find(options.begin(), options.end(), value) == options.end()) {
+        return BenchRefuse(std::string("not an option of ") + field + ": " + value);
+    }
+    g_values[field] = value;
+    return ANVIL_OK;
+}
+AnvilResult BenchSetInt(AnvilPlugin*, const char* field, int64_t value) {
+    return BenchSet(field, ANVIL_BENCHMARK_INT, std::to_string(value));
+}
+AnvilResult BenchSetNumber(AnvilPlugin*, const char* field, double value) {
+    if (!std::isfinite(value)) {
+        std::lock_guard lock(g_mutex);
+        return BenchRefuse(std::string("not finite: ") + (field ? field : "(null)"));
+    }
+    return BenchSet(field, ANVIL_BENCHMARK_NUMBER, std::to_string(value));
+}
+AnvilResult BenchSetEnum(AnvilPlugin*, const char* field, const char* option) {
+    return BenchSet(field, ANVIL_BENCHMARK_ENUM, option != nullptr ? option : "");
+}
+AnvilResult BenchSetFlag(AnvilPlugin*, const char* field, int value) {
+    return BenchSet(field, ANVIL_BENCHMARK_FLAG, value ? "true" : "false");
+}
+AnvilResult BenchDone(AnvilPlugin*) {
+    std::lock_guard lock(g_mutex);
+    ++g_dones;
+    return ANVIL_OK;
+}
+AnvilResult BenchLearning(AnvilPlugin*, const char* reason) {
+    std::lock_guard lock(g_mutex);
+    if (!BenchName(reason) || std::strchr(reason, '.') != nullptr) return BenchRefuse("bad learning reason");
+    if (g_dones != 0) return BenchRefuse("learning() after done()");
+    g_learning = reason;
+    return ANVIL_OK;
+}
+AnvilResult BenchOpenCost(AnvilPlugin*, uint64_t, double ms) {
+    std::lock_guard lock(g_mutex);
+    if (!std::isfinite(ms) || ms < 0) return BenchRefuse("bad open cost");
+    if (g_dones != 0) return BenchRefuse("open_cost() after done()");
+    g_openCost = true;
+    return ANVIL_OK;
+}
+const AnvilBenchmarkService g_benchmark = {sizeof(AnvilBenchmarkService), BenchActive, BenchDeclare,
+                                           BenchSetInt, BenchSetNumber, BenchSetEnum, BenchSetFlag,
+                                           BenchDone, BenchLearning, BenchOpenCost};
+
+// An Anvil older than 1.4 (scenario "old") has no anvil.benchmark: get_service returns NULL.
+const void* GetService(AnvilPlugin*, const char* name, uint32_t version) {
+    if (g_scenario == "old" || std::string(name) != ANVIL_BENCHMARK_SERVICE || version != ANVIL_BENCHMARK_SERVICE_VERSION) {
+        return nullptr;
+    }
+    return &g_benchmark;
+}
 AnvilResult Subscribe(AnvilPlugin*, const char* event, AnvilEventCallback callback, void* context) {
     assert(std::string(event) == ANVIL_GAME_EVENT_READY);
     g_ready = callback;
@@ -199,7 +336,9 @@ int main(int argc, char** argv) {
     const auto load = reinterpret_cast<AnvilResult (*)(const AnvilHost*, AnvilPlugin*)>(
         GetProcAddress(dll, "anvil_plugin_load"));
     assert(load != nullptr);
+    g_loading = true;
     assert(load(&host, reinterpret_cast<AnvilPlugin*>(&host)) == ANVIL_OK);  // a failed module never fails the load
+    g_loading = false;
 
     // config.toml was migrated, and its value applies to this start too.
     assert(fs::exists(data / "settings.toml") && fs::exists(data / "config.toml.migrated"));
@@ -207,7 +346,7 @@ int main(int argc, char** argv) {
 
     const std::string rest = ", metascript_subst=off, attr_cache=verify, zip_profile=on, token_dict_cache=on, "
                              "token_dict_profile=off, range_profile=on, range_witness=on";
-    if (g_scenario == "ok") {
+    if (g_scenario != "refuse") {
         assert(Logged("modules: mimalloc=on, open_warmup=off, ram_prefetch=off, verifypath_listing=on, "
                       "exists_index=on, trigger_intern=on" + rest));
         for (const char* f : {"HeapFree", "HeapReAlloc", "HeapSize", "HeapAlloc", "GetFileAttributesExW",
@@ -243,6 +382,41 @@ int main(int argc, char** argv) {
     g_ready(ANVIL_GAME_EVENT_READY, nullptr, g_readyContext);
     for (int i = 0; i < 100 && !Logged("trigger_intern: map size"); ++i) Sleep(50);
     assert(Logged("trigger_intern: map size"));
+
+    // The benchmark: fields declared in load(), every call one Anvil accepts, done() at the end of the report.
+    if (g_scenario == "old") {
+        assert(!Logged("benchmark"));  // Bellows runs as before; the log has nothing about the missing service
+    } else {
+        for (int i = 0; i < 100; ++i) {
+            {
+                std::lock_guard lock(g_mutex);
+                if (g_dones != 0) break;
+            }
+            Sleep(50);
+        }
+        std::lock_guard lock(g_mutex);
+        std::printf("benchmark: %zu fields declared, %zu set\n", g_fields.size(), g_values.size());
+        assert(g_benchErrors.empty());
+        assert(g_declares >= 1 && g_dones == 1);
+        const bool ok = g_scenario == "ok";
+        const std::map<std::string, std::string> modes = {
+            {"mimalloc", ok ? "on" : "failed"}, {"open_warmup", "off"}, {"ram_prefetch", "off"},
+            {"verifypath_listing", "on"}, {"exists_index", "on"}, {"trigger_intern", ok ? "on" : "failed"},
+            {"metascript_subst", "off"}, {"attr_cache", "verify"}, {"zip_profile", "on"},
+            {"token_dict_cache", "on"}, {"token_dict_profile", "off"}, {"range_profile", "on"},
+            {"range_witness", "on"},
+        };
+        for (const auto& [module, mode] : modes) assert(g_values.at(module + ".mode") == mode);
+        for (const char* field : {"exists_index.requests", "exists_index.listings", "verifypath_listing.mismatches",
+                                  "attr_cache.verifications", "token_dict_cache.entries", "range_profile.checks",
+                                  "range_witness.answered"}) {
+            assert(g_values.contains(field));
+        }
+        // open_warmup and ram_prefetch are off: no open cost, no profile being built, their fields stay null.
+        assert(!g_openCost && g_learning.empty());
+        assert(g_fields.contains("open_warmup.opened") && !g_values.contains("open_warmup.opened"));
+        assert(!g_values.contains("metascript_subst.requests"));
+    }
 
     std::printf("plugin load (%s) ok\n", g_scenario.c_str());
     std::fflush(stdout);

@@ -196,6 +196,9 @@ void ReportTokenDictProfile() {
     InterlockedExchange64(&EU4SB_TokenDictStats.requests, calls0);
     InterlockedExchange64(&EU4SB_TokenDictStats.hits, g_hits[0]);
     InterlockedExchange64(&EU4SB_TokenDictStats.skips, calls1);
+    bench::Get().set("token_dict_profile.tokenizer_lookups", calls0);
+    bench::Get().set("token_dict_profile.tokenizer_hits", g_hits[0]);
+    bench::Get().set("token_dict_profile.get_or_add_lookups", calls1);
     Log(ANVIL_LOG_INFO, "token_dict_profile: tokenizer lookups %lld (hits %lld, distinct keys %zu), get-or-add lookups %lld (hits %lld), dynamic tokens %lld",
         calls0, g_hits[0], g_keys->size(), calls1, g_hits[1], DynamicTokens());
     std::string threads;

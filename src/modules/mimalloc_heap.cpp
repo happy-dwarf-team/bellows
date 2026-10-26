@@ -195,6 +195,9 @@ bool InstallMimalloc(anvil::Host& host, Mode mode) {
     return true;
 }
 
-void ReportMimalloc() { LogStats("mimalloc", EU4SB_MimallocStats); }
+void ReportMimalloc() {
+    LogStats("mimalloc", EU4SB_MimallocStats);
+    bench::SetCounters("mimalloc", EU4SB_MimallocStats);
+}
 
 }  // namespace sb

@@ -465,6 +465,11 @@ void ReportTriggerIntern() {
     Log(ANVIL_LOG_INFO, "trigger_intern: map size %lld, indexed %lld; first to last call %.1f ms (game loop included), "
         "of which original %.1f ms",
         EU4SB_TriggerInternMap.requests, EU4SB_TriggerInternMap.hits, TicksToMs(CallSpan()), TicksToMs(g_ticksOriginal));
+    bench::SetCounters("trigger_intern", EU4SB_TriggerInternStats);
+    if (g_state != nullptr) {
+        bench::Get().set("trigger_intern.map_size", EU4SB_TriggerInternMap.requests);
+        bench::Get().set("trigger_intern.indexed", EU4SB_TriggerInternMap.hits);
+    }
     if (g_state == nullptr) return;
     // The game is ready, so the index is no longer used: release its memory
     // (tens of MB with a non-empty map). Later calls go to the original.

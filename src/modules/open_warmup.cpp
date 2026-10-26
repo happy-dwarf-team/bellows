@@ -257,6 +257,27 @@ void ReportOpenWarmup() {
     const Stats& l = EU4SB_OpenWarmupLearn;
     Log(ANVIL_LOG_INFO, "open_warmup learning: %lld opens recorded, profile %s (%lld entries)", l.requests,
         l.initialized ? "saved" : (l.cacheDisabled ? "NOT saved" : "not written"), l.hits);
+
+    static const char* const kProfiles[] = {"learned", "base_and_mods", "all_list"};
+    if (s.mode >= 1 && s.mode <= 3) bench::Get().set_enum("open_warmup.profile", kProfiles[s.mode - 1]);
+    bench::Get().set("open_warmup.entries", s.requests);
+    bench::Get().set("open_warmup.opened", s.hits);
+    bench::Get().set("open_warmup.failed", s.misses);
+    bench::Get().set("open_warmup.not_tried", s.skips);
+    bench::Get().set("open_warmup.threads", s.duplicateKeys);
+    if (s.initialized) bench::Get().set("open_warmup.finish_time", s.verifications);
+    if (l.mode != 0) {
+        bench::Get().set("open_warmup.learn_recorded", l.requests);
+        bench::Get().set("open_warmup.learn_dropped", l.skips);
+        bench::Get().set("open_warmup.profile_saved", l.initialized != 0);
+        bench::Get().set("open_warmup.profile_entries", l.hits);
+    }
+    // The warm-up opened the game's files ahead of it: their wall time per file is the start's open cost.
+    if (s.initialized && s.hits > 0) {
+        bench::Get().open_cost(static_cast<std::uint64_t>(s.hits), static_cast<double>(s.verifications));
+    }
+    // No learned profile for this mod set yet: this start builds it.
+    if (s.mode == 2 || s.mode == 3) bench::NewModSet();
 }
 
 }  // namespace sb

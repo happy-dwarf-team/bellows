@@ -1,4 +1,5 @@
 // Bellows: the Anvil plugin (API 2, C++ wrapper anvil.hpp).
+#include "benchmark.hpp"
 #include "common.hpp"
 #include "modules/modules.hpp"
 #include "rename.hpp"
@@ -11,6 +12,7 @@
 #include <cctype>
 #include <filesystem>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -30,6 +32,7 @@ DWORD WINAPI FinishAfterReady(void*) {
     sb::ReportTokenDictCache();
     sb::ReportRangeProfile();
     sb::ReportRangeWitness();
+    sb::bench::Done();  // the profiles are saved and the reports made
     return 0;
 }
 
@@ -93,6 +96,10 @@ struct Bellows : anvil::Plugin {
             // range_witness answers before 0x3526B0 runs: range_profile then sees only the walks it still makes.
             {"range_witness", cfg::range_witness.id, sb::InstallRangeWitness},
         };
+        std::vector<const char*> names;
+        for (const auto& m : modules) names.push_back(m.name);
+        sb::bench::Join(host, names);
+
         // The values Anvil validated (defaults, the player's file, ANVIL_BELLOWS_* overrides).
         for (auto& m : modules) {
             const char* text = host.c_api().setting_string(host.self(), m.setting);
@@ -127,8 +134,9 @@ struct Bellows : anvil::Plugin {
                 // sb::Undo removed its other changes; the other modules stay.
                 sb::Log(ANVIL_LOG_WARNING, "%s: %s; module off", m.name, e.what());
             }
-            summary += std::string(summary.empty() ? "" : ", ") + m.name + "=" +
-                       (active ? sb::ModeName(m.mode) : (m.mode == sb::Mode::Off ? "off" : "FAILED"));
+            const std::string mode = active ? sb::ModeName(m.mode) : (m.mode == sb::Mode::Off ? "off" : "failed");
+            summary += std::string(summary.empty() ? "" : ", ") + m.name + "=" + (mode == "failed" ? "FAILED" : mode);
+            sb::bench::SetMode(m.name, mode.c_str());
         }
         sb::Log(ANVIL_LOG_INFO, "modules: %s", summary.c_str());
 

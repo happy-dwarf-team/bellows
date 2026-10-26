@@ -306,6 +306,9 @@ void ReportRangeWitness() {
     InterlockedExchange64(&EU4SB_RangeWitnessStats.requests, s.calls);
     InterlockedExchange64(&EU4SB_RangeWitnessStats.hits, s.answered);
     InterlockedExchange64(&EU4SB_RangeWitnessStats.skips, s.originals);
+    bench::Get().set("range_witness.checks", s.calls);
+    bench::Get().set("range_witness.answered", s.answered);
+    bench::Get().set("range_witness.originals", s.originals);
 }
 
 }  // namespace sb

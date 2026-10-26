@@ -488,6 +488,42 @@ needs Anvil 1.0 (`api = 2`, `anvil = ">=1.0.0"`, `affects_gameplay = false`).
   `anvil check --game` on a copy of `eu4.exe` (Bellows after `anvil-game`, no
   overlap).
 
+## 6c. Start-up benchmark participant (D)
+
+Anvil's start-up benchmark (Anvil `docs/spec/benchmark-v1.md`) runs starts of
+the game without and with a plugin, each quitting itself once the game is
+ready, and reports the times. Bellows takes part through the core service
+`anvil.benchmark` v1 of Anvil 1.4 (`src/benchmark.hpp`); the manifest keeps
+`anvil = ">=1.0.0"`, and on an older Anvil the lookup returns nothing and every
+call does nothing.
+
+- **Fields.** `load()` declares them all, whatever the modules' modes: per
+  module `<module>.mode` (enum `off` / `on` / `verify` / `failed`), and the
+  numbers of the module's `anvil.log` lines as `int` counters: the LogStats
+  counters (`requests`, `hits`, `misses`, `skips`, `verifications`,
+  `mismatches`, and the one printed as "extra" under a name of its own, such
+  as `exists_index.listings`), `open_warmup.*` and `ram_prefetch.*` with their
+  finish times in `ms` and the profile they used as an enum
+  (`open_warmup.profile`: `learned` / `base_and_mods` / `all_list`;
+  `ram_prefetch.profile`: `none` / `learned` / `base`). A module that is off
+  or did not report leaves its fields `null`. A name keeps its meaning; a new
+  meaning gets a new name. The log lines are unchanged.
+- **When.** The modes are set in `load()`; the other values on the
+  ready-report thread, next to each module's log line. `done()` ends that
+  thread, after the profiles are saved and every report is made.
+- **Learning.** `open_warmup` without a learned profile for the mod set
+  (`base_and_mods` or `all_list`), or `ram_prefetch` building its first
+  profile, calls `learning("new_mod_set")`: the start is discarded and
+  replaced.
+- **Open cost.** `open_warmup` reports the files it opened and its wall time
+  (`open_cost(opened, finish_time)`); in the arm with Bellows this is the
+  start's open cost that tells warm starts from cold ones. Without a finished
+  warm-up there is none, and the Manager falls back to Anvil's measurement.
+- **Tests.** `tests/test_plugin_load.cpp` gives the plugin a stand-in service
+  that refuses what Anvil refuses (names, kinds, limits, a set before declare
+  or after `done()`) and checks the modes, some counters and the single
+  `done()`; the `old` scenario has no service.
+
 ## 7. Open questions (Q)
 
 - Whether `mimalloc` should be its own plugin (it stays active during play,
