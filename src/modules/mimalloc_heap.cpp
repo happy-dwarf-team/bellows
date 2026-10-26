@@ -12,7 +12,12 @@
 // (counted as `misses`). Each mimalloc block carries a 16-byte header with the
 // requested size so HeapSize/_msize stays exact (the UCRT's _recalloc zeroes
 // from _msize). Calls for other heaps or with unsupported flags go to
-// kernel32. Active for the whole process lifetime, including gameplay.
+// kernel32. Mode::On: active for the whole process lifetime, including gameplay.
+// Mode::Startup: from the game-ready event on, new blocks come from the
+// Windows heap; frees and sizes still go to the block's owner, and a realloc
+// of a mimalloc block moves it to the Windows heap. The save a player loads
+// later is then allocated outside mimalloc. Calls after the switch for blocks
+// mimalloc does not own are not counted as misses (that is every call).
 #include "modules.hpp"
 
 #include <mimalloc.h>
@@ -32,6 +37,10 @@ HeapFreeFn g_realFree = nullptr;
 HeapReAllocFn g_realReAlloc = nullptr;
 HeapSizeFn g_realSize = nullptr;
 HANDLE g_processHeap = nullptr;
+bool g_startupOnly = false;  // Mode::Startup
+
+// True once Mode::Startup handed new blocks back to the Windows heap.
+inline bool Switched() noexcept { return g_startupOnly && sb::ReadyReached(); }
 
 struct Header {
     std::size_t size;
@@ -62,6 +71,7 @@ __declspec(dllexport) sb::Stats EU4SB_MimallocStats = SB_STATS_INIT;
 }
 
 extern "C" LPVOID WINAPI SB_HeapAlloc(HANDLE heap, DWORD flags, SIZE_T size) {
+    if (Switched()) return g_realAlloc(heap, flags, size);
     if (heap != g_processHeap || (flags & ~static_cast<DWORD>(HEAP_ZERO_MEMORY)) != 0 || size > (SIZE_MAX - kHeader)) {
         sb::Increment(&EU4SB_MimallocStats.skips);
         return g_realAlloc(heap, flags, size);
@@ -83,7 +93,7 @@ extern "C" BOOL WINAPI SB_HeapFree(HANDLE heap, DWORD flags, LPVOID pointer) {
             return TRUE;
         }
         sb::Increment(&EU4SB_MimallocStats.mismatches);
-    } else if (pointer != nullptr) {
+    } else if (pointer != nullptr && !Switched()) {
         sb::Increment(&EU4SB_MimallocStats.misses);
     }
     return g_realFree(heap, flags, pointer);
@@ -95,6 +105,18 @@ extern "C" LPVOID WINAPI SB_HeapReAlloc(HANDLE heap, DWORD flags, LPVOID pointer
         Header* header = HeaderOf(pointer);
         if (header->magic == kMagic) {
             const std::size_t old = header->size;
+            if (Switched()) {
+                // Out of mimalloc: HEAP_ZERO_MEMORY zeroes the new block, the copy keeps the old bytes.
+                void* moved = g_realAlloc(heap, flags, size);
+                if (moved == nullptr) {
+                    SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+                    return nullptr;  // like HeapReAlloc: the old block stays valid
+                }
+                std::memcpy(moved, pointer, old < size ? old : size);
+                header->magic = 0;
+                mi_free(header);
+                return moved;
+            }
             void* base = mi_realloc(header, size + kHeader);
             if (base == nullptr) {
                 SetLastError(ERROR_NOT_ENOUGH_MEMORY);
@@ -107,7 +129,7 @@ extern "C" LPVOID WINAPI SB_HeapReAlloc(HANDLE heap, DWORD flags, LPVOID pointer
             return result;
         }
         sb::Increment(&EU4SB_MimallocStats.mismatches);
-    } else if (pointer != nullptr) {
+    } else if (pointer != nullptr && !Switched()) {
         sb::Increment(&EU4SB_MimallocStats.misses);
     }
     return g_realReAlloc(heap, flags, pointer, size);
@@ -118,7 +140,7 @@ extern "C" SIZE_T WINAPI SB_HeapSize(HANDLE heap, DWORD flags, LPCVOID pointer) 
         const Header* header = HeaderOf(pointer);
         if (header->magic == kMagic) return header->size;
         sb::Increment(&EU4SB_MimallocStats.mismatches);
-    } else if (pointer != nullptr) {
+    } else if (pointer != nullptr && !Switched()) {
         sb::Increment(&EU4SB_MimallocStats.misses);
     }
     return g_realSize(heap, flags, pointer);
@@ -173,6 +195,7 @@ bool InstallMimalloc(anvil::Host& host, Mode mode) {
         }
     }
     g_processHeap = GetProcessHeap();
+    g_startupOnly = mode == Mode::Startup;
     mi_process_init();
     Undo undo;
     // Anvil enables the four together when load() returns, at the entry point
@@ -199,5 +222,19 @@ void ReportMimalloc() {
     LogStats("mimalloc", EU4SB_MimallocStats);
     bench::SetCounters("mimalloc", EU4SB_MimallocStats);
 }
+
+#ifdef SB_MIMALLOC_TEST
+// The heap functions without the import slots, for tests/test_mimalloc_heap.cpp.
+void InitMimallocForTest(Mode mode) {
+    HMODULE kernel32 = GetModuleHandleW(L"kernel32.dll");
+    g_realAlloc = reinterpret_cast<HeapAllocFn>(GetProcAddress(kernel32, "HeapAlloc"));
+    g_realFree = reinterpret_cast<HeapFreeFn>(GetProcAddress(kernel32, "HeapFree"));
+    g_realReAlloc = reinterpret_cast<HeapReAllocFn>(GetProcAddress(kernel32, "HeapReAlloc"));
+    g_realSize = reinterpret_cast<HeapSizeFn>(GetProcAddress(kernel32, "HeapSize"));
+    g_processHeap = GetProcessHeap();
+    g_startupOnly = mode == Mode::Startup;
+    mi_process_init();
+}
+#endif
 
 }  // namespace sb

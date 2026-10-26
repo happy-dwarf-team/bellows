@@ -7,10 +7,10 @@
 
 [setting.mimalloc]
 type = "enum"
-values = [{ name = "on", label = "On" }, { name = "off", label = "Off" }]
+values = [{ name = "on", label = "On" }, { name = "startup", label = "Start-up only" }, { name = "off", label = "Off" }]
 default = "on"
 label = "mimalloc"
-description = "Faster memory allocator for the game's C runtime, for the whole game session."
+description = "Faster memory allocator for the game's C runtime: for the whole game session, or only until the main menu (later allocations use the Windows heap)."
 group = "Start-up"
 restart = true
 

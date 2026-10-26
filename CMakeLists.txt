@@ -122,6 +122,17 @@ if(SB_BUILD_TESTS)
         endif()
         add_test(NAME ${test} COMMAND test_${test})
     endforeach()
+    # The mimalloc heap functions without the import slots (SB_MIMALLOC_TEST: InitMimallocForTest).
+    add_executable(test_mimalloc_heap tests/test_mimalloc_heap.cpp src/modules/mimalloc_heap.cpp src/benchmark.cpp
+        src/common.cpp src/settings.cpp)
+    target_include_directories(test_mimalloc_heap PRIVATE src $<TARGET_PROPERTY:bellows,INCLUDE_DIRECTORIES>)
+    add_dependencies(test_mimalloc_heap bellows)
+    target_link_libraries(test_mimalloc_heap PRIVATE tomlplusplus::tomlplusplus mimalloc-static shell32 ole32 uuid)
+    target_compile_definitions(test_mimalloc_heap PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX SB_MIMALLOC_TEST)
+    if(MSVC)
+        target_compile_options(test_mimalloc_heap PRIVATE /utf-8 /permissive- /EHsc /UNDEBUG)
+    endif()
+    add_test(NAME mimalloc_heap COMMAND test_mimalloc_heap)
     # bellows.dll's anvil_plugin_load against a stand-in host (tests/test_plugin_load.cpp).
     add_executable(test_plugin_load tests/test_plugin_load.cpp)
     target_include_directories(test_plugin_load PRIVATE $<TARGET_PROPERTY:bellows,INCLUDE_DIRECTORIES>)

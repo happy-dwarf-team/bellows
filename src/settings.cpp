@@ -90,6 +90,7 @@ std::string ModeName(Mode mode) {
     case Mode::Off: return "off";
     case Mode::On: return "on";
     case Mode::Verify: return "verify";
+    case Mode::Startup: return "startup";
     }
     return "?";
 }
@@ -100,6 +101,7 @@ std::optional<Mode> ParseMode(std::string_view text) {
     if (lower == "on" || lower == "1" || lower == "true") return Mode::On;
     if (lower == "off" || lower == "0" || lower == "false") return Mode::Off;
     if (lower == "verify") return Mode::Verify;
+    if (lower == "startup") return Mode::Startup;
     return std::nullopt;
 }
 

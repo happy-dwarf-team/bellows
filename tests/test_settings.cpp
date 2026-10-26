@@ -54,6 +54,12 @@ int main() {
     assert(Find(m, "ram_prefetch_budget_mb")->literal == "2048");
     assert(m.values.size() == 6 && m.notes.size() == 3);
 
+    // startup is a mode of mimalloc only; another module migrates it as on.
+    m = sb::MigrateConfigText("[modules]\nmimalloc = \"startup\"\nexists_index = \"startup\"\n", schema);
+    assert(Find(m, "mimalloc")->literal == "\"startup\"");
+    assert(Find(m, "exists_index") == nullptr);  // on, the default
+    assert(m.values.size() == 1 && m.notes.size() == 1);
+
     // Budget outside 64-8192 is left out; a broken file migrates nothing.
     m = sb::MigrateConfigText("[ram_prefetch]\nbudget_mb = 10\n", schema);
     assert(m.values.empty() && m.notes.size() == 1);

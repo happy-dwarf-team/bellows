@@ -25,7 +25,7 @@ code only.
 | `attr_cache` | Negative cache of `GetFileAttributesExW`/`A` for not-found paths during start-up (existing files always hit the real API) | part of the above |
 | `exists_index` | Answers the modifier-picture verifier's "file exists" queries from directory listings | 24.6 → 19.6 s |
 | `verifypath_listing` | Answers PhysFS `verifyPath` stats from directory listings | → 13.3 s |
-| `mimalloc` | Replaces the game's CRT heap with mimalloc for the whole process | 13.8 → 11.8 s |
+| `mimalloc` | Replaces the game's CRT heap with mimalloc for the whole process (`on`) or until the game-ready event (`startup`) | 13.8 → 11.8 s |
 | `trigger_intern` | Skips redundant trigger-interning work at the end of loading (empty map), linear algorithm otherwise | tail −0.8 s |
 | `metascript_subst` | Single-pass `$param$` substitution in scripted effects/triggers | −0.75 s |
 | `open_warmup` | Opens the files the game will need on parallel threads (learned list per mod set) so first-open costs after a reboot or antivirus update are paid off the critical path | cold start 61 → 15 s |
@@ -527,4 +527,10 @@ call does nothing.
 ## 7. Open questions (Q)
 
 - Whether `mimalloc` should be its own plugin (it stays active during play,
-  unlike the start-up-only modules).
+  unlike the start-up-only modules). In the lab (Russia 1719, year 1720 at
+  speed 5, interleaved), the year took 22.06 s with `mimalloc = on` and
+  20.84 s with it off (+5.9%, n = 5 and 6). The `startup` mode hands new
+  blocks back to the Windows heap at the game-ready event, before a save is
+  loaded; frees and sizes still go to the block's owner, and a realloc of a
+  mimalloc block moves it to the Windows heap. Whether that keeps the start-up
+  gain without the cost in play is measured before the default changes.

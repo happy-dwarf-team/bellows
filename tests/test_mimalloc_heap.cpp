@@ -1,0 +1,128 @@
+// The mimalloc heap functions without the import slots: what each mode does
+// before and after the game-ready event.
+#include "../src/common.hpp"
+
+#include <mimalloc.h>
+
+#include <cassert>
+#include <cstdio>
+#include <thread>
+#include <vector>
+
+extern "C" {
+LPVOID WINAPI SB_HeapAlloc(HANDLE heap, DWORD flags, SIZE_T size);
+BOOL WINAPI SB_HeapFree(HANDLE heap, DWORD flags, LPVOID pointer);
+LPVOID WINAPI SB_HeapReAlloc(HANDLE heap, DWORD flags, LPVOID pointer, SIZE_T size);
+SIZE_T WINAPI SB_HeapSize(HANDLE heap, DWORD flags, LPCVOID pointer);
+extern sb::Stats EU4SB_MimallocStats;
+}
+
+namespace sb {
+void InitMimallocForTest(Mode mode);
+}
+
+namespace {
+
+const HANDLE kHeap = GetProcessHeap();
+
+bool Owned(const void* p) { return mi_is_in_heap_region(p); }
+
+unsigned char* Filled(std::size_t size, unsigned char value) {
+    auto* p = static_cast<unsigned char*>(SB_HeapAlloc(kHeap, 0, size));
+    assert(p != nullptr);
+    for (std::size_t i = 0; i < size; ++i) p[i] = value;
+    return p;
+}
+
+bool All(const unsigned char* p, std::size_t from, std::size_t to, unsigned char value) {
+    for (std::size_t i = from; i < to; ++i) {
+        if (p[i] != value) return false;
+    }
+    return true;
+}
+
+void StartupMode() {
+    sb::g_gameReady = 0;
+    sb::InitMimallocForTest(sb::Mode::Startup);
+
+    // Before ready: mimalloc, exact sizes, zeroing.
+    unsigned char* kept = Filled(100, 0xA1);
+    unsigned char* grown = Filled(100, 0xB2);
+    unsigned char* shrunk = Filled(100, 0xC3);
+    auto* zeroed = static_cast<unsigned char*>(SB_HeapAlloc(kHeap, HEAP_ZERO_MEMORY, 64));
+    assert(Owned(kept) && Owned(grown) && Owned(shrunk) && Owned(zeroed));
+    assert(All(zeroed, 0, 64, 0));
+    assert(SB_HeapSize(kHeap, 0, kept) == 100);
+    std::vector<void*> early;
+    for (int i = 0; i < 4000; ++i) early.push_back(Filled(32 + i % 200, 0x5A));
+
+    sb::g_gameReady = 1;
+
+    // After ready: new blocks come from the Windows heap.
+    auto* late = static_cast<unsigned char*>(SB_HeapAlloc(kHeap, HEAP_ZERO_MEMORY, 300));
+    assert(late != nullptr && !Owned(late));
+    assert(All(late, 0, 300, 0));
+    assert(SB_HeapSize(kHeap, 0, late) == 300);
+    late = static_cast<unsigned char*>(SB_HeapReAlloc(kHeap, 0, late, 600));
+    assert(late != nullptr && !Owned(late) && SB_HeapSize(kHeap, 0, late) == 600);
+    assert(SB_HeapFree(kHeap, 0, late));
+
+    // Blocks from before ready keep their owner for sizes and frees.
+    assert(SB_HeapSize(kHeap, 0, kept) == 100 && All(kept, 0, 100, 0xA1));
+
+    // A realloc moves a mimalloc block to the Windows heap, keeping its bytes.
+    grown = static_cast<unsigned char*>(SB_HeapReAlloc(kHeap, HEAP_ZERO_MEMORY, grown, 250));
+    assert(grown != nullptr && !Owned(grown));
+    assert(SB_HeapSize(kHeap, 0, grown) == 250);
+    assert(All(grown, 0, 100, 0xB2) && All(grown, 100, 250, 0));
+    shrunk = static_cast<unsigned char*>(SB_HeapReAlloc(kHeap, 0, shrunk, 40));
+    assert(shrunk != nullptr && !Owned(shrunk));
+    assert(SB_HeapSize(kHeap, 0, shrunk) == 40 && All(shrunk, 0, 40, 0xC3));
+
+    // Frees of early blocks on other threads, next to late blocks of their own.
+    std::vector<std::thread> threads;
+    for (int t = 0; t < 4; ++t) {
+        threads.emplace_back([&early, t] {
+            for (std::size_t i = t; i < early.size(); i += 4) {
+                void* own = SB_HeapAlloc(kHeap, 0, 48);
+                assert(own != nullptr && !Owned(own));
+                assert(SB_HeapFree(kHeap, 0, early[i]));
+                assert(SB_HeapFree(kHeap, 0, own));
+            }
+        });
+    }
+    for (auto& thread : threads) thread.join();
+
+    for (void* p : {static_cast<void*>(kept), static_cast<void*>(grown), static_cast<void*>(shrunk),
+                    static_cast<void*>(zeroed)}) {
+        assert(SB_HeapFree(kHeap, 0, p));
+    }
+    // Calls for Windows-heap blocks after the switch are not misses.
+    assert(EU4SB_MimallocStats.misses == 0);
+    assert(EU4SB_MimallocStats.mismatches == 0);
+}
+
+void WholeSessionMode() {
+    sb::g_gameReady = 1;
+    sb::InitMimallocForTest(sb::Mode::On);
+    unsigned char* p = Filled(100, 0x11);
+    assert(Owned(p));
+    p = static_cast<unsigned char*>(SB_HeapReAlloc(kHeap, 0, p, 400));
+    assert(p != nullptr && Owned(p) && SB_HeapSize(kHeap, 0, p) == 400 && All(p, 0, 100, 0x11));
+    assert(SB_HeapFree(kHeap, 0, p));
+
+    // A Windows-heap block still goes to kernel32, counted as a miss.
+    void* foreign = HeapAlloc(kHeap, 0, 16);
+    const LONG64 misses = EU4SB_MimallocStats.misses;
+    assert(SB_HeapFree(kHeap, 0, foreign));
+    assert(EU4SB_MimallocStats.misses == misses + 1);
+}
+
+}  // namespace
+
+int main() {
+    StartupMode();
+    WholeSessionMode();
+    std::puts("mimalloc_heap: ok");
+    return 0;
+}
