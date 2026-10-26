@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.10.0](https://github.com/happy-dwarf-team/bellows/compare/v0.9.0...v0.10.0) (2026-10-26)
+
+
+### Features
+
+* report Bellows' fields to Anvil's start-up benchmark ([#51](https://github.com/happy-dwarf-team/bellows/issues/51)) ([261eed0](https://github.com/happy-dwarf-team/bellows/commit/261eed00640bcabf5cbd7e89df974984d822c7b7))
+
+
+### Build
+
+* take the Anvil SDK from the 1.4.0 release ([#49](https://github.com/happy-dwarf-team/bellows/issues/49)) ([e0205e7](https://github.com/happy-dwarf-team/bellows/commit/e0205e772b47d103da07b9a86ddd3df69910d774))
+
 ## [0.9.0](https://github.com/happy-dwarf-team/bellows/compare/v0.8.0...v0.9.0) (2026-10-21)
 
 
