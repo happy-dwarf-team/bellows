@@ -47,6 +47,21 @@ same in all of these starts, with and without Bellows. With default settings
 the modules also compare a sample of their answers with the game's own code
 (about 45,700 comparisons per start): 0 differences.
 
+### Measure your own
+
+Anvil 1.5 or newer has a **Benchmark** tab in the Anvil Manager
+(`AnvilManager.exe` in the game folder). It starts the game again and again,
+without Bellows and with it in turn; each start quits by itself once the game
+is ready, and nothing in your saves, mods or `anvil.toml` changes. The tab
+shows the median and spread per setup, and the cold starts (after a reboot)
+the series happened to contain, separately. You can then send the report to
+the Anvil project, after seeing exactly what is sent, or copy it into a
+[performance report](https://github.com/happy-dwarf-team/bellows/issues/new?template=performance_report.yml).
+Bellows 0.10.0 and newer adds its module states and counters to the report.
+
+Benchmark times run to `anvil-game.ready`, the end of start-up, so they are
+about 1.5 s longer than the times above, which stop at `Running application`.
+
 ## Modules
 
 | Module | What it does |
