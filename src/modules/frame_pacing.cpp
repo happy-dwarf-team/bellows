@@ -88,7 +88,8 @@ bool InstallFramePacing(anvil::Host& host, Mode mode) {
         const int index = IndexOf(cpu);
         InterlockedIncrement64(&g_calls[index]);
         InterlockedIncrement64(&EU4SB_FramePacingStats.requests);
-        if (index == kFastest && g_intervalMs > 0) {
+        // Only ever longer than the game's own threshold: the module never draws more often than the game.
+        if (index == kFastest && g_intervalMs > 0 && g_interval > cpu.xmm[6].f32[0]) {
             cpu.xmm[6].f32[0] = g_interval;
             InterlockedIncrement64(&g_replaced);
             InterlockedIncrement64(&EU4SB_FramePacingStats.hits);
