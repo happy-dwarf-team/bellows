@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0](https://github.com/happy-dwarf-team/bellows/compare/v0.10.0...v0.11.0) (2026-10-26)
+
+
+### Features
+
+* **mimalloc:** use mimalloc only until the main menu by default ([#59](https://github.com/happy-dwarf-team/bellows/issues/59)) ([943206b](https://github.com/happy-dwarf-team/bellows/commit/943206b0c684d87b45f034d1db9e761e56802b18))
+
 ## [0.10.0](https://github.com/happy-dwarf-team/bellows/compare/v0.9.0...v0.10.0) (2026-10-26)
 
 
