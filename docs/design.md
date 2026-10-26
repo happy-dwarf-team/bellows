@@ -327,7 +327,8 @@ base `[0x245B070]` (1.0) times the table `0x1C33E18` indexed by the speed at
 one, checked in the game).
 
 A mid hook after the clock read (`0x769F78`) replaces the threshold in xmm6 at
-speed 5 with `frame_pacing_interval_ms` (250 ms by default); the game still
+speed 5 with `frame_pacing_interval_ms` (250 ms by default; never with a
+shorter one than the game's own); the game still
 decides with its own clock and last-frame time. A second mid hook on the
 drawing branch (`0x769F9A`) counts the frames per speed into
 `frame_pacing.tsv`. `frame_pacing_interval_ms = 0` keeps the game's threshold
