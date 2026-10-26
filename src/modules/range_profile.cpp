@@ -172,6 +172,8 @@ void ReportRangeProfile() {
     InterlockedExchange64(&EU4SB_RangeProfileStats.requests, calls);
     InterlockedExchange64(&EU4SB_RangeProfileStats.hits, distance);
     Log(ANVIL_LOG_INFO, "range_profile: at game ready %lld range checks, %lld distance calls inside them", calls, distance);
+    bench::Get().set("range_profile.checks", calls);
+    bench::Get().set("range_profile.distance_calls", distance);
 }
 
 }  // namespace sb

@@ -666,6 +666,22 @@ void ReportRamPrefetch() {
         g_failed, TicksToMs(g_ticksDecode), kWorkers, finish ? "finished after" : "still running at stop,",
         finish ? TicksToMs(finish - g_startTicks) : 0.0, g_committedPeak / 1048576.0,
         static_cast<unsigned long long>(g_budgetBytes >> 20), g_learned->size());
+
+    bench::SetCounters("ram_prefetch", EU4SB_RamPrefetchStats);
+    static const char* const kProfiles[] = {"none", "learned", "base"};
+    bench::Get().set_enum("ram_prefetch.profile", kProfiles[source]);
+    bench::Get().set("ram_prefetch.members", g_profileEntries);
+    bench::Get().set("ram_prefetch.archives", g_profileArchives);
+    bench::Get().set("ram_prefetch.prefetched_mb", g_bytesPrefetched / 1048576.0);
+    bench::Get().set("ram_prefetch.served_mb", g_bytesServed / 1048576.0);
+    bench::Get().set("ram_prefetch.failed", g_failed);
+    bench::Get().set("ram_prefetch.decode_time", TicksToMs(g_ticksDecode));
+    if (finish) bench::Get().set("ram_prefetch.finish_time", TicksToMs(finish - g_startTicks));
+    bench::Get().set("ram_prefetch.peak_mb", g_committedPeak / 1048576.0);
+    bench::Get().set("ram_prefetch.budget_mb", g_budgetBytes >> 20);
+    bench::Get().set("ram_prefetch.learned", g_learned->size());
+    // No learned profile for this mod set yet: this start builds it.
+    if (source != 1 && g_profileTarget != nullptr) bench::NewModSet();
 }
 
 }  // namespace sb

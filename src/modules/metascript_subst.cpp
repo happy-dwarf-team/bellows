@@ -209,6 +209,7 @@ bool InstallMetascriptSubst(anvil::Host& host, Mode mode) {
 
 void ReportMetascriptSubst() {
     LogStats("metascript_subst", EU4SB_MetascriptStats);
+    bench::SetCounters("metascript_subst", EU4SB_MetascriptStats);
     if (EU4SB_MetascriptStats.requests > 0) {
         Log(ANVIL_LOG_INFO, "metascript_subst: time in hook %.1f ms, of which original %.1f ms", TicksToMs(g_ticksTotal),
             TicksToMs(g_ticksOriginal));

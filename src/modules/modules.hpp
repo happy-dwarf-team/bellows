@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../benchmark.hpp"
 #include "../common.hpp"
 
 #include "symbols.gen.hpp"  // sym::<name>, written by anvil gen from plugin/symbols.toml
@@ -33,7 +34,8 @@ void FinishOpenWarmup();
 // Stops prefetching, frees unused buffers and saves the archive-member profile (after the game-ready event).
 void FinishRamPrefetch();
 
-// Writes the counters of every installed module to the log.
+// Writes the counters of every installed module to the log and sets its
+// benchmark fields (benchmark.hpp).
 void ReportMimalloc();
 void ReportVerifyPathListing();
 void ReportExistsIndex();

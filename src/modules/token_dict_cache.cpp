@@ -269,6 +269,9 @@ void ReportTokenDictCache() {
     InterlockedExchange(&s.readyDisabled, g_disabled == 2 ? 1 : 0);
     LogStats("token_dict_cache", s);
     Log(ANVIL_LOG_INFO, "token_dict_cache: %zu thread caches, %llu entries", caches, static_cast<unsigned long long>(entries));
+    bench::SetCounters("token_dict_cache", s);
+    bench::Get().set("token_dict_cache.thread_caches", caches);
+    bench::Get().set("token_dict_cache.entries", entries);
 }
 
 }  // namespace sb

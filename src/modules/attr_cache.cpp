@@ -300,6 +300,7 @@ bool InstallAttrCache(anvil::Host& host, Mode mode) {
 
 void ReportAttrCache() {
     LogStats("attr_cache", EU4SB_AttrCacheStats);
+    bench::SetCounters("attr_cache", EU4SB_AttrCacheStats);
     if (EU4SB_AttrCacheStats.requests > 0) {
         Log(ANVIL_LOG_INFO, "attr_cache: time in hooks %.1f ms; real API on checked hits %.1f ms (%lld checks)",
             TicksToMs(g_ticksTotal), TicksToMs(g_ticksHitReal), EU4SB_AttrCacheStats.verifications);

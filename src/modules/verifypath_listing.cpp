@@ -300,6 +300,9 @@ bool InstallVerifyPathListing(anvil::Host& host, Mode mode) {
     return true;
 }
 
-void ReportVerifyPathListing() { LogStats("verifypath_listing", EU4SB_VerifyPathStats); }
+void ReportVerifyPathListing() {
+    LogStats("verifypath_listing", EU4SB_VerifyPathStats);
+    bench::SetCounters("verifypath_listing", EU4SB_VerifyPathStats);
+}
 
 }  // namespace sb

@@ -321,6 +321,9 @@ bool InstallExistsIndex(anvil::Host& host, Mode mode) {
     return true;
 }
 
-void ReportExistsIndex() { LogStats("exists_index", EU4SB_ExistsStats); }
+void ReportExistsIndex() {
+    LogStats("exists_index", EU4SB_ExistsStats);
+    bench::SetCounters("exists_index", EU4SB_ExistsStats);
+}
 
 }  // namespace sb

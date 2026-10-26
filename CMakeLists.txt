@@ -59,6 +59,7 @@ endif()
 # settings.toml, the DLL), laid out by the package; `anvil gen` writes
 # symbols.gen.hpp (sym::) and settings.gen.hpp (cfg::) at build time.
 set(SB_SOURCES
+    src/benchmark.cpp
     src/common.cpp
     src/rename.cpp
     src/settings.cpp
@@ -107,7 +108,7 @@ endif()
 if(SB_BUILD_TESTS)
     enable_testing()
     foreach(test rename trigger_intern token_dict_cache metascript_subst settings access_profile path_rules zip_reader range_stats range_witness)
-        add_executable(test_${test} tests/test_${test}.cpp src/common.cpp src/settings.cpp src/rename.cpp
+        add_executable(test_${test} tests/test_${test}.cpp src/benchmark.cpp src/common.cpp src/settings.cpp src/rename.cpp
             src/modules/access_profile.cpp src/modules/zip_reader.cpp)
         # The SDK headers and the generated symbols.gen.hpp / settings.gen.hpp of the plugin.
         target_include_directories(test_${test} PRIVATE src $<TARGET_PROPERTY:bellows,INCLUDE_DIRECTORIES>)
@@ -128,7 +129,7 @@ if(SB_BUILD_TESTS)
     if(MSVC)
         target_compile_options(test_plugin_load PRIVATE /utf-8 /permissive- /EHsc /UNDEBUG)
     endif()
-    foreach(scenario ok refuse)
+    foreach(scenario ok refuse old)
         add_test(NAME plugin_load_${scenario}
             COMMAND test_plugin_load $<TARGET_FILE:bellows> ${CMAKE_BINARY_DIR}/plugin/bellows ${scenario})
     endforeach()
