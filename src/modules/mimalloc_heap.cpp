@@ -20,7 +20,10 @@
 // mimalloc does not own are not counted as misses (that is every call).
 // Nothing allocates from mimalloc after the switch, so nothing runs its
 // delayed purge: CollectMimalloc returns the freed pages at the ready and
-// session events (the lab saw +0.37 GiB per save load without it).
+// session events (the lab saw +0.37 GiB per save load without it), and
+// CollectMimallocIfDue at the next frame once 64 MiB of mimalloc blocks were
+// freed since the last collect (anvil-game 1.5 publishes no session event
+// for a save loaded from the in-game menu; the lab saw +0.46 GiB there).
 #include "modules.hpp"
 
 #include <mimalloc.h>
@@ -45,6 +48,14 @@ bool g_startupOnly = false;  // Mode::Startup
 
 // True once Mode::Startup handed new blocks back to the Windows heap.
 inline bool Switched() noexcept { return g_startupOnly && sb::ReadyReached(); }
+
+// Bytes of mimalloc blocks freed after the switch since the last collect.
+constexpr LONG64 kCollectAfterBytes = 64ll << 20;
+volatile LONG64 g_freedSinceCollect = 0;
+
+inline void CountFreed(std::size_t bytes) noexcept {
+    if (Switched()) InterlockedExchangeAdd64(&g_freedSinceCollect, static_cast<LONG64>(bytes));
+}
 
 struct Header {
     std::size_t size;
@@ -93,6 +104,7 @@ extern "C" BOOL WINAPI SB_HeapFree(HANDLE heap, DWORD flags, LPVOID pointer) {
         Header* header = HeaderOf(pointer);
         if (header->magic == kMagic) {
             header->magic = 0;
+            CountFreed(header->size + kHeader);
             mi_free(header);
             return TRUE;
         }
@@ -118,6 +130,7 @@ extern "C" LPVOID WINAPI SB_HeapReAlloc(HANDLE heap, DWORD flags, LPVOID pointer
                 }
                 std::memcpy(moved, pointer, old < size ? old : size);
                 header->magic = 0;
+                CountFreed(old + kHeader);
                 mi_free(header);
                 return moved;
             }
@@ -231,10 +244,18 @@ void CollectMimalloc(const char* reason) {
         return static_cast<double>(counters.PrivateUsage) / (1024.0 * 1024.0);
     };
     const double before = commitMiB();
+    const LONG64 freed = InterlockedExchange64(&g_freedSinceCollect, 0);
     const LONG64 start = Ticks();
     mi_collect(true);
-    Log(ANVIL_LOG_INFO, "mimalloc: freed pages returned at %s in %.1f ms, commit %.0f -> %.0f MiB", reason,
-        TicksToMs(Ticks() - start), before, commitMiB());
+    Log(ANVIL_LOG_INFO, "mimalloc: freed pages returned at %s in %.1f ms (%.0f MiB freed since the last), "
+        "commit %.0f -> %.0f MiB", reason, TicksToMs(Ticks() - start), static_cast<double>(freed) / (1024.0 * 1024.0),
+        before, commitMiB());
+}
+
+bool CollectMimallocIfDue() {
+    if (!g_startupOnly || g_freedSinceCollect < kCollectAfterBytes) return false;
+    CollectMimalloc("64 MiB freed");
+    return true;
 }
 
 void ReportMimalloc() {

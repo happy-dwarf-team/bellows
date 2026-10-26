@@ -22,6 +22,7 @@ extern sb::Stats EU4SB_MimallocStats;
 namespace sb {
 void InitMimallocForTest(Mode mode);
 void CollectMimalloc(const char* reason);
+bool CollectMimallocIfDue();
 }
 
 namespace {
@@ -112,7 +113,8 @@ double CommitMiB() {
 }
 
 // After the switch nothing allocates from mimalloc, so blocks freed later stay committed
-// until CollectMimalloc: here ~260 MiB from threads that stay alive, freed on a thread that ends.
+// until a collect: here ~260 MiB from threads that stay alive, freed on a thread that ends;
+// the frame-time check collects once 64 MiB were freed, and not before.
 void StartupModeReturnsMemory() {
     sb::g_gameReady = 0;
     sb::InitMimallocForTest(sb::Mode::Startup);
@@ -130,17 +132,23 @@ void StartupModeReturnsMemory() {
         });
     }
     while (allocated < kThreads) Sleep(1);
+    void* last = Filled(64, 2);
     sb::g_gameReady = 1;
+    sb::CollectMimalloc("ready");  // as plugin.cpp does; nothing was freed yet
+    assert(!sb::CollectMimallocIfDue());
     std::thread([&] {
         for (auto& list : blocks) {
             for (void* p : list) assert(SB_HeapFree(kHeap, 0, p));
         }
     }).join();
     const double freed = CommitMiB();
-    sb::CollectMimalloc("test");
+    assert(sb::CollectMimallocIfDue());
     const double collected = CommitMiB();
-    std::printf("mimalloc_heap: commit after the frees %.0f MiB, after CollectMimalloc %.0f MiB\n", freed, collected);
+    std::printf("mimalloc_heap: commit after the frees %.0f MiB, after the frame-time collect %.0f MiB\n", freed,
+                collected);
     assert(freed - collected > 150.0);
+    assert(SB_HeapFree(kHeap, 0, last));  // a small free afterwards: no collect
+    assert(!sb::CollectMimallocIfDue());
     leave = true;
     for (auto& thread : threads) thread.join();
 }

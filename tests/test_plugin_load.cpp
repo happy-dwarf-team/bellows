@@ -45,6 +45,8 @@ AnvilEventCallback g_ready = nullptr;
 void* g_readyContext = nullptr;
 AnvilEventCallback g_session = nullptr;
 void* g_sessionContext = nullptr;
+AnvilEventCallback g_frame = nullptr;
+void* g_frameContext = nullptr;
 unsigned char g_symbolMemory[256] = {};  // what address_of returns for every symbol
 
 void NeverCalled() { std::abort(); }  // what `next` and `previous` lead to: nothing runs the changes
@@ -266,6 +268,11 @@ AnvilResult Subscribe(AnvilPlugin*, const char* event, AnvilEventCallback callba
         g_sessionContext = context;
         return ANVIL_OK;
     }
+    if (std::string(event) == ANVIL_GAME_EVENT_FRAME) {
+        g_frame = callback;
+        g_frameContext = context;
+        return ANVIL_OK;
+    }
     assert(std::string(event) == ANVIL_GAME_EVENT_READY);
     g_ready = callback;
     g_readyContext = context;
@@ -398,6 +405,11 @@ int main(int argc, char** argv) {
     const bool collects = g_scenario != "refuse";  // refuse: mimalloc failed
     assert(Logged("mimalloc: freed pages returned at ready") == collects);
     assert(Logged("mimalloc: freed pages returned at session start") == collects);
+    // The frame handler (mimalloc = "startup" only) collects nothing while little was freed.
+    assert(g_frame != nullptr);
+    const AnvilGameFrame frame = {sizeof(AnvilGameFrame), 0, 1};
+    g_frame(ANVIL_GAME_EVENT_FRAME, &frame, g_frameContext);
+    assert(!Logged("mimalloc: freed pages returned at 64 MiB freed"));
 
     // The benchmark: fields declared in load(), every call one Anvil accepts, done() at the end of the report.
     if (g_scenario == "old") {

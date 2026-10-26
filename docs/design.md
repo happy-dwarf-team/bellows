@@ -540,4 +540,9 @@ call does nothing.
   +0.37 GiB at each further load. Nothing allocates from mimalloc after the
   switch, so nothing ran its delayed purge; `mi_collect(true)` on the main
   thread at the ready and session events now returns those pages (offline:
-  261 → 20 MiB for blocks of live threads freed on another thread).
+  261 → 20 MiB for blocks of live threads freed on another thread). With it
+  the year was no longer slower than with `off` (21.23 against 21.69 s), but
+  the first save loaded from the in-game menu still added 0.46 GiB:
+  anvil-game 1.5 publishes no session event there. So the frees of
+  mimalloc blocks after the switch are counted as well, and the next frame
+  collects once 64 MiB were freed since the last collect.

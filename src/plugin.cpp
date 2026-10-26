@@ -149,6 +149,11 @@ struct Bellows : anvil::Plugin {
             const bool ended = session != nullptr && session->change == ANVIL_GAME_SESSION_ENDED;
             sb::CollectMimalloc(ended ? "session end" : "session start");
         });
+        // ... and so does a save loaded from the in-game menu, which publishes no session event in
+        // anvil-game 1.5: a frame collects once enough was freed (a counter read otherwise).
+        if (modules[0].mode == sb::Mode::Startup) {
+            host.subscribe(ANVIL_GAME_EVENT_FRAME, [] { sb::CollectMimallocIfDue(); });
+        }
         // A failed module only turns itself off: load() returns normally.
     }
 };
