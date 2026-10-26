@@ -12,6 +12,10 @@ bellows, it gets the forge hot sooner.
 
 **Install guide:
 [anvil.happydwarf.dev/plugins/bellows](https://anvil.happydwarf.dev/plugins/bellows/).**
+Players can also subscribe on the
+[Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3823747170);
+the rest of Happy Dwarf Team's tools for EU4 are on
+[happydwarf.dev](https://happydwarf.dev/).
 
 Formerly **EU4 Startup Boost** (plugin id `eu4-startup-boost`, up to 0.5.0);
 see [Updating from EU4 Startup Boost](#updating-from-eu4-startup-boost).
