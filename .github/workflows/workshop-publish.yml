@@ -7,11 +7,12 @@ name: workshop-publish
 # Workshop and GitHub serve the same build. The release notes become the
 # Workshop change note, and workshop/description.md the item's description.
 #
-# Run by hand (workflow_dispatch, from main only), it publishes the latest
-# release again with main's workshop/ folder and the given change note, e.g.
-# "Workshop page: ...": the way to put a new description on Steam without a
-# release. The steam-workshop environment must then allow the branch main next
-# to the tags v*.
+# Run by hand (workflow_dispatch, from main only), it publishes the given
+# release again with main's workshop/ folder: the way to update the Workshop
+# page between releases. The release must be the one in workshop/descriptor.mod,
+# that is the latest. Steam keeps the mod's version when its files are unchanged
+# and then records no change note, but it does take the new description. The
+# steam-workshop environment must then allow the branch main next to the tags v*.
 #
 # Opt-in: it runs only when the repository variable WORKSHOP_PUBLISH is `true`
 # (Settings → Secrets and variables → Actions → Variables). It also needs
@@ -24,8 +25,8 @@ on:
     types: [published]
   workflow_dispatch:
     inputs:
-      change-note:
-        description: 'The Workshop change note, e.g. "Workshop page: how to measure the gain yourself"'
+      tag:
+        description: The release to publish again with main's description, e.g. v0.10.0
         required: true
         type: string
 
@@ -45,7 +46,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      TAG: ${{ github.event.release.tag_name }}
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
     steps:
       # The release event checks out the release's tag, a manual run main.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -57,8 +58,6 @@ jobs:
           PRIVATE: ${{ github.event.repository.private }}
         run: |
           set -euo pipefail
-          # A manual run publishes the latest release.
-          TAG=${TAG:-$(gh release view --json tagName --jq .tagName)}
           version=${TAG#v}
           # pdx-ws takes the version (and the item ID) from the descriptor.
           descriptor=$(sed -n 's/^version="\([^"]*\)".*/\1/p' workshop/descriptor.mod)
@@ -94,7 +93,7 @@ jobs:
         with:
           steam-username: ${{ secrets.STEAM_USERNAME }}
           steam-session: ${{ secrets.STEAM_SESSION }}
-          change-note: ${{ github.event.release.body || inputs.change-note }}
+          change-note: ${{ github.event_name == 'workflow_dispatch' && 'Updated the Workshop page.' || github.event.release.body }}
 
       - name: Link the Workshop item
         env:
