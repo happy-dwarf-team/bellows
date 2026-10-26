@@ -76,6 +76,7 @@ set(SB_SOURCES
     src/modules/token_dict_profile.cpp
     src/modules/range_profile.cpp
     src/modules/range_witness.cpp
+    src/modules/frame_pacing.cpp
     src/modules/trigger_intern.cpp
     src/modules/verifypath_listing.cpp)
 # File version shown in the DLL's Properties, from the same version.txt.
