@@ -12,6 +12,10 @@ bellows, it gets the forge hot sooner.
 
 **Install guide:
 [anvil.happydwarf.dev/plugins/bellows](https://anvil.happydwarf.dev/plugins/bellows/).**
+Players can also subscribe on the
+[Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3823747170);
+the rest of Happy Dwarf Team's tools for EU4 are on
+[happydwarf.dev](https://happydwarf.dev/).
 
 Formerly **EU4 Startup Boost** (plugin id `eu4-startup-boost`, up to 0.5.0);
 see [Updating from EU4 Startup Boost](#updating-from-eu4-startup-boost).
@@ -173,6 +177,14 @@ checksum.
   release is published. It downloads that release's `bellows-windows-x64.zip`,
   checks its build attestation, unpacks `bellows/` into `workshop/anvil/bellows/`
   and publishes the mod, with the release notes as the change note.
+- To put a new description on Steam without a release, run the same workflow by
+  hand from `main` with a change note: it publishes the latest release again
+  with `main`'s `workshop/` folder (it fails when `main`'s descriptor version is
+  not that release's, for example while a newer release is still a draft):
+
+  ```sh
+  gh workflow run workshop-publish.yml --ref main -f change-note="Workshop page: what changed"
+  ```
 
 Setting it up, once (maintainers):
 
@@ -215,7 +227,8 @@ Setting it up, once (maintainers):
    ```
 
    In **Settings → Environments → steam-workshop**, add a required reviewer and
-   allow only the tags `v*`: the environment gates every publish job.
+   allow only the tags `v*` and the branch `main` (for the manual run): the
+   environment gates every publish job.
 4. **Turn publishing on:** `gh variable set WORKSHOP_PUBLISH --body true`.
 
 From then on, publishing a release's draft (see
