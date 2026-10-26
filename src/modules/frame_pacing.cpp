@@ -21,8 +21,8 @@ namespace {
 constexpr std::int32_t kFastest = 4;  // the last entry of the 5-entry table at 0x1C33E18
 constexpr int kIndexes = 6;           // 0-4, and 5 for anything else
 
-std::int64_t g_intervalMs = 250;  // 0: keep the game's threshold, count only
-float g_interval = 0.25f;         // seconds, the unit of the game's clock in 0x769EA0
+std::int64_t g_intervalMs = 100;  // 0: keep the game's threshold, count only
+float g_interval = 0.1f;         // seconds, the unit of the game's clock in 0x769EA0
 std::size_t g_speedOffset = 0;
 anvil::Change g_compare, g_render;
 volatile LONG64 g_calls[kIndexes] = {}, g_frames[kIndexes] = {};

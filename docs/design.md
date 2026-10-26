@@ -28,7 +28,7 @@ code only.
 | `mimalloc` | Replaces the game's CRT heap with mimalloc for the whole process (`on`) or until the game-ready event (`startup`) | 13.8 → 11.8 s |
 | `trigger_intern` | Skips redundant trigger-interning work at the end of loading (empty map), linear algorithm otherwise | tail −0.8 s |
 | `metascript_subst` | Single-pass `$param$` substitution in scripted effects/triggers | −0.75 s |
-| `frame_pacing` | Simulation, experimental, off by default: at speed 5, frames drawn from inside the daily tick at most every 250 ms instead of 50 ms | year 1720: 21.2 → 19.2 s |
+| `frame_pacing` | Simulation, experimental, off by default: at speed 5, frames drawn from inside the daily tick at most every 100 ms instead of 50 ms | year 1720: 21.2 → 19.2 s |
 | `open_warmup` | Opens the files the game will need on parallel threads (learned list per mod set) so first-open costs after a reboot or antivirus update are paid off the critical path | cold start 61 → 15 s |
 
 Diagnostics from the lab (`file_trace`, deep API counters, heap sampling) are
@@ -327,7 +327,8 @@ base `[0x245B070]` (1.0) times the table `0x1C33E18` indexed by the speed at
 one, checked in the game).
 
 A mid hook after the clock read (`0x769F78`) replaces the threshold in xmm6 at
-speed 5 with `frame_pacing_interval_ms` (250 ms by default; never with a
+speed 5 with `frame_pacing_interval_ms` (100 ms by default, chosen from the
+series below; never with a
 shorter one than the game's own); the game still
 decides with its own clock and last-frame time. A second mid hook on the
 drawing branch (`0x769F9A`) counts the frames per speed into
