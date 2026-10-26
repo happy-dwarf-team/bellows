@@ -28,7 +28,7 @@ code only.
 | `mimalloc` | Replaces the game's CRT heap with mimalloc for the whole process (`on`) or until the game-ready event (`startup`) | 13.8 → 11.8 s |
 | `trigger_intern` | Skips redundant trigger-interning work at the end of loading (empty map), linear algorithm otherwise | tail −0.8 s |
 | `metascript_subst` | Single-pass `$param$` substitution in scripted effects/triggers | −0.75 s |
-| `frame_pacing` | Simulation, experimental, off by default: at speed 5, frames drawn from inside the daily tick at most every 250 ms instead of 50 ms | year 1720: 21.9 → 19.5 s (preliminary) |
+| `frame_pacing` | Simulation, experimental, off by default: at speed 5, frames drawn from inside the daily tick at most every 250 ms instead of 50 ms | year 1720: 21.2 → 19.2 s |
 | `open_warmup` | Opens the files the game will need on parallel threads (learned list per mod set) so first-open costs after a reboot or antivirus update are paid off the critical path | cold start 61 → 15 s |
 
 Diagnostics from the lab (`file_trace`, deep API counters, heap sampling) are
@@ -341,11 +341,16 @@ this module, year 1720 at speed 5 through Tongs; lab `docs/bellows-frame-pacing.
   of ~13 per second in an earlier check without the module; frames between
   days were 20 per second (9 in that check), so the screen still updates about
   20 times a second.
-- Interleaved series, preliminary: 250 ms 19.10, 19.19, 19.52, 19.68, 25.23 s
-  for the year (median 19.52 s); the game's threshold 21.79, 22.09 s (median
-  21.94 s, four of six trials rejected on event pauses). -11%, but with two
-  valid trials in one arm the series decides nothing yet (p = 0.48).
-- Not measured yet: input latency at speed 5, other saves and dates.
+- Two interleaved series (one launch per trial, both arms with the hooks
+  installed; the control arm keeps the game's threshold): 250 ms median
+  19.23 s for the year (n = 8, 18.72-25.23; seven of eight at 18.72-19.68),
+  the game's threshold 21.19 s (n = 7, 19.98-25.05): -1.96 s (-9.2%,
+  permutation test of the medians p = 0.049); main-thread CPU -7.8%. The
+  second series alone: -6.9% (p = 0.11). Six trials were rejected on event
+  pauses, in both arms. About 22 frames inside the tick per session at speed 5
+  instead of 210-340.
+- Not measured yet: input latency at speed 5, other saves, dates and
+  intervals. Hence experimental and off by default.
 
 ### attr_cache
 

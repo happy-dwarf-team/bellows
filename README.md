@@ -83,7 +83,7 @@ about 1.5 s longer than the times above, which stop at `Running application`.
 | `attr_cache` | Remembers "file not found" answers for game and mod files during start-up (off by default: ~0.1 s left next to the other modules) |
 | `token_dict_cache` | Caches the script tokenizer's keyword lookups (~0.4 s) |
 | `range_witness` | **Simulation, not start-up.** Answers the country range check from the province that was in range last time instead of walking all of the country's provinces again; same answers as the game's code (lab: a year at speed 5 in 20.6 s instead of 27.6 s). `"verify"` compares every answer with the game's and writes the first mismatches to `range_witness_mismatches.tsv` |
-| `frame_pacing` | **Simulation, experimental, off by default.** At the fastest speed, draws frames from inside the daily tick less often (setting `frame_pacing_interval_ms`, 250 ms; the game's own is 50 ms). The simulation is the same; the map and interface update between days instead, and react later to clicks during long days. Lab measurement is preliminary |
+| `frame_pacing` | **Simulation, experimental, off by default.** At the fastest speed, draws frames from inside the daily tick less often (setting `frame_pacing_interval_ms`, 250 ms; the game's own is 50 ms). The simulation is the same; the map and interface update between days instead, and react later to clicks during long days (lab: a year at speed 5 in 19.2 s instead of 21.2 s; click latency not measured yet) |
 
 Diagnostics, off by default: `zip_profile`, `token_dict_profile`,
 `range_profile`.
@@ -97,7 +97,8 @@ starts normally.
 ## Settings
 
 Each module is a setting `on`, `off` or (where the module has it) `verify`,
-plus `ram_prefetch_budget_mb` (64–8192); the defaults, labels and
+plus `ram_prefetch_budget_mb` (64–8192) and `frame_pacing_interval_ms`
+(0–1000; 0 keeps the game's own interval); the defaults, labels and
 descriptions are in [`plugin/settings.toml`](plugin/settings.toml). Your
 values go into `anvil/data/bellows/settings.toml`, one line each, only those
 that differ from the default, for example:
