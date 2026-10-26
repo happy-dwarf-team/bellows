@@ -44,8 +44,8 @@ FetchContent_MakeAvailable(tomlplusplus mimalloc)
 #     release changes both, on purpose, in its own pull request.
 #   - An unpacked SDK archive, or an SDK installed from a local Anvil checkout
 #     (`cmake --install <anvil build> --component sdk`): -DAnvilPlugin_DIR=<sdk>/cmake.
-set(SB_ANVIL_VERSION 1.0.0)
-set(SB_ANVIL_SDK_SHA256 e8ca738da4ead81f17e8e548447057c8f2b1df0529c7b00185a2f531d4ea89fe)
+set(SB_ANVIL_VERSION 1.4.0)
+set(SB_ANVIL_SDK_SHA256 e8c9801b1cdddf4eecacbf02eae121fb03734674073b84089820493b24a2a4a3)
 if(AnvilPlugin_DIR)
     find_package(AnvilPlugin REQUIRED)
 else()
