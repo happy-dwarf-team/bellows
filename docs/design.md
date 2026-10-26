@@ -534,7 +534,7 @@ call does nothing.
   loaded; frees and sizes still go to the block's owner, and a realloc of a
   mimalloc block moves it to the Windows heap. Whether that keeps the start-up
   gain without the cost in play is measured before the default changes.
-  First lab run of `startup` (11 years per arm in each series): the year at
+  First lab run of `startup` (11 valid trials per arm, interleaved): the year at
   21.28 s (not separable from `off`), start-up 12.52 s against 13.58 s with
   `off`, but 0.3 GiB more commit than `on` from the first save load and
   +0.37 GiB at each further load. Nothing allocates from mimalloc after the
