@@ -356,8 +356,13 @@ this module, year 1720 at speed 5 through Tongs; lab `docs/bellows-frame-pacing.
   the game's threshold median 52 ms, p90 89 ms, max 183 ms. Input is handled
   later, mostly in the tail: with 250 ms it waits for the frames between
   days. While paused there is no difference.
-- Not measured: time until the reaction is on screen, other saves, dates and
-  intervals. Hence experimental and off by default.
+- Shorter intervals (one more series each, few valid trials): 100 ms -8.5%
+  (n = 2) and 150 ms -9.1% (n = 3) for the year against the pooled control,
+  as 250 ms; key press median 72.5 and 78.5 ms, p90 135 and 159 ms. The median
+  cost stays (input waits for the frames between days whatever the
+  interval); the tail shrinks with the interval.
+- Not measured: time until the reaction is on screen, other saves and dates.
+  Hence experimental and off by default.
 
 ### attr_cache
 
