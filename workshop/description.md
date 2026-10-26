@@ -1,11 +1,11 @@
-**Your game starts in about 13 seconds instead of 37. The forge gets hot sooner.**
+**Your game starts in about 12 seconds instead of 39. The forge gets hot sooner.**
 
 ![](https://i.imgur.com/Uf8Z21n.png)
 
 ## Overview
 EU4 spends a long time staring at its own files before you get to the main menu. Bellows helps it along: it fetches what the game is about to need before the game asks, and answers the boring questions faster. Nothing in your game is changed, it just starts sooner.
 
-On our test machine (10 mods) the trip to the main menu went from about 37 seconds to about 13. Your mileage may vary, but it should not get worse, and you can measure it on your own computer (see below).
+On our test machine (10 mods) the trip to the main menu went from about 39 seconds to about 12. Your mileage may vary, but it should not get worse, and you can measure it on your own computer (see below).
 
 ![](https://i.imgur.com/Uf8Z21n.png)
 
@@ -77,4 +77,4 @@ I am, in fact, a happy dwarf myself.
 ## Credits
 **Anvil** for letting a dwarf into the forge.
 **mimalloc** by Microsoft for the faster memory handling.
-**Everyone who waited 37 seconds for the main menu**: never again.
+**Everyone who waited 39 seconds for the main menu**: never again.
