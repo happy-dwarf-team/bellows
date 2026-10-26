@@ -28,6 +28,7 @@ code only.
 | `mimalloc` | Replaces the game's CRT heap with mimalloc for the whole process (`on`) or until the game-ready event (`startup`) | 13.8 → 11.8 s |
 | `trigger_intern` | Skips redundant trigger-interning work at the end of loading (empty map), linear algorithm otherwise | tail −0.8 s |
 | `metascript_subst` | Single-pass `$param$` substitution in scripted effects/triggers | −0.75 s |
+| `frame_pacing` | Simulation, experimental, off by default: at speed 5, frames drawn from inside the daily tick at most every 250 ms instead of 50 ms | year 1720: 21.9 → 19.5 s (preliminary) |
 | `open_warmup` | Opens the files the game will need on parallel threads (learned list per mod set) so first-open costs after a reboot or antivirus update are paid off the critical path | cold start 61 → 15 s |
 
 Diagnostics from the lab (`file_trace`, deep API counters, heap sampling) are
@@ -313,6 +314,38 @@ Tongs-driven year 1720 at speed 5; lab `docs/simulation-profile.md`):
 On by default since then, like `token_dict_cache` (kept out of the written
 `config.toml`, so existing files get it too). Still open: other saves, mod
 sets and much later dates.
+
+### frame_pacing (simulation, experimental)
+
+Off by default. At speed 5 the lab's profile of year 1720 put about 16% of the
+main thread's samples inside frames the game draws from within the daily tick
+(lab `docs/simulation-profile.md`, "Klatki rysowane w trakcie ticku").
+`0x769EA0` is called about 40 times between the stages of the tick and draws a
+frame (`0x14C25A0` with `outer` = 0) when the time since the last one exceeds
+base `[0x245B070]` (1.0) times the table `0x1C33E18` indexed by the speed at
+`+0x1E08` (0.02 for speeds 1-4, 0.05 for speed 5; the index is the speed minus
+one, checked in the game).
+
+A mid hook after the clock read (`0x769F78`) replaces the threshold in xmm6 at
+speed 5 with `frame_pacing_interval_ms` (250 ms by default); the game still
+decides with its own clock and last-frame time. A second mid hook on the
+drawing branch (`0x769F9A`) counts the frames per speed into
+`frame_pacing.tsv`. `frame_pacing_interval_ms = 0` keeps the game's threshold
+and only counts. The simulation does not read these frames; what changes is how
+often the screen and input are handled inside long days.
+
+Lab (EU4 1.37.5, Russia 1719 save, 8 workers per pool, Bellows defaults plus
+this module, year 1720 at speed 5 through Tongs; lab `docs/bellows-frame-pacing.md`):
+
+- Live check at 250 ms: 5 frames inside the tick in ~10 s at speed 5 instead
+  of ~13 per second in an earlier check without the module; frames between
+  days were 20 per second (9 in that check), so the screen still updates about
+  20 times a second.
+- Interleaved series, preliminary: 250 ms 19.10, 19.19, 19.52, 19.68, 25.23 s
+  for the year (median 19.52 s); the game's threshold 21.79, 22.09 s (median
+  21.94 s, four of six trials rejected on event pauses). -11%, but with two
+  valid trials in one arm the series decides nothing yet (p = 0.48).
+- Not measured yet: input latency at speed 5, other saves and dates.
 
 ### attr_cache
 
