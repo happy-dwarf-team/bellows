@@ -545,4 +545,14 @@ call does nothing.
   the first save loaded from the in-game menu still added 0.46 GiB:
   anvil-game 1.5 publishes no session event there. So the frees of
   mimalloc blocks after the switch are counted as well, and the next frame
-  collects once 64 MiB were freed since the last collect.
+  collects once 64 MiB were freed since the last collect. With that, commit
+  stayed within 0.08 GiB of `on` through four in-game loads to 1740. A third
+  series had `startup` 10.5% slower than `off` (p = 0.084); the deciding
+  interleaved series (66 trials, with and without the frame handler, and
+  `off` on the same DLL, with other processes' CPU load recorded per trial)
+  did not repeat it: −0.4% (p = 0.60), and the handler +0.6% (p = 0.79).
+  Over all series `startup` was +0.5% against `off` (n = 66 and 53,
+  p = 0.42) and `on` +5.3% (p = 0.033). `startup` is the default since
+  0.11; a `config.toml` of 0.7.0 that says `on` (its default then) migrates
+  to the new default. The start-up gain (about 1.1 s against `off`) was
+  measured on the first `startup` build, before the collects.

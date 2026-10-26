@@ -68,6 +68,9 @@ void MigrateModule(const toml::table& schema, const std::string& name, const tom
         m.notes.push_back("config.toml: " + name + " has no " + option + " mode; migrated as on");
         option = "on";
     }
+    // config.toml of 0.7.0 held every value, defaults included: one that was the default then
+    // and is not any more says nothing about the player's choice.
+    if (name == "mimalloc" && option == "on") return;  // the default until startup (0.11)
     if (option != declared->default_text) m.values.push_back({name, Quoted(option)});
 }
 
