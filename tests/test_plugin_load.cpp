@@ -43,6 +43,10 @@ std::string g_scenario;
 std::wstring g_pluginDir, g_dataDir;
 AnvilEventCallback g_ready = nullptr;
 void* g_readyContext = nullptr;
+AnvilEventCallback g_session = nullptr;
+void* g_sessionContext = nullptr;
+AnvilEventCallback g_frame = nullptr;
+void* g_frameContext = nullptr;
 unsigned char g_symbolMemory[256] = {};  // what address_of returns for every symbol
 
 void NeverCalled() { std::abort(); }  // what `next` and `previous` lead to: nothing runs the changes
@@ -117,6 +121,7 @@ int64_t SettingInt(AnvilPlugin*, AnvilSetting setting) { return setting == CFG_R
 double SettingFloat(AnvilPlugin*, AnvilSetting) { return 0.0; }
 const char* SettingString(AnvilPlugin*, AnvilSetting setting) {
     switch (setting) {
+    case CFG_MIMALLOC: return "startup";  // a mode only mimalloc has, also as a benchmark field value
     case CFG_OPEN_WARMUP:
     case CFG_RAM_PREFETCH: return "off";  // their threads would read the game folder
     case CFG_TOKEN_DICT_PROFILE: return "off";  // its ready report walks the (here fake) keyword tree
@@ -258,6 +263,16 @@ const void* GetService(AnvilPlugin*, const char* name, uint32_t version) {
     return &g_benchmark;
 }
 AnvilResult Subscribe(AnvilPlugin*, const char* event, AnvilEventCallback callback, void* context) {
+    if (std::string(event) == ANVIL_GAME_EVENT_SESSION) {
+        g_session = callback;
+        g_sessionContext = context;
+        return ANVIL_OK;
+    }
+    if (std::string(event) == ANVIL_GAME_EVENT_FRAME) {
+        g_frame = callback;
+        g_frameContext = context;
+        return ANVIL_OK;
+    }
     assert(std::string(event) == ANVIL_GAME_EVENT_READY);
     g_ready = callback;
     g_readyContext = context;
@@ -347,7 +362,7 @@ int main(int argc, char** argv) {
     const std::string rest = ", metascript_subst=off, attr_cache=verify, zip_profile=on, token_dict_cache=on, "
                              "token_dict_profile=off, range_profile=on, range_witness=on";
     if (g_scenario != "refuse") {
-        assert(Logged("modules: mimalloc=on, open_warmup=off, ram_prefetch=off, verifypath_listing=on, "
+        assert(Logged("modules: mimalloc=startup, open_warmup=off, ram_prefetch=off, verifypath_listing=on, "
                       "exists_index=on, trigger_intern=on" + rest));
         for (const char* f : {"HeapFree", "HeapReAlloc", "HeapSize", "HeapAlloc", "GetFileAttributesExW",
                               "GetFileAttributesA"}) {
@@ -383,6 +398,19 @@ int main(int argc, char** argv) {
     for (int i = 0; i < 100 && !Logged("trigger_intern: map size"); ++i) Sleep(50);
     assert(Logged("trigger_intern: map size"));
 
+    // mimalloc = "startup" returns freed pages at the ready event and at each session event.
+    assert(g_session != nullptr);
+    const AnvilGameSession started = {sizeof(AnvilGameSession), ANVIL_GAME_SESSION_STARTED, 0, 0};
+    g_session(ANVIL_GAME_EVENT_SESSION, &started, g_sessionContext);
+    const bool collects = g_scenario != "refuse";  // refuse: mimalloc failed
+    assert(Logged("mimalloc: freed pages returned at ready") == collects);
+    assert(Logged("mimalloc: freed pages returned at session start") == collects);
+    // The frame handler (mimalloc = "startup" only) collects nothing while little was freed.
+    assert(g_frame != nullptr);
+    const AnvilGameFrame frame = {sizeof(AnvilGameFrame), 0, 1};
+    g_frame(ANVIL_GAME_EVENT_FRAME, &frame, g_frameContext);
+    assert(!Logged("mimalloc: freed pages returned at 64 MiB freed"));
+
     // The benchmark: fields declared in load(), every call one Anvil accepts, done() at the end of the report.
     if (g_scenario == "old") {
         assert(!Logged("benchmark"));  // Bellows runs as before; the log has nothing about the missing service
@@ -400,7 +428,7 @@ int main(int argc, char** argv) {
         assert(g_declares >= 1 && g_dones == 1);
         const bool ok = g_scenario == "ok";
         const std::map<std::string, std::string> modes = {
-            {"mimalloc", ok ? "on" : "failed"}, {"open_warmup", "off"}, {"ram_prefetch", "off"},
+            {"mimalloc", ok ? "startup" : "failed"}, {"open_warmup", "off"}, {"ram_prefetch", "off"},
             {"verifypath_listing", "on"}, {"exists_index", "on"}, {"trigger_intern", ok ? "on" : "failed"},
             {"metascript_subst", "off"}, {"attr_cache", "verify"}, {"zip_profile", "on"},
             {"token_dict_cache", "on"}, {"token_dict_profile", "off"}, {"range_profile", "on"},

@@ -73,7 +73,7 @@ about 1.5 s longer than the times above, which stop at `Running application`.
 
 | Module | What it does |
 | --- | --- |
-| `mimalloc` | Faster memory allocator for the game's C runtime (whole session) |
+| `mimalloc` | Faster memory allocator for the game's C runtime until the main menu (`startup`, the default; later allocations use the Windows heap), or for the whole session (`on`, which made the simulation about 5% slower in the lab) |
 | `verifypath_listing` | Answers PhysFS path checks from directory listings |
 | `exists_index` | Answers "does this file exist" for the modifier icon check |
 | `trigger_intern` | Faster trigger interning at the end of loading (~0.4 s instead of ~0.6 s for the game's own code with the shipped trigger profile; a `config.toml` written by 0.3.0 or earlier said `trigger_intern = "off"`, and the migration keeps that: delete the line from `settings.toml` to use the default `"on"`) |

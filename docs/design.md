@@ -25,7 +25,7 @@ code only.
 | `attr_cache` | Negative cache of `GetFileAttributesExW`/`A` for not-found paths during start-up (existing files always hit the real API) | part of the above |
 | `exists_index` | Answers the modifier-picture verifier's "file exists" queries from directory listings | 24.6 → 19.6 s |
 | `verifypath_listing` | Answers PhysFS `verifyPath` stats from directory listings | → 13.3 s |
-| `mimalloc` | Replaces the game's CRT heap with mimalloc for the whole process | 13.8 → 11.8 s |
+| `mimalloc` | Replaces the game's CRT heap with mimalloc for the whole process (`on`) or until the game-ready event (`startup`) | 13.8 → 11.8 s |
 | `trigger_intern` | Skips redundant trigger-interning work at the end of loading (empty map), linear algorithm otherwise | tail −0.8 s |
 | `metascript_subst` | Single-pass `$param$` substitution in scripted effects/triggers | −0.75 s |
 | `open_warmup` | Opens the files the game will need on parallel threads (learned list per mod set) so first-open costs after a reboot or antivirus update are paid off the critical path | cold start 61 → 15 s |
@@ -527,4 +527,32 @@ call does nothing.
 ## 7. Open questions (Q)
 
 - Whether `mimalloc` should be its own plugin (it stays active during play,
-  unlike the start-up-only modules).
+  unlike the start-up-only modules). In the lab (Russia 1719, year 1720 at
+  speed 5, interleaved), the year took 22.06 s with `mimalloc = on` and
+  20.84 s with it off (+5.9%, n = 5 and 6). The `startup` mode hands new
+  blocks back to the Windows heap at the game-ready event, before a save is
+  loaded; frees and sizes still go to the block's owner, and a realloc of a
+  mimalloc block moves it to the Windows heap. Whether that keeps the start-up
+  gain without the cost in play is measured before the default changes.
+  First lab run of `startup` (11 valid trials per arm, interleaved): the year at
+  21.28 s (not separable from `off`), start-up 12.52 s against 13.58 s with
+  `off`, but 0.3 GiB more commit than `on` from the first save load and
+  +0.37 GiB at each further load. Nothing allocates from mimalloc after the
+  switch, so nothing ran its delayed purge; `mi_collect(true)` on the main
+  thread at the ready and session events now returns those pages (offline:
+  261 → 20 MiB for blocks of live threads freed on another thread). With it
+  the year was no longer slower than with `off` (21.23 against 21.69 s), but
+  the first save loaded from the in-game menu still added 0.46 GiB:
+  anvil-game 1.5 publishes no session event there. So the frees of
+  mimalloc blocks after the switch are counted as well, and the next frame
+  collects once 64 MiB were freed since the last collect. With that, commit
+  stayed within 0.08 GiB of `on` through four in-game loads to 1740. A third
+  series had `startup` 10.5% slower than `off` (p = 0.084); the deciding
+  interleaved series (66 trials, with and without the frame handler, and
+  `off` on the same DLL, with other processes' CPU load recorded per trial)
+  did not repeat it: −0.4% (p = 0.60), and the handler +0.6% (p = 0.79).
+  Over all series `startup` was +0.5% against `off` (n = 66 and 53,
+  p = 0.42) and `on` +5.3% (p = 0.033). `startup` is the default since
+  0.11; a `config.toml` of 0.7.0 that says `on` (its default then) migrates
+  to the new default. The start-up gain (about 1.1 s against `off`) was
+  measured on the first `startup` build, before the collects.

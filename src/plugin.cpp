@@ -41,6 +41,7 @@ DWORD WINAPI FinishAfterReady(void*) {
 // it runs on a thread of its own, as it did on Anvil's watcher thread before.
 void OnGameReady() {
     if (InterlockedExchange(&sb::g_gameReady, 1) != 0) return;
+    sb::CollectMimalloc("ready");  // on the main thread: mimalloc collects through a thread it knows
     HANDLE thread = CreateThread(nullptr, 0, &FinishAfterReady, nullptr, 0, nullptr);
     if (thread != nullptr) {
         SetThreadDescription(thread, L"bellows ready report");
@@ -142,6 +143,17 @@ struct Bellows : anvil::Plugin {
 
         // The plugin.toml dependency makes anvil-game load first (both are early).
         host.subscribe(ANVIL_GAME_EVENT_READY, [] { OnGameReady(); });
+        // A save loaded or left frees most of what mimalloc still holds in "startup" mode.
+        host.subscribe(ANVIL_GAME_EVENT_SESSION, [](const void* payload) {
+            const auto* session = static_cast<const AnvilGameSession*>(payload);
+            const bool ended = session != nullptr && session->change == ANVIL_GAME_SESSION_ENDED;
+            sb::CollectMimalloc(ended ? "session end" : "session start");
+        });
+        // ... and so does a save loaded from the in-game menu, which publishes no session event in
+        // anvil-game 1.5: a frame collects once enough was freed (a counter read otherwise).
+        if (modules[0].mode == sb::Mode::Startup) {
+            host.subscribe(ANVIL_GAME_EVENT_FRAME, [] { sb::CollectMimallocIfDue(); });
+        }
         // A failed module only turns itself off: load() returns normally.
     }
 };

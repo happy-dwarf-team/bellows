@@ -43,7 +43,8 @@ static_assert(offsetof(Stats, readyDisabled) == 0x40, "stats layout drift");
 
 inline void Increment(volatile LONG64* value) noexcept { InterlockedIncrement64(value); }
 
-enum class Mode { Off, On, Verify };
+// Startup: active until the game-ready event only (a module that offers it says how).
+enum class Mode { Off, On, Verify, Startup };
 
 // 1 once anvil-game published its ready event (the game finished
 // initializing, the main menu is up). A plain volatile read: aligned 32-bit

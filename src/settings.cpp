@@ -68,6 +68,9 @@ void MigrateModule(const toml::table& schema, const std::string& name, const tom
         m.notes.push_back("config.toml: " + name + " has no " + option + " mode; migrated as on");
         option = "on";
     }
+    // config.toml of 0.7.0 held every value, defaults included: one that was the default then
+    // and is not any more says nothing about the player's choice.
+    if (name == "mimalloc" && option == "on") return;  // the default until startup (0.11)
     if (option != declared->default_text) m.values.push_back({name, Quoted(option)});
 }
 
@@ -90,6 +93,7 @@ std::string ModeName(Mode mode) {
     case Mode::Off: return "off";
     case Mode::On: return "on";
     case Mode::Verify: return "verify";
+    case Mode::Startup: return "startup";
     }
     return "?";
 }
@@ -100,6 +104,7 @@ std::optional<Mode> ParseMode(std::string_view text) {
     if (lower == "on" || lower == "1" || lower == "true") return Mode::On;
     if (lower == "off" || lower == "0" || lower == "false") return Mode::Off;
     if (lower == "verify") return Mode::Verify;
+    if (lower == "startup") return Mode::Startup;
     return std::nullopt;
 }
 
