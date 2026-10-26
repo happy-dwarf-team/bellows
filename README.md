@@ -177,14 +177,13 @@ checksum.
   release is published. It downloads that release's `bellows-windows-x64.zip`,
   checks its build attestation, unpacks `bellows/` into `workshop/anvil/bellows/`
   and publishes the mod, with the release notes as the change note.
-- To put a new description on Steam without a release, run the same workflow by
-  hand from `main` with a change note: it publishes the latest release again
-  with `main`'s `workshop/` folder (it fails when `main`'s descriptor version is
-  not that release's, for example while a newer release is still a draft):
-
-  ```sh
-  gh workflow run workshop-publish.yml --ref main -f change-note="Workshop page: what changed"
-  ```
+- To update the Workshop page between releases, run it by hand on `main`
+  with the latest release:
+  `gh workflow run workshop-publish.yml --ref main -f tag=vX.Y.Z`. It publishes
+  that release's package again with `main`'s `workshop/` folder, and fails when
+  `main`'s descriptor version is not that release's (for example while a newer
+  release is still a draft). Steam keeps the mod's version when the files are
+  unchanged and records no change note, but takes the new description.
 
 Setting it up, once (maintainers):
 
