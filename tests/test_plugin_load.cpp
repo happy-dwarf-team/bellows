@@ -117,6 +117,7 @@ int64_t SettingInt(AnvilPlugin*, AnvilSetting setting) { return setting == CFG_R
 double SettingFloat(AnvilPlugin*, AnvilSetting) { return 0.0; }
 const char* SettingString(AnvilPlugin*, AnvilSetting setting) {
     switch (setting) {
+    case CFG_MIMALLOC: return "startup";  // a mode only mimalloc has, also as a benchmark field value
     case CFG_OPEN_WARMUP:
     case CFG_RAM_PREFETCH: return "off";  // their threads would read the game folder
     case CFG_TOKEN_DICT_PROFILE: return "off";  // its ready report walks the (here fake) keyword tree
@@ -347,7 +348,7 @@ int main(int argc, char** argv) {
     const std::string rest = ", metascript_subst=off, attr_cache=verify, zip_profile=on, token_dict_cache=on, "
                              "token_dict_profile=off, range_profile=on, range_witness=on";
     if (g_scenario != "refuse") {
-        assert(Logged("modules: mimalloc=on, open_warmup=off, ram_prefetch=off, verifypath_listing=on, "
+        assert(Logged("modules: mimalloc=startup, open_warmup=off, ram_prefetch=off, verifypath_listing=on, "
                       "exists_index=on, trigger_intern=on" + rest));
         for (const char* f : {"HeapFree", "HeapReAlloc", "HeapSize", "HeapAlloc", "GetFileAttributesExW",
                               "GetFileAttributesA"}) {
@@ -400,7 +401,7 @@ int main(int argc, char** argv) {
         assert(g_declares >= 1 && g_dones == 1);
         const bool ok = g_scenario == "ok";
         const std::map<std::string, std::string> modes = {
-            {"mimalloc", ok ? "on" : "failed"}, {"open_warmup", "off"}, {"ram_prefetch", "off"},
+            {"mimalloc", ok ? "startup" : "failed"}, {"open_warmup", "off"}, {"ram_prefetch", "off"},
             {"verifypath_listing", "on"}, {"exists_index", "on"}, {"trigger_intern", ok ? "on" : "failed"},
             {"metascript_subst", "off"}, {"attr_cache", "verify"}, {"zip_profile", "on"},
             {"token_dict_cache", "on"}, {"token_dict_profile", "off"}, {"range_profile", "on"},

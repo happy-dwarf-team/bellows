@@ -10,7 +10,7 @@ namespace {
 
 anvil::Benchmark g_benchmark;
 
-constexpr const char* kModes[] = {"off", "on", "verify", "failed"};
+constexpr const char* kModes[] = {"off", "on", "verify", "startup", "failed"};
 constexpr const char* kOpenWarmupProfiles[] = {"learned", "base_and_mods", "all_list"};
 constexpr const char* kRamPrefetchProfiles[] = {"none", "learned", "base"};
 
