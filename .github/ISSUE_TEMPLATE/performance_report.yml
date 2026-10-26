@@ -5,7 +5,15 @@ body:
   - type: markdown
     attributes:
       value: |
-        Start times vary a lot between runs. Compare several starts with and without the plugin, alternating them, and say whether they are warm (game started before since the last reboot) or cold (first start after a reboot).
+        The easiest way is the **Benchmark** tab of the Anvil Manager (Anvil 1.5 or newer): it runs the starts for you and gives a report to paste below. Without it, compare several starts with and without the plugin, alternating them, and say whether they are warm (game started before since the last reboot) or cold (first start after a reboot).
+  - type: textarea
+    id: benchmark-report
+    attributes:
+      label: Benchmark report (JSON)
+      description: From the Benchmark tab's **Copy**, or a kept report opened from the tab. If you paste it, the fields below are optional.
+      render: json
+    validations:
+      required: false
   - type: textarea
     id: times
     attributes:
@@ -15,7 +23,7 @@ body:
         Without plugin: 35.1 / 34.8 / 35.4 s
         With plugin:    15.6 / 15.2 / 15.5 s
     validations:
-      required: true
+      required: false
   - type: dropdown
     id: start-kind
     attributes:
@@ -25,27 +33,27 @@ body:
         - Cold (after a reboot)
         - Mixed / not sure
     validations:
-      required: true
+      required: false
   - type: input
     id: measured-how
     attributes:
       label: How you measured
       description: e.g. stopwatch from clicking Play, or timestamps in `anvil/anvil.log` / the game logs.
     validations:
-      required: true
+      required: false
   - type: input
     id: versions
     attributes:
       label: Plugin, Anvil and game versions
     validations:
-      required: true
+      required: false
   - type: textarea
     id: system
     attributes:
       label: System
       description: Drive the game is on (NVMe / SATA SSD / HDD), RAM, CPU, and the number of enabled mods.
     validations:
-      required: true
+      required: false
   - type: textarea
     id: log
     attributes:
