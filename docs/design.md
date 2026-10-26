@@ -350,7 +350,13 @@ this module, year 1720 at speed 5 through Tongs; lab `docs/bellows-frame-pacing.
   second series alone: -6.9% (p = 0.11). Six trials were rejected on event
   pauses, in both arms. About 22 frames inside the tick per session at speed 5
   instead of 210-340.
-- Not measured yet: input latency at speed 5, other saves, dates and
+- Input latency at speed 5 (Tongs `pause`: Space pushed into the game's SDL
+  queue until the pause flag is set, 10 ms polling; normal CPU affinity; ABBA
+  sessions, 120 presses per arm): 250 ms median 76 ms, p90 189 ms, max 401 ms;
+  the game's threshold median 52 ms, p90 89 ms, max 183 ms. Input is handled
+  later, mostly in the tail: with 250 ms it waits for the frames between
+  days. While paused there is no difference.
+- Not measured: time until the reaction is on screen, other saves, dates and
   intervals. Hence experimental and off by default.
 
 ### attr_cache
