@@ -264,6 +264,31 @@ up; when none exists (the answer came from a value exactly at the threshold),
 the lookup waits 30 game days. Nothing is kept across loads beyond what the
 session builds. `verify` always runs the original and compares.
 
+Counters go to `range_witness.tsv` in the data folder every 5 s. In `verify`
+the first 32 cases of each kind of mismatch (`verify_disagree`: a valid witness
+but the original says out of range; `verify_value_differs`: the original
+stopped at the witness and wrote another value) are also kept: copied into a
+fixed array inside the check when detected (no allocation; later cases are only
+counted), and appended to `range_witness_mismatches.tsv` by the same writer
+thread. The file is started with only its header when the module installs in
+`verify`, so an empty table means no mismatch in the session; `on` neither
+creates it nor keeps anything. One row per case:
+
+| Column | Meaning |
+| --- | --- |
+| `kind` | `disagree` or `value_differs` |
+| `day`, `date` | game day (days since 1.1.0, 365-day years) and the same as `year.month.day` |
+| `country`, `country_id` | the checked country's pointer and its id (bits 32–47 of `+0x20`, the index into the country array) |
+| `target`, `threshold` | target province id and the threshold of the key |
+| `witness_related`, `witness_owner_id`, `witness_province` | the witness: `-1` for the country's own list, else the index of the relation record, and the id of the country whose list holds it |
+| `witness_value` | the module's value at the witness, before the original's rounding to thousands |
+| `original_value` | the value the original wrote (`-1` when it returned null) |
+| `first_below_related`, `first_below_province` | where the walk stops by the module's formula, evaluated after the original (for `value_differs` this is the witness by definition) |
+
+The country tag is not written: no offset for it is validated in
+`symbols.toml`. The province at which the original itself stopped is not
+observable from its result; `first_below_*` is the module's reconstruction.
+
 Lab (EU4 1.37.5, Russia 1719 save, 8 workers per pool, only this module on,
 Tongs-driven year 1720 at speed 5; lab `docs/simulation-profile.md`):
 

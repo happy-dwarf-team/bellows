@@ -11,6 +11,7 @@
 // "in range" is the answer the original would give: the original stops at the first such
 // province and any such province makes the answer true. Otherwise the original runs and the
 // witness is looked up again; when none exists, the lookup is retried only after a while.
+// Verify also keeps the first mismatches of each kind (Mismatch) for the module to write out.
 
 #include <cstdint>
 #include <unordered_map>
@@ -62,6 +63,23 @@ struct WitnessStats {
     std::int64_t verify_value_differs = 0;
 };
 
+// One verify mismatch, copied when it is detected and written out later by the module.
+enum class MismatchKind : std::uint8_t { Disagree, ValueDiffers };
+
+struct Mismatch {
+    MismatchKind kind = MismatchKind::Disagree;
+    std::int32_t day = 0;
+    std::uintptr_t country = 0;
+    std::int32_t country_id = -1;
+    std::int32_t target = -1;
+    std::int32_t threshold = 0;
+    Witness witness;                    // related index (-1: own list) and province
+    std::int32_t witness_owner_id = -1;  // country whose list holds the witness
+    std::int64_t witness_value = 0;      // the module's formula, before rounding
+    std::int32_t original_value = -1;    // what the original wrote (-1: it returned nullptr)
+    Witness first_below;                 // where the walk stops by the module's formula
+};
+
 // Game must provide:
 //   int* Original(void* country, int* out, void* target, void* arg4, int* threshold);
 //   const std::int32_t* ListBegin(void* owner);  const std::int32_t* ListEnd(void* owner);
@@ -70,11 +88,13 @@ struct WitnessStats {
 //   bool Eligible(void* owner, std::int32_t province);  // the walk's filter
 //   bool Value(void* owner, bool related, std::int32_t province, void* target, std::int64_t* value);
 //   std::int32_t TargetId(void* target);
+//   std::int32_t CountryId(void* country);
 //   std::int32_t Day();
 template <class Game>
 class WitnessEngine {
 public:
     static constexpr std::int32_t kRetryDays = 30;
+    static constexpr std::size_t kMismatchesPerKind = 32;  // kept per kind; later ones are only counted
 
     WitnessStats stats;
 
@@ -112,10 +132,19 @@ public:
                 // When the original stopped at the witness itself it wrote the same value.
                 const Witness first = FirstBelow(g, country, target, limit);
                 if (first.related == known.related && first.province == known.province) {
-                    ++(*result == Rounded(witnessValue) ? stats.verify_value_same : stats.verify_value_differs);
+                    if (*result == Rounded(witnessValue)) {
+                        ++stats.verify_value_same;
+                    } else {
+                        ++stats.verify_value_differs;
+                        Record(g, MismatchKind::ValueDiffers, country, key, known, witnessValue, result, first);
+                    }
                 }
             } else {
                 ++stats.verify_disagree;
+                if (kept_[static_cast<int>(MismatchKind::Disagree)] < kMismatchesPerKind) {
+                    Record(g, MismatchKind::Disagree, country, key, known, witnessValue, result,
+                           FirstBelow(g, country, target, limit));
+                }
             }
         }
         if (!inRange) {
@@ -140,6 +169,10 @@ public:
     }
 
     std::size_t size() const { return witnesses_.size(); }
+
+    // Kept mismatches in the order they were found; an entry never changes once kept.
+    std::size_t mismatch_count() const { return mismatchCount_; }
+    const Mismatch& mismatch(std::size_t i) const { return mismatches_[i]; }
 
     // The original's rounding of the value it writes: truncated to thousands.
     static int Rounded(std::int64_t value) { return static_cast<int>(value) / 1000 * 1000; }
@@ -189,7 +222,30 @@ private:
         return w;
     }
 
+    void Record(Game& g, MismatchKind kind, void* country, const WitnessKey& key, const Witness& witness,
+                std::int64_t witnessValue, const int* result, const Witness& first) {
+        std::size_t& kept = kept_[static_cast<int>(kind)];
+        if (kept >= kMismatchesPerKind) return;
+        ++kept;
+        Mismatch& m = mismatches_[mismatchCount_++];
+        m.kind = kind;
+        m.day = g.Day();
+        m.country = key.country;
+        m.country_id = g.CountryId(country);
+        m.target = key.target;
+        m.threshold = key.threshold;
+        m.witness = witness;
+        void* owner = witness.related >= 0 ? g.Related(country, witness.related) : country;
+        m.witness_owner_id = owner != nullptr ? g.CountryId(owner) : -1;
+        m.witness_value = witnessValue;
+        m.original_value = result != nullptr ? *result : -1;
+        m.first_below = first;
+    }
+
     std::unordered_map<WitnessKey, Witness, WitnessKeyHash> witnesses_;
+    Mismatch mismatches_[2 * kMismatchesPerKind];
+    std::size_t mismatchCount_ = 0;
+    std::size_t kept_[2] = {};
 };
 
 }  // namespace sb
