@@ -28,6 +28,7 @@ code only.
 | `mimalloc` | Replaces the game's CRT heap with mimalloc for the whole process (`on`) or until the game-ready event (`startup`) | 13.8 → 11.8 s |
 | `trigger_intern` | Skips redundant trigger-interning work at the end of loading (empty map), linear algorithm otherwise | tail −0.8 s |
 | `metascript_subst` | Single-pass `$param$` substitution in scripted effects/triggers | −0.75 s |
+| `frame_pacing` | Simulation, experimental, off by default: at speed 5, frames drawn from inside the daily tick at most every 100 ms instead of 50 ms | year 1720: 22.8 → 20.2 s |
 | `open_warmup` | Opens the files the game will need on parallel threads (learned list per mod set) so first-open costs after a reboot or antivirus update are paid off the critical path | cold start 61 → 15 s |
 
 Diagnostics from the lab (`file_trace`, deep API counters, heap sampling) are
@@ -313,6 +314,60 @@ Tongs-driven year 1720 at speed 5; lab `docs/simulation-profile.md`):
 On by default since then, like `token_dict_cache` (kept out of the written
 `config.toml`, so existing files get it too). Still open: other saves, mod
 sets and much later dates.
+
+### frame_pacing (simulation, experimental)
+
+Off by default. At speed 5 the lab's profile of year 1720 put about 16% of the
+main thread's samples inside frames the game draws from within the daily tick
+(lab `docs/simulation-profile.md`, "Klatki rysowane w trakcie ticku").
+`0x769EA0` is called about 40 times between the stages of the tick and draws a
+frame (`0x14C25A0` with `outer` = 0) when the time since the last one exceeds
+base `[0x245B070]` (1.0) times the table `0x1C33E18` indexed by the speed at
+`+0x1E08` (0.02 for speeds 1-4, 0.05 for speed 5; the index is the speed minus
+one, checked in the game).
+
+A mid hook after the clock read (`0x769F78`) replaces the threshold in xmm6 at
+speed 5 with `frame_pacing_interval_ms` (100 ms by default, chosen from the
+series below; never with a
+shorter one than the game's own); the game still
+decides with its own clock and last-frame time. A second mid hook on the
+drawing branch (`0x769F9A`) counts the frames per speed into
+`frame_pacing.tsv`. `frame_pacing_interval_ms = 0` keeps the game's threshold
+and only counts. The simulation does not read these frames; what changes is how
+often the screen and input are handled inside long days.
+
+Lab (EU4 1.37.5, Russia 1719 save, 8 workers per pool, Bellows defaults plus
+this module, year 1720 at speed 5 through Tongs; lab `docs/bellows-frame-pacing.md`):
+
+- Live check at 250 ms: 5 frames inside the tick in ~10 s at speed 5 instead
+  of ~13 per second in an earlier check without the module; frames between
+  days were 20 per second (9 in that check), so the screen still updates about
+  20 times a second.
+- Two interleaved series (one launch per trial, both arms with the hooks
+  installed; the control arm keeps the game's threshold): 250 ms median
+  19.23 s for the year (n = 8, 18.72-25.23; seven of eight at 18.72-19.68),
+  the game's threshold 21.19 s (n = 7, 19.98-25.05): -1.96 s (-9.2%,
+  permutation test of the medians p = 0.049); main-thread CPU -7.8%. The
+  second series alone: -6.9% (p = 0.11). Six trials were rejected on event
+  pauses, in both arms. About 22 frames inside the tick per session at speed 5
+  instead of 210-340.
+- Input latency at speed 5 (Tongs `pause`: Space pushed into the game's SDL
+  queue until the pause flag is set, 10 ms polling; normal CPU affinity; ABBA
+  sessions, 120 presses per arm): 250 ms median 76 ms, p90 189 ms, max 401 ms;
+  the game's threshold median 52 ms, p90 89 ms, max 183 ms. Input is handled
+  later, mostly in the tail: with 250 ms it waits for the frames between
+  days. While paused there is no difference.
+- Shorter intervals (one more series each, few valid trials): 100 ms -8.5%
+  (n = 2) and 150 ms -9.1% (n = 3) for the year against the pooled control,
+  as 250 ms; key press median 72.5 and 78.5 ms, p90 135 and 159 ms. The median
+  cost stays (input waits for the frames between days whatever the
+  interval); the tail shrinks with the interval.
+- 100 ms, interleaved series of its own (ACCAACCAACCA): 20.17 s for the year
+  (n = 4, 19.35-21.91) against 22.80 s with the game's threshold (n = 5,
+  22.53-23.94): -11.6%, p = 0.024, no overlap; main-thread CPU -10.3%. Hence
+  the default of 100 ms: the gain of 250 ms with the shortest latency tail.
+- Not measured: time until the reaction is on screen, other saves and dates.
+  Experimental and off by default, since the median latency cost stays.
 
 ### attr_cache
 

@@ -292,3 +292,24 @@ bytes = "48 89 5C 24 20 55 56 57 48 83 EC 20"
 memory = "code"
 signature = "unsigned char* ()"
 note = "second fallback getter"
+
+# --- frame_pacing ------------------------------------------------------------------
+
+[symbol.nested_frame_threshold]
+rva = 0x769F4B
+bytes = "48 63 86 08 1E 00 00 4C 8D 2D A7 60 89 FF F3 0F 10 35 0F 11 CF 01 F3 41 0F 59 B4 85 18 3E C3 01"
+memory = "code"
+values.speed_offset = { at = 3, size = 4 }
+note = "0x769EA0 (draw a frame from inside the daily tick when enough time passed): threshold = base [0x245B070] * table 0x1C33E18[speed index at +0x1E08] into xmm6"
+
+[symbol.nested_frame_compare]
+rva = 0x769F78
+bytes = "0F 28 F8 F2 0F 5C BE 20 1E 00 00"   # movaps xmm7,xmm0; subsd xmm7,[rsi+1E20h]
+memory = "code"
+note = "0x769EA0 after the clock read: xmm6 = threshold (float), rsi = game state; the time since the last frame is compared with it next"
+
+[symbol.nested_frame_render]
+rva = 0x769F9A
+bytes = "48 8B BE 00 1E 00 00"            # mov rdi,[rsi+1E00h]
+memory = "code"
+note = "0x769EA0: the branch that draws the frame (0x14C25A0 with outer = 0)"

@@ -32,6 +32,7 @@ DWORD WINAPI FinishAfterReady(void*) {
     sb::ReportTokenDictCache();
     sb::ReportRangeProfile();
     sb::ReportRangeWitness();
+    sb::ReportFramePacing();
     sb::bench::Done();  // the profiles are saved and the reports made
     return 0;
 }
@@ -96,6 +97,7 @@ struct Bellows : anvil::Plugin {
             {"range_profile", cfg::range_profile.id, sb::InstallRangeProfile},  // diagnostic
             // range_witness answers before 0x3526B0 runs: range_profile then sees only the walks it still makes.
             {"range_witness", cfg::range_witness.id, sb::InstallRangeWitness},
+            {"frame_pacing", cfg::frame_pacing.id, sb::InstallFramePacing},  // experimental, off by default
         };
         std::vector<const char*> names;
         for (const auto& m : modules) names.push_back(m.name);
@@ -124,6 +126,7 @@ struct Bellows : anvil::Plugin {
             }
         }
         sb::SetRamPrefetchBudget(static_cast<std::uint64_t>(budget));
+        sb::SetFramePacingInterval(cfg::frame_pacing_interval_ms.get());
 
         std::string summary;
         for (const auto& m : modules) {
