@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.12.0](https://github.com/happy-dwarf-team/bellows/compare/v0.11.0...v0.12.0) (2026-10-27)
+
+
+### Features
+
+* **army_search_profile:** diagnostic counters of the AI army search ([#65](https://github.com/happy-dwarf-team/bellows/issues/65)) ([b511467](https://github.com/happy-dwarf-team/bellows/commit/b511467dd55b215e474f0b79bb8f7863e0814f0a))
+* **frame_pacing:** draw frames inside the daily tick less often at the fastest speed ([#61](https://github.com/happy-dwarf-team/bellows/issues/61)) ([a4614ee](https://github.com/happy-dwarf-team/bellows/commit/a4614ee41183282b80602a131c822718c5996091))
+* **range_witness:** write the first verify mismatches to range_witness_mismatches.tsv ([#62](https://github.com/happy-dwarf-team/bellows/issues/62)) ([e232667](https://github.com/happy-dwarf-team/bellows/commit/e232667add6c27f6759ed47493f969d3f7052450))
+* **score_probe:** diagnostic memo counters for the AI scoring functions ([#66](https://github.com/happy-dwarf-team/bellows/issues/66)) ([8d8edbf](https://github.com/happy-dwarf-team/bellows/commit/8d8edbf9401b1887f04e0c53b7dded82c536dbbd))
+* **tick_profile:** diagnostic profile of the daily tick's stages ([#64](https://github.com/happy-dwarf-team/bellows/issues/64)) ([3c71a45](https://github.com/happy-dwarf-team/bellows/commit/3c71a4507ef1bfb8067112a98b0ec7b8dd4c2dde))
+
 ## [0.11.0](https://github.com/happy-dwarf-team/bellows/compare/v0.10.0...v0.11.0) (2026-10-26)
 
 
