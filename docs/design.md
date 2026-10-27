@@ -369,6 +369,38 @@ this module, year 1720 at speed 5 through Tongs; lab `docs/bellows-frame-pacing.
 - Not measured: time until the reaction is on screen, other saves and dates.
   Experimental and off by default, since the median latency cost stays.
 
+### tick_profile (diagnostic, simulation)
+
+Off by default. Where the daily tick spends its time, without a sampler.
+`0x758430` runs one game day: the daily part `0x75BBE0`, the monthly tick
+`0x75D690` on the first of a month and the yearly tick `0x75E260` on 1 January.
+Between their stages it calls `0x769EA0` (draw a frame if enough time passed)
+from about 40 fixed places. Both functions are hooked at their entry only to
+observe: the day is cut into segments at the `0x769EA0` calls, named by the
+return addresses at both ends, and the time inside `0x769EA0` is counted apart.
+Every 5 s the module writes `tick_profile_segments.tsv` (from, to, calls,
+total and max ms), `tick_profile_frames.tsv` (per checkpoint) and
+`tick_profile_days.tsv` (date, ms, frame ms, checkpoints per game day). The
+logic is in `tick_profile_core.hpp`, tested by `tests/test_tick_profile.cpp`.
+
+Lab (Russia 1719 save driven to 1770 at speed 5 with the defaults plus this
+module, normal CPU affinity; lab `docs/simulation-profile.md`, "Etapy dziennego
+ticku"): the year's tick time does not grow with the campaign up to 1770
+(16-19 s in calm years, 22-32 s in some); frames drawn inside the tick take
+8.5-18.5%; one segment, from inside `0x75B4B0` (the pool job `0x77D8A0`) to the
+next checkpoint of the daily part, takes about half of the tick without frames.
+
+That segment holds the AI pool job: `0x75B4B0` sorts the per-country AI objects
+(`gamestate+0xB78`) by tag, not by cost, and runs `0x77D8A0`, a parallel_for
+whose item is `0xB0FA0`, one country's daily AI. The module also hooks both to
+observe and writes `tick_profile_jobs.tsv` (per job: wall time, items, item sum
+and maximum, threads, main-thread and busiest-thread time, and the lower bound
+max(longest item, sum / threads)) and `tick_profile_countries.tsv`. Lab, 1719 to
+1730, 6 workers per pool: the job is 47% of the tick (112.9 s of 239.2 s), the
+busiest thread is busy for 111.2 s of it, the lower bound is 98.5 s, and one
+country takes 17% of all AI time. A better order would save at most ~6% of the
+tick; making the heaviest countries' AI cheaper is where the time is.
+
 ### attr_cache
 
 Ported in the lab's "negative" policy only: `GetFileAttributesExW` and

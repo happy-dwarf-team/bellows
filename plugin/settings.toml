@@ -106,6 +106,15 @@ description = "Simulation, not start-up: answers the country range check from th
 group = "Simulation"
 restart = true
 
+[setting.tick_profile]
+type = "enum"
+values = [{ name = "off", label = "Off" }, { name = "on", label = "On" }]
+default = "off"
+label = "Daily tick profile"
+description = "Diagnostic: time of each stage of the daily, monthly and yearly tick and of the frames drawn inside it, per game day, in tick_profile*.tsv."
+group = "Diagnostics"
+restart = true
+
 [setting.frame_pacing]
 type = "enum"
 values = [{ name = "off", label = "Off" }, { name = "on", label = "On" }]
