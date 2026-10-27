@@ -313,3 +313,19 @@ rva = 0x769F9A
 bytes = "48 8B BE 00 1E 00 00"            # mov rdi,[rsi+1E00h]
 memory = "code"
 note = "0x769EA0: the branch that draws the frame (0x14C25A0 with outer = 0)"
+
+# --- tick_profile ------------------------------------------------------------------
+
+[symbol.daily_tick]
+rva = 0x758430
+bytes = "48 8B C4 55 53 56 57 41 54 41 55 41 56"
+memory = "code"
+signature = "void (void* state)"
+note = "gamestate.cpp: one game day (daily part 0x75BBE0, monthly 0x75D690, yearly 0x75E260)"
+
+[symbol.nested_frame_check]
+rva = 0x769EA0
+bytes = "48 8B C4 48 89 58 10 4C 89 40 18 55 56 57"
+memory = "code"
+signature = "void (void* state, uint8_t force, void* a3, int line)"
+note = "gamestate.cpp: draws a frame if enough time passed; called between the stages of the tick"

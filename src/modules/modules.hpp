@@ -28,6 +28,7 @@ bool InstallTokenDictCache(anvil::Host& host, Mode mode);
 bool InstallRangeProfile(anvil::Host& host, Mode mode);  // diagnostic
 bool InstallRangeWitness(anvil::Host& host, Mode mode);
 bool InstallFramePacing(anvil::Host& host, Mode mode);
+bool InstallTickProfile(anvil::Host& host, Mode mode);  // diagnostic
 void SetFramePacingInterval(std::int64_t milliseconds);  // before InstallFramePacing; 0 = count only
 
 // mimalloc = "startup": returns the pages freed since the switch to Windows
