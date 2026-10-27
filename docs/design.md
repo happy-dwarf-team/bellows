@@ -390,6 +390,17 @@ ticku"): the year's tick time does not grow with the campaign up to 1770
 8.5-18.5%; one segment, from inside `0x75B4B0` (the pool job `0x77D8A0`) to the
 next checkpoint of the daily part, takes about half of the tick without frames.
 
+That segment holds the AI pool job: `0x75B4B0` sorts the per-country AI objects
+(`gamestate+0xB78`) by tag, not by cost, and runs `0x77D8A0`, a parallel_for
+whose item is `0xB0FA0`, one country's daily AI. The module also hooks both to
+observe and writes `tick_profile_jobs.tsv` (per job: wall time, items, item sum
+and maximum, threads, main-thread and busiest-thread time, and the lower bound
+max(longest item, sum / threads)) and `tick_profile_countries.tsv`. Lab, 1719 to
+1730, 6 workers per pool: the job is 47% of the tick (112.9 s of 239.2 s), the
+busiest thread is busy for 111.2 s of it, the lower bound is 98.5 s, and one
+country takes 17% of all AI time. A better order would save at most ~6% of the
+tick; making the heaviest countries' AI cheaper is where the time is.
+
 ### attr_cache
 
 Ported in the lab's "negative" policy only: `GetFileAttributesExW` and
