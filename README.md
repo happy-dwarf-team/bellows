@@ -87,7 +87,8 @@ about 1.5 s longer than the times above, which stop at `Running application`.
 
 Diagnostics, off by default: `zip_profile`, `token_dict_profile`,
 `range_profile`, `tick_profile` (time of each stage of the daily, monthly and
-yearly tick per game day).
+yearly tick per game day), `army_search_profile` (calls, time and repeated
+answers of the AI army search).
 
 Supported game build: EU4 1.37.5 (Steam, Windows 64-bit). Every game address
 is declared in [`plugin/symbols.toml`](plugin/symbols.toml); Anvil checks
