@@ -420,6 +420,24 @@ answer would change the AI in the rest, so that is not a Bellows module; the
 exact routes left are inside the scoring functions (`0xF8EA0` 34%,
 `0x96F860` 23%, `0x102140` 22.5% of the search).
 
+### score_probe (diagnostic, simulation)
+
+Off by default. Asks whether the scoring work inside the AI army search could
+be remembered within a game day with the game's own answers. It hooks, only to
+observe, `0x96F860` (a method of the search's scoring functor: can the unit
+move into a province), `0x102140` (army strength against a province) and
+`0x1998F0` (a per-province table value at a date delta). Per call the inputs
+become a key, with and without the army or unit; a memo per thread, cleared at
+each new game day (no lock on the game's hot path), counts keys that come back
+and whether the output is the same. `score_probe.tsv` has one row per function.
+
+Lab (Russia 1719 to 1722; lab `docs/simulation-profile.md`, "Czy funkcje
+oceniające da się zapamiętać"): every repeated full key gave the same output
+(0 differences in 23.4 million repeats), but only `0x1998F0` repeats often
+(55% of 32.9 million calls), worth about 1-2% of the tick; leaving the army or
+unit out of the key changes the output (0.25-5.6%), so no function can be
+shared between armies. No module followed.
+
 ### attr_cache
 
 Ported in the lab's "negative" policy only: `GetFileAttributesExW` and
