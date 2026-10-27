@@ -10,12 +10,14 @@
 // stop, and the same province ended the walk day after day. The call at 0x35214C is
 // redirected here: the witness province is checked first with the game's own functions and
 // the same formula; only when it no longer qualifies does the original walk run (and a new
-// witness is looked up). Mode verify always runs the original and compares the answers.
+// witness is looked up). Mode verify always runs the original and compares the answers; the
+// first mismatches of each kind go to range_witness_mismatches.tsv with the counters.
 #include "../settings.hpp"
 #include "modules.hpp"
 #include "range_witness_core.hpp"
 
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 #include <fstream>
 #include <string>
@@ -184,6 +186,7 @@ struct Game {
         }
     }
     std::int32_t TargetId(void* t) { return sb::Read<std::int32_t>(t, kProvinceId); }
+    std::int32_t CountryId(void* c) { return static_cast<std::uint16_t>(sb::Read<std::uint64_t>(c, kCountryInfo) >> 32); }
 };
 
 Game g_game;
@@ -192,6 +195,52 @@ SRWLOCK g_lock = SRWLOCK_INIT;
 volatile LONG64 g_ticks = 0;
 volatile LONG g_dirty = 0;
 std::wstring* g_dir = nullptr;
+std::size_t g_mismatchesWritten = 0;  // writer thread only
+
+constexpr const wchar_t* kMismatchFile = L"\\range_witness_mismatches.tsv";
+
+// Game day (days since 1.1.0, 365-day years) as the game prints dates: year.month.day.
+std::string DayToDate(std::int32_t day) {
+    static constexpr int kMonth[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    if (day < 0) return "-";
+    int rest = day % 365;
+    int month = 0;
+    while (rest >= kMonth[month]) rest -= kMonth[month++];
+    return std::to_string(day / 365) + "." + std::to_string(month + 1) + "." + std::to_string(rest + 1);
+}
+
+void StartMismatchFile() {
+    try {
+        std::ofstream out(*g_dir + kMismatchFile, std::ios::binary | std::ios::trunc);
+        out << "kind\tday\tdate\tcountry\tcountry_id\ttarget\tthreshold\twitness_related\twitness_owner_id"
+               "\twitness_province\twitness_value\toriginal_value\tfirst_below_related\tfirst_below_province\n";
+    } catch (...) {
+    }
+}
+
+void AppendMismatches() {
+    sb::Mismatch fresh[2 * sb::WitnessEngine<Game>::kMismatchesPerKind];
+    std::size_t count = 0;
+    AcquireSRWLockShared(&g_lock);
+    for (std::size_t i = g_mismatchesWritten; i < g_engine->mismatch_count(); ++i) fresh[count++] = g_engine->mismatch(i);
+    ReleaseSRWLockShared(&g_lock);
+    if (count == 0) return;
+    try {
+        std::ofstream out(*g_dir + kMismatchFile, std::ios::binary | std::ios::app);
+        for (std::size_t i = 0; i < count; ++i) {
+            const sb::Mismatch& m = fresh[i];
+            char country[24];
+            std::snprintf(country, sizeof(country), "0x%llx", static_cast<unsigned long long>(m.country));
+            out << (m.kind == sb::MismatchKind::Disagree ? "disagree" : "value_differs") << "\t" << m.day << "\t"
+                << DayToDate(m.day) << "\t" << country << "\t" << m.country_id << "\t" << m.target << "\t"
+                << m.threshold << "\t" << m.witness.related << "\t" << m.witness_owner_id << "\t"
+                << m.witness.province << "\t" << m.witness_value << "\t" << m.original_value << "\t"
+                << m.first_below.related << "\t" << m.first_below.province << "\n";
+        }
+        if (out) g_mismatchesWritten += count;
+    } catch (...) {
+    }
+}
 
 void WriteFile() {
     sb::WitnessStats s;
@@ -200,6 +249,7 @@ void WriteFile() {
     s = g_engine->stats;
     size = g_engine->size();
     ReleaseSRWLockShared(&g_lock);
+    if (g_mode == sb::Mode::Verify) AppendMismatches();
     try {
         const std::wstring path = *g_dir + L"\\range_witness.tsv";
         const std::wstring temp = path + L".tmp";
@@ -286,6 +336,7 @@ bool InstallRangeWitness(anvil::Host& host, Mode mode) {
     g_rootDate = static_cast<std::size_t>(host.value(sym::root_and_date, "date_offset"));
     host.redirect(g_site, sym::range_check_call, &SB_RangeWitness);
     g_original = g_site.next_pointer();
+    if (mode == Mode::Verify) StartMismatchFile();
     HANDLE thread = CreateThread(nullptr, 0, WriterThread, nullptr, 0, nullptr);
     if (thread != nullptr) {
         SetThreadDescription(thread, L"bellows range_witness writer");
@@ -293,8 +344,9 @@ bool InstallRangeWitness(anvil::Host& host, Mode mode) {
     }
     InterlockedExchange(&EU4SB_RangeWitnessStats.mode, mode == Mode::Verify ? 2 : 1);
     InterlockedExchange(&EU4SB_RangeWitnessStats.initialized, 1);
-    Log(ANVIL_LOG_INFO, "range_witness: %s, scale %.3f offset %.3f; counters in range_witness.tsv every 5 s",
-        ModeName(mode).c_str(), g_scale, g_offset);
+    Log(ANVIL_LOG_INFO, "range_witness: %s, scale %.3f offset %.3f; counters in range_witness.tsv every 5 s%s",
+        ModeName(mode).c_str(), g_scale, g_offset,
+        mode == Mode::Verify ? ", first mismatches in range_witness_mismatches.tsv" : "");
     return true;
 }
 

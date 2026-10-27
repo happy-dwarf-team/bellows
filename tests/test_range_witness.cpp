@@ -15,6 +15,7 @@ namespace {
 struct Country {
     std::vector<std::int32_t> provinces;
     std::vector<Country*> related;  // nullptr = relation does not qualify
+    std::int32_t id = 0;
 };
 
 struct Target {
@@ -64,6 +65,7 @@ struct FakeGame {
         return true;
     }
     std::int32_t TargetId(void* t) { return static_cast<Target*>(t)->id; }
+    std::int32_t CountryId(void* c) { return static_cast<Country*>(c)->id; }
     std::int32_t Day() { return day; }
 };
 
@@ -151,16 +153,95 @@ int main() {
     e.Check(g, &russia, &out, &siberia, nullptr, nullptr, false);
     assert(g.originals == before + 3);
 
+    // Mode on never keeps mismatches.
+    assert(e.mismatch_count() == 0);
+
     // Verify: the original always runs; answers agree; the original stopped at the witness itself.
     const int beforeVerify = g.originals;
     r = e.Check(g, &russia, &out, &siberia, nullptr, &threshold, true);
     assert(g.originals == beforeVerify + 1 && e.stats.verify_agree == 1 && e.stats.verify_value_same == 1 && out == 150'000);
+    assert(e.mismatch_count() == 0);
 
     // Verify catches a wrong formula: the witness claims "in range" but the original says no.
+    russia.id = 42;
     g.values[{4, 900}] = 500'000;
     g.lieAbout = 4;
     e.Check(g, &russia, &out, &siberia, nullptr, &threshold, true);
     assert(e.stats.verify_disagree == 1 && out > threshold);
+    // ... and keeps the case with what both sides said.
+    assert(e.mismatch_count() == 1);
+    {
+        const sb::Mismatch& m = e.mismatch(0);
+        assert(m.kind == sb::MismatchKind::Disagree && m.day == g.day);
+        assert(m.country == reinterpret_cast<std::uintptr_t>(&russia) && m.country_id == 42);
+        assert(m.target == 900 && m.threshold == 200'000);
+        assert(m.witness.related == -1 && m.witness.province == 4 && m.witness_owner_id == 42);
+        assert(m.witness_value == 0 && m.original_value == 500'000);  // the walk's minimum over 1, 3, 4, 5
+        assert(m.first_below.related == -1 && m.first_below.province == 4);
+    }
+
+    // A wrong value at the province where the original stops: value_differs, and only the first
+    // kMismatchesPerKind of each kind are kept while the counters go on.
+    {
+        constexpr std::size_t kKept = sb::WitnessEngine<FakeGame>::kMismatchesPerKind;
+        constexpr int kRepeats = static_cast<int>(kKept) + 8;
+        sb::WitnessEngine<FakeGame> v;
+        g.day = 500;
+        g.lieAbout = -1;
+        g.values[{4, 900}] = 150'500;
+        v.Check(g, &russia, &out, &siberia, nullptr, &threshold, true);  // acquires province 4
+        assert(v.stats.acquired == 1 && v.mismatch_count() == 0);
+        g.lieAbout = 4;
+        for (int i = 0; i < kRepeats; ++i) v.Check(g, &russia, &out, &siberia, nullptr, &threshold, true);
+        assert(v.stats.verify_value_differs == kRepeats && v.mismatch_count() == kKept);
+        const sb::Mismatch& m = v.mismatch(0);
+        assert(m.kind == sb::MismatchKind::ValueDiffers && m.day == 500 && m.country_id == 42);
+        assert(m.witness.province == 4 && m.witness_value == 0 && m.original_value == 150'000);
+        assert(m.first_below.related == -1 && m.first_below.province == 4);
+
+        // Disagreements fill their own share: the witness is dropped each time, so re-acquire it.
+        for (int i = 0; i < kRepeats; ++i) {
+            g.lieAbout = -1;
+            g.values[{4, 900}] = 150'500;
+            v.Check(g, &russia, &out, &siberia, nullptr, &threshold, true);
+            g.lieAbout = 4;
+            g.values[{4, 900}] = 500'000;
+            v.Check(g, &russia, &out, &siberia, nullptr, &threshold, true);
+        }
+        assert(v.stats.verify_disagree == kRepeats && v.mismatch_count() == 2 * kKept);
+        assert(v.mismatch(kKept).kind == sb::MismatchKind::Disagree);
+        assert(v.mismatch(2 * kKept - 1).kind == sb::MismatchKind::Disagree);
+    }
+
+    // A witness from a related country: the row names the related country that holds it.
+    {
+        sb::WitnessEngine<FakeGame> v;
+        Country vassal{{78}, {}, 7};
+        Country overlord{{1}, {&vassal}, 3};
+        g.lieAbout = -1;
+        g.values[{78, 900}] = 120'000;
+        v.Check(g, &overlord, &out, &siberia, nullptr, &threshold, true);  // acquires 78 via relation 0
+        g.values[{78, 900}] = 500'000;
+        g.lieAbout = 78;
+        v.Check(g, &overlord, &out, &siberia, nullptr, &threshold, true);
+        assert(v.stats.verify_disagree == 1 && v.mismatch_count() == 1);
+        const sb::Mismatch& m = v.mismatch(0);
+        assert(m.country_id == 3 && m.witness.related == 0 && m.witness.province == 78 && m.witness_owner_id == 7);
+        assert(m.original_value == 500'000 && m.first_below.related == 0 && m.first_below.province == 78);
+    }
+
+    // Mode on with the same wrong formula: answered from the witness, nothing kept.
+    {
+        sb::WitnessEngine<FakeGame> v;
+        g.lieAbout = -1;
+        g.values[{4, 900}] = 150'500;
+        v.Check(g, &russia, &out, &siberia, nullptr, &threshold, false);
+        g.lieAbout = 4;
+        g.values[{4, 900}] = 500'000;
+        for (int i = 0; i < 4; ++i) v.Check(g, &russia, &out, &siberia, nullptr, &threshold, false);
+        assert(v.stats.answered == 4 && v.mismatch_count() == 0);
+    }
+    g.lieAbout = -1;
 
     std::printf("ok: %lld checks, %lld answered, %lld originals\n", static_cast<long long>(e.stats.calls),
                 static_cast<long long>(e.stats.answered), static_cast<long long>(e.stats.originals));
