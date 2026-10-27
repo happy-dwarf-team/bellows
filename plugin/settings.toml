@@ -124,6 +124,15 @@ description = "Diagnostic: calls, time and repeated answers of the AI army searc
 group = "Diagnostics"
 restart = true
 
+[setting.score_probe]
+type = "enum"
+values = [{ name = "off", label = "Off" }, { name = "on", label = "On" }]
+default = "off"
+label = "AI scoring probe"
+description = "Diagnostic: how often the inputs of the AI army search's scoring functions repeat within a game day, in score_probe.tsv."
+group = "Diagnostics"
+restart = true
+
 [setting.frame_pacing]
 type = "enum"
 values = [{ name = "off", label = "Off" }, { name = "on", label = "On" }]
