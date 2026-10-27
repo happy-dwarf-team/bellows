@@ -28,7 +28,7 @@ code only.
 | `mimalloc` | Replaces the game's CRT heap with mimalloc for the whole process (`on`) or until the game-ready event (`startup`) | 13.8 → 11.8 s |
 | `trigger_intern` | Skips redundant trigger-interning work at the end of loading (empty map), linear algorithm otherwise | tail −0.8 s |
 | `metascript_subst` | Single-pass `$param$` substitution in scripted effects/triggers | −0.75 s |
-| `frame_pacing` | Simulation, experimental, off by default: at speed 5, frames drawn from inside the daily tick at most every 100 ms instead of 50 ms | year 1720: 21.2 → 19.2 s |
+| `frame_pacing` | Simulation, experimental, off by default: at speed 5, frames drawn from inside the daily tick at most every 100 ms instead of 50 ms | year 1720: 22.8 → 20.2 s |
 | `open_warmup` | Opens the files the game will need on parallel threads (learned list per mod set) so first-open costs after a reboot or antivirus update are paid off the critical path | cold start 61 → 15 s |
 
 Diagnostics from the lab (`file_trace`, deep API counters, heap sampling) are
@@ -362,8 +362,12 @@ this module, year 1720 at speed 5 through Tongs; lab `docs/bellows-frame-pacing.
   as 250 ms; key press median 72.5 and 78.5 ms, p90 135 and 159 ms. The median
   cost stays (input waits for the frames between days whatever the
   interval); the tail shrinks with the interval.
+- 100 ms, interleaved series of its own (ACCAACCAACCA): 20.17 s for the year
+  (n = 4, 19.35-21.91) against 22.80 s with the game's threshold (n = 5,
+  22.53-23.94): -11.6%, p = 0.024, no overlap; main-thread CPU -10.3%. Hence
+  the default of 100 ms: the gain of 250 ms with the shortest latency tail.
 - Not measured: time until the reaction is on screen, other saves and dates.
-  Hence experimental and off by default.
+  Experimental and off by default, since the median latency cost stays.
 
 ### attr_cache
 
