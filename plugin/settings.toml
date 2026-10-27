@@ -115,6 +115,15 @@ description = "Diagnostic: time of each stage of the daily, monthly and yearly t
 group = "Diagnostics"
 restart = true
 
+[setting.army_search_profile]
+type = "enum"
+values = [{ name = "off", label = "Off" }, { name = "on", label = "On" }]
+default = "off"
+label = "AI army search profile"
+description = "Diagnostic: calls, time and repeated answers of the AI army search, in army_search*.tsv."
+group = "Diagnostics"
+restart = true
+
 [setting.frame_pacing]
 type = "enum"
 values = [{ name = "off", label = "Off" }, { name = "on", label = "On" }]

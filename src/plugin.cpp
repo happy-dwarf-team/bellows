@@ -100,6 +100,7 @@ struct Bellows : anvil::Plugin {
             {"frame_pacing", cfg::frame_pacing.id, sb::InstallFramePacing},  // experimental, off by default
             // diagnostic; its hook on 0x769EA0 sits at the entry, frame_pacing's inside the function.
             {"tick_profile", cfg::tick_profile.id, sb::InstallTickProfile},
+            {"army_search_profile", cfg::army_search_profile.id, sb::InstallArmySearchProfile},  // diagnostic
         };
         std::vector<const char*> names;
         for (const auto& m : modules) names.push_back(m.name);
