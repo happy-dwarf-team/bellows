@@ -380,6 +380,8 @@ int main(int argc, char** argv) {
         assert(Live("mid_hook " + std::to_string(SYM_NESTED_FRAME_RENDER)));
         assert(Live("hook_function " + std::to_string(SYM_DAILY_TICK)));
         assert(Live("hook_function " + std::to_string(SYM_NESTED_FRAME_CHECK)));
+        assert(Live("hook_function " + std::to_string(SYM_AI_JOB)));
+        assert(Live("hook_function " + std::to_string(SYM_AI_COUNTRY)));
     } else {
         // HeapAlloc refused: the three heap imports mimalloc already had are removed. The
         // second trigger_intern site refused: the first one is removed. The rest stays.

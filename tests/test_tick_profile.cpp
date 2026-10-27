@@ -54,6 +54,22 @@ int main() {
     assert(Has(d, "1720.1.1\t100\t20\t2"));
     assert(Has(d, "1720.2.1\t81\t1\t2"));
 
+    // A pool job on the second day: 4 threads, 100 ticks of items, the longest 40: bound = max(40, 25).
+    sb::TickJob job;
+    job.wall = 60;
+    job.items = 10;
+    job.sum = 100;
+    job.max_item = 40;
+    job.threads = 4;
+    job.main_busy = 30;
+    job.max_busy = 50;
+    p.AddJob(job);
+    std::ostringstream jobs;
+    p.WriteJobs(jobs, 1.0);
+    std::printf("%s", jobs.str().c_str());
+    assert(p.jobs() == 1);
+    assert(Has(jobs.str(), "1720.2.1\t60\t10\t100\t40\t4\t30\t50\t40"));
+
     assert(sb::TickProfile::Date(0) == "0.1.1");
     assert(sb::TickProfile::Date(1720 * 365 + 364) == "1720.12.31");
     assert(sb::TickProfile::Date(1720 * 365 + 59) == "1720.3.1");

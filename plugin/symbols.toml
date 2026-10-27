@@ -329,3 +329,17 @@ bytes = "48 8B C4 48 89 58 10 4C 89 40 18 55 56 57"
 memory = "code"
 signature = "void (void* state, uint8_t force, void* a3, int line)"
 note = "gamestate.cpp: draws a frame if enough time passed; called between the stages of the tick"
+
+[symbol.ai_job]
+rva = 0x77D8A0
+bytes = "48 89 5C 24 10 48 89 74 24 20 55 57 41 54"
+memory = "code"
+signature = "void (void* list, void* arg)"
+note = "called only from 0x75B4B0: parallel_for on the pools over the per-country AI objects (item 0xB0FA0)"
+
+[symbol.ai_country]
+rva = 0xB0FA0
+bytes = "40 55 53 56 57 41 54 41 55"
+memory = "code"
+signature = "void (void* ai)"
+note = "one country's daily AI update; from the pool job's functor (0x7861C2) or serially from 0x75B4B0 (0x75BA13)"

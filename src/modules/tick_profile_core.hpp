@@ -37,6 +37,18 @@ struct TickDay {
     std::int32_t checkpoints = 0;  // calls of 0x769EA0 during the day
 };
 
+// One call of the AI pool job 0x77D8A0 (parallel_for over the per-country AI updates 0xB0FA0).
+struct TickJob {
+    std::int32_t day = 0;
+    std::int64_t wall = 0;         // ticks inside 0x77D8A0 on the main thread
+    std::int32_t items = 0;        // 0xB0FA0 calls inside it
+    std::int64_t sum = 0;          // ticks of all items
+    std::int64_t max_item = 0;     // the longest item
+    std::int32_t threads = 0;      // threads that ran at least one item
+    std::int64_t main_busy = 0;    // item ticks on the main thread
+    std::int64_t max_busy = 0;     // item ticks of the busiest thread
+};
+
 class TickProfile {
 public:
     static constexpr std::uint32_t kDayStart = 0;           // segment end: entering 0x758430
@@ -75,6 +87,26 @@ public:
     }
 
     std::size_t days() const { return days_.size(); }
+
+    // Each job is stamped with the day being run (or the last one when outside a day).
+    void AddJob(TickJob job) {
+        job.day = current_.day;
+        jobs_.push_back(job);
+    }
+
+    std::size_t jobs() const { return jobs_.size(); }
+
+    // Per job: the wall time, the items, and the lower bound any order of the same items on the
+    // same threads could reach: max(longest item, sum / threads).
+    void WriteJobs(std::ostream& out, double ms_per_tick) const {
+        out << "date\twall_ms\titems\tsum_ms\tmax_item_ms\tthreads\tmain_busy_ms\tmax_busy_ms\tbound_ms\n";
+        for (const auto& j : jobs_) {
+            const double bound = static_cast<double>(std::max(j.max_item, j.threads > 0 ? j.sum / j.threads : j.sum));
+            out << Date(j.day) << "\t" << j.wall * ms_per_tick << "\t" << j.items << "\t" << j.sum * ms_per_tick
+                << "\t" << j.max_item * ms_per_tick << "\t" << j.threads << "\t" << j.main_busy * ms_per_tick << "\t"
+                << j.max_busy * ms_per_tick << "\t" << bound * ms_per_tick << "\n";
+        }
+    }
 
     void WriteSegments(std::ostream& out, double ms_per_tick) const {
         out << "from\tto\tcalls\ttotal_ms\tmax_ms\n";
@@ -127,6 +159,7 @@ private:
     std::map<std::pair<std::uint32_t, std::uint32_t>, TickSpan> segments_;
     std::map<std::uint32_t, TickSpan> frames_;
     std::vector<TickDay> days_;
+    std::vector<TickJob> jobs_;
 };
 
 }  // namespace sb
