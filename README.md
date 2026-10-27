@@ -86,7 +86,8 @@ about 1.5 s longer than the times above, which stop at `Running application`.
 | `frame_pacing` | **Simulation, experimental, off by default.** At the fastest speed, draws frames from inside the daily tick less often (setting `frame_pacing_interval_ms`, 100 ms; the game's own is 50 ms). The simulation is the same; the map and interface update between days instead, and react later to clicks during long days (lab: a year at speed 5 in 20.2 s instead of 22.8 s; a key press at speed 5 handled after 73 ms instead of 50 ms in the median) |
 
 Diagnostics, off by default: `zip_profile`, `token_dict_profile`,
-`range_profile`.
+`range_profile`, `tick_profile` (time of each stage of the daily, monthly and
+yearly tick per game day).
 
 Supported game build: EU4 1.37.5 (Steam, Windows 64-bit). Every game address
 is declared in [`plugin/symbols.toml`](plugin/symbols.toml); Anvil checks

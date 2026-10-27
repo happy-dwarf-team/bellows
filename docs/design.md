@@ -369,6 +369,27 @@ this module, year 1720 at speed 5 through Tongs; lab `docs/bellows-frame-pacing.
 - Not measured: time until the reaction is on screen, other saves and dates.
   Experimental and off by default, since the median latency cost stays.
 
+### tick_profile (diagnostic, simulation)
+
+Off by default. Where the daily tick spends its time, without a sampler.
+`0x758430` runs one game day: the daily part `0x75BBE0`, the monthly tick
+`0x75D690` on the first of a month and the yearly tick `0x75E260` on 1 January.
+Between their stages it calls `0x769EA0` (draw a frame if enough time passed)
+from about 40 fixed places. Both functions are hooked at their entry only to
+observe: the day is cut into segments at the `0x769EA0` calls, named by the
+return addresses at both ends, and the time inside `0x769EA0` is counted apart.
+Every 5 s the module writes `tick_profile_segments.tsv` (from, to, calls,
+total and max ms), `tick_profile_frames.tsv` (per checkpoint) and
+`tick_profile_days.tsv` (date, ms, frame ms, checkpoints per game day). The
+logic is in `tick_profile_core.hpp`, tested by `tests/test_tick_profile.cpp`.
+
+Lab (Russia 1719 save driven to 1770 at speed 5 with the defaults plus this
+module, normal CPU affinity; lab `docs/simulation-profile.md`, "Etapy dziennego
+ticku"): the year's tick time does not grow with the campaign up to 1770
+(16-19 s in calm years, 22-32 s in some); frames drawn inside the tick take
+8.5-18.5%; one segment, from inside `0x75B4B0` (the pool job `0x77D8A0`) to the
+next checkpoint of the daily part, takes about half of the tick without frames.
+
 ### attr_cache
 
 Ported in the lab's "negative" policy only: `GetFileAttributesExW` and
