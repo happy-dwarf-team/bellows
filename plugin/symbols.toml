@@ -352,3 +352,26 @@ bytes = "4C 89 4C 24 20 89 54 24 10 48 89 4C 24 08 55 53 56 57 41 54"
 memory = "code"
 signature = "uint64_t (void* scorer, int mode, void* army, uint64_t arg, float* score, uint8_t a6, uint8_t* a7, uint8_t* a8, uint8_t* a9, uint8_t a10, uint8_t a11, void* path)"
 note = "ai_army.cpp (called from 0xEAB50): AI army search over the province graph with a scoring functor"
+
+# --- score_probe -------------------------------------------------------------------
+
+[symbol.score_move]
+rva = 0x96F860
+bytes = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 41 54 41 55"
+memory = "code"
+signature = "uint64_t (void* self, void* unit, void* a3, void* a4, void* a5, void* a6, char* a7)"
+note = "method of the army search's scoring functor (vtable 0x1C3CD98 + 8): can the unit move into a province"
+
+[symbol.score_strength]
+rva = 0x102140
+bytes = "48 89 5C 24 10 48 89 4C 24 08 55 56 57 48 81 EC 90 00 00 00"
+memory = "code"
+signature = "float (uint64_t flag, uint64_t army, void* province, uint8_t a4, int a5)"
+note = "AI army strength against a province (0x198C70 on the per-province table 0x242BA00)"
+
+[symbol.score_table]
+rva = 0x1998F0
+bytes = "48 8B C4 4C 89 48 20 44 89 40 18 48 89 50 10 48 89 48 08 53"
+memory = "code"
+signature = "int* (int* out, int64_t* entry, int delta, int64_t table, int64_t* extra)"
+note = "value of a per-province table entry at a date delta (called from 0x198C70)"
