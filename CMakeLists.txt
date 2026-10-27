@@ -78,6 +78,7 @@ set(SB_SOURCES
     src/modules/range_witness.cpp
     src/modules/frame_pacing.cpp
     src/modules/tick_profile.cpp
+    src/modules/army_search_profile.cpp
     src/modules/trigger_intern.cpp
     src/modules/verifypath_listing.cpp)
 # File version shown in the DLL's Properties, from the same version.txt.
@@ -109,7 +110,7 @@ endif()
 
 if(SB_BUILD_TESTS)
     enable_testing()
-    foreach(test rename trigger_intern token_dict_cache metascript_subst settings access_profile path_rules zip_reader range_stats range_witness tick_profile)
+    foreach(test rename trigger_intern token_dict_cache metascript_subst settings access_profile path_rules zip_reader range_stats range_witness tick_profile army_search)
         add_executable(test_${test} tests/test_${test}.cpp src/benchmark.cpp src/common.cpp src/settings.cpp src/rename.cpp
             src/modules/access_profile.cpp src/modules/zip_reader.cpp)
         # The SDK headers and the generated symbols.gen.hpp / settings.gen.hpp of the plugin.

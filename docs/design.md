@@ -401,6 +401,25 @@ busiest thread is busy for 111.2 s of it, the lower bound is 98.5 s, and one
 country takes 17% of all AI time. A better order would save at most ~6% of the
 tick; making the heaviest countries' AI cheaper is where the time is.
 
+### army_search_profile (diagnostic, simulation)
+
+Off by default. About half of the per-country daily AI (`0xB0FA0`) is
+`0x1022B0`, called from `ai_army.cpp` (`0xEAB50`): a priority-queue search
+over the province graph with a scoring functor (`param_1`, vtable
+`0x1C3CD98`) for one army (`param_3`); it returns a province and a score
+(`*param_5`), fills a path (`param_12`) and clears two arrays sized by the
+province count on every call. The module hooks it only to observe and writes
+`army_search.tsv` (calls, time, armies, keys, and per key whether the result
+and score equal the previous call's) and `army_search_days.tsv`.
+
+Lab (Russia 1719 to 1725, defaults plus this module; lab
+`docs/simulation-profile.md`, "Wyszukiwanie armii AI"): one search per AI army
+a day (about 85), 546 µs on average, 53.5% of the AI time; 92.6% of searches
+return the same province and score as the day before. Returning yesterday's
+answer would change the AI in the rest, so that is not a Bellows module; the
+exact routes left are inside the scoring functions (`0xF8EA0` 34%,
+`0x96F860` 23%, `0x102140` 22.5% of the search).
+
 ### attr_cache
 
 Ported in the lab's "negative" policy only: `GetFileAttributesExW` and
