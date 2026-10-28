@@ -359,7 +359,7 @@ int main(int argc, char** argv) {
     assert(fs::exists(data / "settings.toml") && fs::exists(data / "config.toml.migrated"));
     assert(Logged("config.toml migrated to settings.toml (1 value(s)"));
 
-    const std::string rest = ", metascript_subst=off, attr_cache=verify, zip_profile=on, token_dict_cache=on, "
+    const std::string rest = ", metascript_subst=off, metascript_blocks=on, attr_cache=verify, zip_profile=on, token_dict_cache=on, "
                              "token_dict_profile=off, range_profile=on, range_witness=on, frame_pacing=on, tick_profile=on, army_search_profile=on, score_probe=on";
     if (g_scenario != "refuse") {
         assert(Logged("modules: mimalloc=startup, open_warmup=off, ram_prefetch=off, verifypath_listing=on, "
@@ -374,6 +374,7 @@ int main(int argc, char** argv) {
         assert(Live("redirect_call " + std::to_string(SYM_TRIGGER_INTERN_CALL_A)));
         assert(Live("redirect_call " + std::to_string(SYM_TRIGGER_INTERN_CALL_B)));
         assert(Live("redirect_call " + std::to_string(SYM_TOKEN_LOOKUP_TOKENIZER_CALL)));
+        assert(Live("redirect_call " + std::to_string(SYM_METASCRIPT_BLOCKS_CALL)));
         assert(Live("hook_function " + std::to_string(SYM_RANGE_MIN_DISTANCE)));
         assert(Live("redirect_call " + std::to_string(SYM_RANGE_CHECK_CALL)));
         assert(Live("mid_hook " + std::to_string(SYM_NESTED_FRAME_COMPARE)));
@@ -440,7 +441,7 @@ int main(int argc, char** argv) {
         const std::map<std::string, std::string> modes = {
             {"mimalloc", ok ? "startup" : "failed"}, {"open_warmup", "off"}, {"ram_prefetch", "off"},
             {"verifypath_listing", "on"}, {"exists_index", "on"}, {"trigger_intern", ok ? "on" : "failed"},
-            {"metascript_subst", "off"}, {"attr_cache", "verify"}, {"zip_profile", "on"},
+            {"metascript_subst", "off"}, {"metascript_blocks", "on"}, {"attr_cache", "verify"}, {"zip_profile", "on"},
             {"token_dict_cache", "on"}, {"token_dict_profile", "off"}, {"range_profile", "on"},
             {"range_witness", "on"}, {"frame_pacing", "on"}, {"tick_profile", "on"}, {"army_search_profile", "on"}, {"score_probe", "on"},
         };

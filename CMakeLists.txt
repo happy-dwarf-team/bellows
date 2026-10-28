@@ -70,6 +70,7 @@ set(SB_SOURCES
     src/modules/ram_prefetch.cpp
     src/modules/exists_index.cpp
     src/modules/metascript_subst.cpp
+    src/modules/metascript_blocks.cpp
     src/modules/mimalloc_heap.cpp
     src/modules/open_warmup.cpp
     src/modules/token_dict_cache.cpp
@@ -111,7 +112,7 @@ endif()
 
 if(SB_BUILD_TESTS)
     enable_testing()
-    foreach(test rename trigger_intern token_dict_cache metascript_subst settings access_profile path_rules zip_reader range_stats range_witness tick_profile army_search score_probe frame_pacing)
+    foreach(test rename trigger_intern token_dict_cache metascript_subst metascript_blocks settings access_profile path_rules zip_reader range_stats range_witness tick_profile army_search score_probe frame_pacing)
         add_executable(test_${test} tests/test_${test}.cpp src/benchmark.cpp src/common.cpp src/settings.cpp src/rename.cpp
             src/modules/access_profile.cpp src/modules/zip_reader.cpp)
         # The SDK headers and the generated symbols.gen.hpp / settings.gen.hpp of the plugin.

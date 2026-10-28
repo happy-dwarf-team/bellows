@@ -24,6 +24,7 @@ DWORD WINAPI FinishAfterReady(void*) {
     sb::ReportExistsIndex();
     sb::ReportTriggerIntern();
     sb::ReportMetascriptSubst();
+    sb::ReportMetascriptBlocks();
     sb::ReportOpenWarmup();
     sb::ReportAttrCache();
     sb::ReportRamPrefetch();
@@ -88,6 +89,7 @@ struct Bellows : anvil::Plugin {
             {"exists_index", cfg::exists_index.id, sb::InstallExistsIndex},
             {"trigger_intern", cfg::trigger_intern.id, sb::InstallTriggerIntern},
             {"metascript_subst", cfg::metascript_subst.id, sb::InstallMetascriptSubst},
+            {"metascript_blocks", cfg::metascript_blocks.id, sb::InstallMetascriptBlocks},
             {"attr_cache", cfg::attr_cache.id, sb::InstallAttrCache},
             {"zip_profile", cfg::zip_profile.id, sb::InstallZipProfile},  // diagnostic, off by default
             // token_dict_cache and token_dict_profile redirect the same call: both chain, the profile then counts
