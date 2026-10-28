@@ -27,6 +27,7 @@ constexpr CounterModule kCounterModules[] = {
     {"exists_index", "listings", "Directory listings read"},
     {"trigger_intern", "index_builds", "Index builds"},
     {"metascript_subst", "tokens", "Tokens substituted"},
+    {"metascript_blocks", "blocks", "Blocks resolved"},
     {"attr_cache", "paths", "Paths remembered"},
     {"ram_prefetch", "prefetched", "Members prefetched"},
     {"token_dict_cache", "flushes", "Cache flushes"},

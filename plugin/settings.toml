@@ -50,6 +50,15 @@ description = "Single-pass $parameter$ substitution in scripted effects and trig
 group = "Start-up"
 restart = true
 
+[setting.metascript_blocks]
+type = "enum"
+values = [{ name = "on", label = "On" }, { name = "off", label = "Off" }, { name = "verify", label = "Verify" }]
+default = "on"
+label = "Conditional blocks"
+description = "Single-pass resolution of [[parameter] ...] blocks in scripted effects and triggers (big gain on mods with large scripted effects, e.g. Anbennar)."
+group = "Start-up"
+restart = true
+
 [setting.open_warmup]
 type = "enum"
 values = [{ name = "on", label = "On" }, { name = "off", label = "Off" }]

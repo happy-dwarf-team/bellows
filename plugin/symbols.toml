@@ -125,6 +125,18 @@ bytes = "E8 94 0E 00 00"               # call 0xDB1800
 memory = "code"
 note = "second call of the substitution in 0xDB0860"
 
+[symbol.metascript_blocks_args]
+rva = 0xDB08B7
+bytes = "4C 8B C6 48 8B D7 48 8B CB"   # mov r8,rsi; mov rdx,rdi; mov rcx,rbx
+memory = "code"
+note = "the arguments of metascript_blocks_call: (script, text, arguments)"
+
+[symbol.metascript_blocks_call]
+rva = 0xDB08C0
+bytes = "E8 4B 0B 00 00"               # call 0xDB1410 (conditional blocks [[param] ...])
+memory = "code"
+note = "the only call of the block resolution, in 0xDB0860 before the substitution"
+
 [symbol.string_assign]
 rva = 0x95110
 bytes = "48 89 5C 24 10 48 89 6C 24 18 56 57 41 57"
