@@ -28,7 +28,7 @@ code only.
 | `mimalloc` | Replaces the game's CRT heap with mimalloc for the whole process (`on`) or until the game-ready event (`startup`) | 13.8 → 11.8 s |
 | `trigger_intern` | Skips redundant trigger-interning work at the end of loading (empty map), linear algorithm otherwise | tail −0.8 s |
 | `metascript_subst` | Single-pass `$param$` substitution in scripted effects/triggers | −0.75 s |
-| `frame_pacing` | Simulation, experimental, off by default: at speed 5, frames drawn from inside the daily tick at most every 100 ms instead of 50 ms | year 1720: 22.8 → 20.2 s |
+| `frame_pacing` | Simulation, experimental, off by default: at speed 5, frames drawn from inside the daily tick at most every 100 ms instead of 50 ms while no input waits, at once for a waiting press | year 1720: 23.4 → 20.8 s; key press 51.5 → 21 ms |
 | `open_warmup` | Opens the files the game will need on parallel threads (learned list per mod set) so first-open costs after a reboot or antivirus update are paid off the critical path | cold start 61 → 15 s |
 
 Diagnostics from the lab (`file_trace`, deep API counters, heap sampling) are
@@ -335,6 +335,43 @@ drawing branch (`0x769F9A`) counts the frames per speed into
 `frame_pacing.tsv`. `frame_pacing_interval_ms = 0` keeps the game's threshold
 and only counts. The simulation does not read these frames; what changes is how
 often the screen and input are handled inside long days.
+
+With `frame_pacing_input = "draw"` (the default since 0.13) frames are skipped
+only while no input waits. A waiting key press, click or wheel turn gets a
+frame at the next check, whatever the game's threshold (at most one every
+10 ms; the frame takes the input out of the queue), so the game reacts sooner
+than without the module; mouse motion gets the game's own threshold, so moving
+the mouse costs no more frames than the game draws itself. Input waits either
+in the main thread's Windows queue (`GetQueueStatus` with `QS_KEY`,
+`QS_MOUSEBUTTON` and `QS_MOUSEMOVE`; SDL reads that queue only when a frame
+pumps events, and the check runs on the main thread, which owns the window) or
+in SDL's own queue (`SDL_PeepEvents` of the statically linked SDL 2.0.4 at
+`0x17467A0` with no buffer and `SDL_PEEKEVENT` counts the events of a type
+range; events pushed by another plugin, such as Tongs, are there). The queues
+are probed at most every 2 ms of the game's clock (checks in between reuse the
+answer), with one `SDL_PeepEvents` over keys, buttons and motion and a second
+one only when something waits. A first version that kept only the
+game's threshold while input waited was no faster than `"wait"`: input almost
+always arrived when the time since the last frame was still below 50 ms, so
+the game's own rule would not have drawn either, and the outer frame between
+days handled it. `"wait"` keeps the 0.12.0 behaviour: the longer interval also
+while input waits. `frame_pacing.tsv` counts the probes (`input_probes`), the
+frames drawn for a press (`input_press`) and the checks with mouse motion
+waiting (`input_motion`).
+
+Lab measurement of `"draw"` (lab `docs/bellows-frame-pacing.md`, "Reakcja na
+wejście"; EU4 1.37.5, Russia 1719 save, Bellows defaults plus this module):
+
+- Input latency at speed 5 (Tongs `pause`, 60 presses per session, normal
+  Process Lasso rule): median 21 ms (p90 82 ms) against 51.5 ms (p90 92 ms)
+  without the module, 120 presses each, sessions ACCA with the final build;
+  an earlier ABCCBA series gave 21 / 50.5 / 72.5 ms for `"draw"`, without the
+  module and `"wait"`.
+- Year 1720 at speed 5 (SIMULATION, 8 workers per pool, interleaved): 20.8 s
+  (4 trials, 19.1–21.4) against 23.4 s without the module (6 trials,
+  21.1–33.9), -10.9%, permutation p = 0.09; `"wait"` 19.4 s (7 trials). In
+  the same series `"draw"` and `"wait"` differed by +2.3% (p = 0.94): the
+  probes cost no measurable time.
 
 Lab (EU4 1.37.5, Russia 1719 save, 8 workers per pool, Bellows defaults plus
 this module, year 1720 at speed 5 through Tongs; lab `docs/bellows-frame-pacing.md`):
