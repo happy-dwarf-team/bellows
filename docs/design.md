@@ -28,7 +28,7 @@ code only.
 | `mimalloc` | Replaces the game's CRT heap with mimalloc for the whole process (`on`) or until the game-ready event (`startup`) | 13.8 → 11.8 s |
 | `trigger_intern` | Skips redundant trigger-interning work at the end of loading (empty map), linear algorithm otherwise | tail −0.8 s |
 | `metascript_subst` | Single-pass `$param$` substitution in scripted effects/triggers | −0.75 s |
-| `frame_pacing` | Simulation, experimental, off by default: at speed 5, frames drawn from inside the daily tick at most every 100 ms instead of 50 ms | year 1720: 22.8 → 20.2 s |
+| `frame_pacing` | Simulation, experimental, off by default: at speed 5, frames drawn from inside the daily tick at most every 100 ms instead of 50 ms while no input waits, at once for a waiting press | year 1720: 23.4 → 20.8 s; key press 51.5 → 21 ms |
 | `open_warmup` | Opens the files the game will need on parallel threads (learned list per mod set) so first-open costs after a reboot or antivirus update are paid off the critical path | cold start 61 → 15 s |
 
 Diagnostics from the lab (`file_trace`, deep API counters, heap sampling) are
@@ -358,6 +358,20 @@ days handled it. `"wait"` keeps the 0.12.0 behaviour: the longer interval also
 while input waits. `frame_pacing.tsv` counts the probes (`input_probes`), the
 frames drawn for a press (`input_press`) and the checks with mouse motion
 waiting (`input_motion`).
+
+Lab measurement of `"draw"` (lab `docs/bellows-frame-pacing.md`, "Reakcja na
+wejście"; EU4 1.37.5, Russia 1719 save, Bellows defaults plus this module):
+
+- Input latency at speed 5 (Tongs `pause`, 60 presses per session, normal
+  Process Lasso rule): median 21 ms (p90 82 ms) against 51.5 ms (p90 92 ms)
+  without the module, 120 presses each, sessions ACCA with the final build;
+  an earlier ABCCBA series gave 21 / 50.5 / 72.5 ms for `"draw"`, without the
+  module and `"wait"`.
+- Year 1720 at speed 5 (SIMULATION, 8 workers per pool, interleaved): 20.8 s
+  (4 trials, 19.1–21.4) against 23.4 s without the module (6 trials,
+  21.1–33.9), -10.9%, permutation p = 0.09; `"wait"` 19.4 s (7 trials). In
+  the same series `"draw"` and `"wait"` differed by +2.3% (p = 0.94): the
+  probes cost no measurable time.
 
 Lab (EU4 1.37.5, Russia 1719 save, 8 workers per pool, Bellows defaults plus
 this module, year 1720 at speed 5 through Tongs; lab `docs/bellows-frame-pacing.md`):
