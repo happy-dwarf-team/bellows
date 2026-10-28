@@ -54,6 +54,24 @@ same in all 31 starts of that day, with and without Bellows. With default settin
 the modules also compare a sample of their answers with the game's own code
 (about 45,700 comparisons per start): 0 differences.
 
+### A big mod set: Anbennar
+
+Anbennar with Proper 2K UI Enhanced and P2KE Patch - Anbennar (the Workshop
+items as of 26 October 2026), warm start to the main menu, original
+`eu4.exe`, Anvil 1.5.2 and Bellows 0.14.0 from the release files, Bellows with
+default settings and the profiles it learned on earlier starts, 5 interleaved
+starts each, in a separate game profile with no other game running:
+
+| Setup | Starts | Median |
+| --- | --- | ---: |
+| Without Anvil | 85.32 / 87.19 / 84.64 / 85.29 / 86.01 s | 85.32 s |
+| Anvil + anvil-game + Bellows 0.14.0 | 22.42 / 21.81 / 21.83 / 22.47 / 23.01 s | **22.42 s** |
+
+About 10 s of that gain comes from `metascript_blocks` (0.14.0), which matters
+for Anbennar's large scripted effects and makes no difference on the 10-mod set
+above. The game's logs were the same in all five pairs of starts. The first
+start after a reboot was not measured on this mod set.
+
 ### Measure your own
 
 Anvil 1.5 or newer has a **Benchmark** tab in the Anvil Manager
