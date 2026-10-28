@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.14.0](https://github.com/happy-dwarf-team/bellows/compare/v0.13.0...v0.14.0) (2026-10-28)
+
+
+### Features
+
+* **metascript_blocks:** resolve [[param] ...] blocks of scripted effects in one pass ([#69](https://github.com/happy-dwarf-team/bellows/issues/69)) ([f44ca47](https://github.com/happy-dwarf-team/bellows/commit/f44ca47dffa8377fa1e4827a5ea91dbb4ce927da))
+
+
+### Performance
+
+* **metascript_blocks:** move a sampled comparison off slow calls ([#71](https://github.com/happy-dwarf-team/bellows/issues/71)) ([d1d0668](https://github.com/happy-dwarf-team/bellows/commit/d1d0668b31f7bb82dcb719fde79ec946a0f41e3f))
+
 ## [0.13.0](https://github.com/happy-dwarf-team/bellows/compare/v0.12.0...v0.13.0) (2026-10-28)
 
 
