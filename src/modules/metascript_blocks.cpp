@@ -19,7 +19,10 @@
 // else goes to the original. "verify" = compute ours, run the original,
 // compare (the game keeps the original's result); "on" = ours, every 256th
 // call with blocks compared (on a mismatch the original's result stays and the
-// module disables itself). Not used once the game is ready.
+// module disables itself). A sample that falls on a call whose original would
+// be slow (blocks x length above kSampleWorkLimit; on Anbennar one such call
+// costs ~0.6 s) moves to the next call below the limit. Not used once the game
+// is ready.
 #include "modules.hpp"
 
 #include <climits>
@@ -39,6 +42,9 @@ constexpr std::size_t kBlockBody = 0x20;
 constexpr std::size_t kBlockStart = 0x40;
 constexpr std::size_t kBlockEnd = 0x44;
 constexpr std::size_t kBlockNegate = 0x48;  // byte: the body is kept when it differs from "argument present"
+// "on": the largest blocks x text length a sampled comparison runs the original
+// for (the original rebuilds the text once per block; ~4 ms at this size).
+constexpr std::uint64_t kSampleWorkLimit = std::uint64_t{1} << 24;
 
 using BlocksFn = void (*)(void*, void*, void*);
 using AssignFn = void* (*)(void*, const char*, std::size_t);
@@ -50,6 +56,7 @@ anvil::FunctionHook<void(void*, void*, void*)> g_site;
 AssignFn g_assign = nullptr;
 bool g_verifyOnly = false;
 volatile LONG64 g_sequence = 0;
+volatile LONG g_samplePending = 0;  // a sample fell on a slow call and waits for a cheaper one
 volatile LONG64 g_ticksTotal = 0;
 volatile LONG64 g_ticksOriginal = 0;
 
@@ -175,7 +182,9 @@ extern "C" void SB_MetascriptBlocks(void* script, void* text, void* arguments) {
     }
     const LONG64 blocks = BlockCount(script);
     const LONG64 sequence = InterlockedIncrement64(&g_sequence);
-    if (g_verifyOnly || (sequence & 255) == 1) {
+    if ((sequence & 255) == 1) InterlockedExchange(&g_samplePending, 1);
+    const bool cheap = static_cast<std::uint64_t>(blocks) * StringView(text).size <= kSampleWorkLimit;
+    if (g_verifyOnly || (cheap && InterlockedCompareExchange(&g_samplePending, 0, 1) == 1)) {
         sb::Increment(&EU4SB_MetascriptBlocksStats.verifications);
         CallOriginal(script, text, arguments);
         if (!Equal(StringView(text), View{result.data(), result.size()})) {
