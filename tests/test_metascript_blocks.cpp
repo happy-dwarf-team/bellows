@@ -317,6 +317,29 @@ int main() {
         Expect(c, &Stats().skips, "a1");
     }
 
+    // A sample that falls on a slow call (blocks x length above the limit) moves to the next cheap call.
+    ResetStats();
+    g_sequence = 0;
+    g_samplePending = 0;
+    {
+        Case big;
+        for (int i = 0; i < 20; ++i) {
+            big.text += std::string(50000, 'a');
+            AddBlock(big, i % 2 ? "x" : "y", "kept", false);
+        }
+        AddArg(big, "x", "1");
+        big.Sync();
+        assert(static_cast<std::uint64_t>(big.script.items.size()) * big.text.size() > kSampleWorkLimit);
+        const int calls = g_originalCalls;
+        const std::string expected = RunOriginal(big);
+        assert(RunModule(big) == expected);  // sequence 1: sampled, but not compared
+        assert(g_originalCalls == calls + 1 && S(&Stats().verifications) == 0 && S(&Stats().hits) == 1);
+        Case small = Random(rng);
+        while (small.script.items.empty()) small = Random(rng);
+        assert(RunModule(small) == RunOriginal(small));
+        assert(S(&Stats().verifications) == 1 && S(&Stats().hits) == 2 && g_samplePending == 0);
+    }
+
     // A sampled disagreement keeps the original's result and disables the module.
     ResetStats();
     g_original = [](void*, void* text, void*) { Set(*static_cast<MsString*>(text), "other"); };
