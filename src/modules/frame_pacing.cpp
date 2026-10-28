@@ -34,12 +34,15 @@ constexpr std::uint32_t kLastKey = 0x3FF;
 constexpr std::uint32_t kMouseMotion = 0x400;  // SDL_MOUSEMOTION
 constexpr std::uint32_t kFirstButton = 0x401;  // SDL_MOUSEBUTTONDOWN, SDL_MOUSEBUTTONUP, SDL_MOUSEWHEEL
 constexpr std::uint32_t kLastButton = 0x403;
+constexpr double kProbeGap = 0.002;            // seconds: the queues are probed at most this often
 
 std::int64_t g_intervalMs = 100;  // 0: keep the game's threshold, count only
 float g_interval = 0.1f;         // seconds, the unit of the game's clock in 0x769EA0
 bool g_drawOnInput = true;
 std::size_t g_speedOffset = 0, g_lastFrameOffset = 0;
 sym::Types::sdl_peep_events::Pointer g_peepEvents = nullptr;
+double g_lastProbe = -1.0;  // main thread only: the clock at the last probe and what it found
+sb::Waiting g_lastWaiting = sb::Waiting::Nothing;
 anvil::Change g_compare, g_render;
 volatile LONG64 g_calls[kIndexes] = {}, g_frames[kIndexes] = {};
 volatile LONG64 g_replaced = 0, g_inputProbes = 0, g_inputPress = 0, g_inputMotion = 0;
@@ -52,18 +55,25 @@ int IndexOf(const anvil::Cpu& cpu) noexcept {
 }
 
 // Called on the main thread, which owns the game's window and its message queue.
-bool SdlWaiting(std::uint32_t first, std::uint32_t last) noexcept {
-    return g_peepEvents(nullptr, 0, kPeekEvent, first, last) > 0;
+int SdlCount(std::uint32_t first, std::uint32_t last) noexcept {
+    return g_peepEvents(nullptr, 0, kPeekEvent, first, last);
 }
 
 sb::Waiting InputWaiting() noexcept {
     const DWORD queued = HIWORD(GetQueueStatus(QS_KEY | QS_MOUSEMOVE | QS_MOUSEBUTTON));
-    if ((queued & (QS_KEY | QS_MOUSEBUTTON)) != 0 || SdlWaiting(kFirstKey, kLastKey) ||
-        SdlWaiting(kFirstButton, kLastButton)) {
-        return sb::Waiting::Press;
-    }
-    if ((queued & QS_MOUSEMOVE) != 0 || SdlWaiting(kMouseMotion, kMouseMotion)) return sb::Waiting::Motion;
-    return sb::Waiting::Nothing;
+    if ((queued & (QS_KEY | QS_MOUSEBUTTON)) != 0) return sb::Waiting::Press;
+    // One count over keys, motion and buttons; only when something waits, a second one tells motion apart.
+    const int sdl = SdlCount(kFirstKey, kLastButton);
+    if (sdl > 0) return SdlCount(kMouseMotion, kMouseMotion) < sdl ? sb::Waiting::Press : sb::Waiting::Motion;
+    return (queued & QS_MOUSEMOVE) != 0 ? sb::Waiting::Motion : sb::Waiting::Nothing;
+}
+
+// At most one probe every kProbeGap on the game's clock; checks in between reuse its answer.
+sb::Waiting ProbeInput(double now) noexcept {
+    if (now - g_lastProbe < kProbeGap && now >= g_lastProbe) return g_lastWaiting;
+    g_lastProbe = now;
+    InterlockedIncrement64(&g_inputProbes);
+    return g_lastWaiting = InputWaiting();
 }
 
 void WriteFile() {
@@ -130,15 +140,11 @@ bool InstallFramePacing(anvil::Host& host, Mode mode) {
         if (index != kFastest || g_intervalMs <= 0) return;
         const float game = cpu.xmm[6].f32[0];
         // xmm0 = the clock now, [rsi + last_frame_offset] = the time of the last frame (seconds, double).
-        const double elapsed =
-            cpu.xmm[0].f64[0] - sb::Read<double>(reinterpret_cast<const void*>(cpu.rsi), g_lastFrameOffset);
+        const double now = cpu.xmm[0].f64[0];
+        const double elapsed = now - sb::Read<double>(reinterpret_cast<const void*>(cpu.rsi), g_lastFrameOffset);
         sb::Waiting waiting = sb::Waiting::Nothing;
-        bool probed = false;
-        const float threshold = PacedThreshold(game, g_interval, elapsed, g_drawOnInput, [&] {
-            probed = true;
-            return waiting = InputWaiting();
-        });
-        if (probed) InterlockedIncrement64(&g_inputProbes);
+        const float threshold =
+            PacedThreshold(game, g_interval, elapsed, g_drawOnInput, [&] { return waiting = ProbeInput(now); });
         if (waiting == sb::Waiting::Press && threshold == 0.0f) InterlockedIncrement64(&g_inputPress);
         if (waiting == sb::Waiting::Motion) InterlockedIncrement64(&g_inputMotion);
         if (threshold == game) return;

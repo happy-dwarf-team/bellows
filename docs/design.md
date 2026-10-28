@@ -348,7 +348,9 @@ pumps events, and the check runs on the main thread, which owns the window) or
 in SDL's own queue (`SDL_PeepEvents` of the statically linked SDL 2.0.4 at
 `0x17467A0` with no buffer and `SDL_PEEKEVENT` counts the events of a type
 range; events pushed by another plugin, such as Tongs, are there). The queues
-are probed at every check at speed 5. A first version that kept only the
+are probed at most every 2 ms of the game's clock (checks in between reuse the
+answer), with one `SDL_PeepEvents` over keys, buttons and motion and a second
+one only when something waits. A first version that kept only the
 game's threshold while input waited was no faster than `"wait"`: input almost
 always arrived when the time since the last frame was still below 50 ms, so
 the game's own rule would not have drawn either, and the outer frame between
