@@ -10,7 +10,14 @@
 // and its own last-frame time, whether to draw. The simulation does not depend on these
 // frames: they only draw and handle input sooner. A second mid hook on the drawing branch
 // counts the frames per speed index.
+//
+// With frame_pacing_input = "draw" (the default) frames are skipped only while no input waits: a
+// waiting key press, click or wheel turn gets a frame at the next check (it takes the input out of the
+// queue), mouse motion the game's own threshold. Input waits in the main thread's Windows queue
+// (GetQueueStatus; SDL reads it only when a frame pumps events) or in SDL's own queue (SDL_PeepEvents
+// with no buffer counts the events; another plugin's SDL_PushEvent puts them there).
 #include "../settings.hpp"
+#include "frame_pacing_core.hpp"
 #include "modules.hpp"
 
 #include <fstream>
@@ -21,18 +28,42 @@ namespace {
 constexpr std::int32_t kFastest = 4;  // the last entry of the 5-entry table at 0x1C33E18
 constexpr int kIndexes = 6;           // 0-4, and 5 for anything else
 
+constexpr int kPeekEvent = 1;                  // SDL_PEEKEVENT
+constexpr std::uint32_t kFirstKey = 0x300;     // SDL_KEYDOWN, up to the text events
+constexpr std::uint32_t kLastKey = 0x3FF;
+constexpr std::uint32_t kMouseMotion = 0x400;  // SDL_MOUSEMOTION
+constexpr std::uint32_t kFirstButton = 0x401;  // SDL_MOUSEBUTTONDOWN, SDL_MOUSEBUTTONUP, SDL_MOUSEWHEEL
+constexpr std::uint32_t kLastButton = 0x403;
+
 std::int64_t g_intervalMs = 100;  // 0: keep the game's threshold, count only
 float g_interval = 0.1f;         // seconds, the unit of the game's clock in 0x769EA0
-std::size_t g_speedOffset = 0;
+bool g_drawOnInput = true;
+std::size_t g_speedOffset = 0, g_lastFrameOffset = 0;
+sym::Types::sdl_peep_events::Pointer g_peepEvents = nullptr;
 anvil::Change g_compare, g_render;
 volatile LONG64 g_calls[kIndexes] = {}, g_frames[kIndexes] = {};
-volatile LONG64 g_replaced = 0;
+volatile LONG64 g_replaced = 0, g_inputProbes = 0, g_inputPress = 0, g_inputMotion = 0;
 volatile LONG g_dirty = 0;
 std::wstring* g_dir = nullptr;
 
 int IndexOf(const anvil::Cpu& cpu) noexcept {
     const auto index = sb::Read<std::int32_t>(reinterpret_cast<const void*>(cpu.rsi), g_speedOffset);
     return index >= 0 && index < kIndexes - 1 ? index : kIndexes - 1;
+}
+
+// Called on the main thread, which owns the game's window and its message queue.
+bool SdlWaiting(std::uint32_t first, std::uint32_t last) noexcept {
+    return g_peepEvents(nullptr, 0, kPeekEvent, first, last) > 0;
+}
+
+sb::Waiting InputWaiting() noexcept {
+    const DWORD queued = HIWORD(GetQueueStatus(QS_KEY | QS_MOUSEMOVE | QS_MOUSEBUTTON));
+    if ((queued & (QS_KEY | QS_MOUSEBUTTON)) != 0 || SdlWaiting(kFirstKey, kLastKey) ||
+        SdlWaiting(kFirstButton, kLastButton)) {
+        return sb::Waiting::Press;
+    }
+    if ((queued & QS_MOUSEMOVE) != 0 || SdlWaiting(kMouseMotion, kMouseMotion)) return sb::Waiting::Motion;
+    return sb::Waiting::Nothing;
 }
 
 void WriteFile() {
@@ -43,7 +74,11 @@ void WriteFile() {
             std::ofstream out(temp, std::ios::binary | std::ios::trunc);
             out << "key\tvalue\n"
                 << "interval_ms\t" << g_intervalMs << "\n"
-                << "replaced\t" << g_replaced << "\n";
+                << "draw_on_input\t" << (g_drawOnInput ? 1 : 0) << "\n"
+                << "replaced\t" << g_replaced << "\n"
+                << "input_probes\t" << g_inputProbes << "\n"
+                << "input_press\t" << g_inputPress << "\n"
+                << "input_motion\t" << g_inputMotion << "\n";
             for (int i = 0; i < kIndexes; ++i) {
                 out << "calls_" << i << "\t" << g_calls[i] << "\n"
                     << "frames_" << i << "\t" << g_frames[i] << "\n";
@@ -70,9 +105,10 @@ __declspec(dllexport) sb::Stats EU4SB_FramePacingStats = SB_STATS_INIT;
 
 namespace sb {
 
-void SetFramePacingInterval(std::int64_t milliseconds) {
+void SetFramePacingInterval(std::int64_t milliseconds, bool draw_on_input) {
     g_intervalMs = milliseconds;
     g_interval = static_cast<float>(milliseconds) / 1000.0f;
+    g_drawOnInput = draw_on_input;
 }
 
 bool InstallFramePacing(anvil::Host& host, Mode mode) {
@@ -83,17 +119,32 @@ bool InstallFramePacing(anvil::Host& host, Mode mode) {
         return false;
     }
     g_speedOffset = static_cast<std::size_t>(host.value(sym::nested_frame_threshold, "speed_offset"));
+    g_lastFrameOffset = static_cast<std::size_t>(host.value(sym::nested_frame_compare, "last_frame_offset"));
+    g_peepEvents = host.function(sym::sdl_peep_events);
     Undo undo;
     g_compare = host.mid_hook(sym::nested_frame_compare, [](anvil::Cpu& cpu) {
         const int index = IndexOf(cpu);
         InterlockedIncrement64(&g_calls[index]);
         InterlockedIncrement64(&EU4SB_FramePacingStats.requests);
-        // Only ever longer than the game's own threshold: the module never draws more often than the game.
-        if (index == kFastest && g_intervalMs > 0 && g_interval > cpu.xmm[6].f32[0]) {
-            cpu.xmm[6].f32[0] = g_interval;
-            InterlockedIncrement64(&g_replaced);
-            InterlockedIncrement64(&EU4SB_FramePacingStats.hits);
-        }
+        // Longer than the game's own threshold, except a frame at once for a waiting press.
+        if (index != kFastest || g_intervalMs <= 0) return;
+        const float game = cpu.xmm[6].f32[0];
+        // xmm0 = the clock now, [rsi + last_frame_offset] = the time of the last frame (seconds, double).
+        const double elapsed =
+            cpu.xmm[0].f64[0] - sb::Read<double>(reinterpret_cast<const void*>(cpu.rsi), g_lastFrameOffset);
+        sb::Waiting waiting = sb::Waiting::Nothing;
+        bool probed = false;
+        const float threshold = PacedThreshold(game, g_interval, elapsed, g_drawOnInput, [&] {
+            probed = true;
+            return waiting = InputWaiting();
+        });
+        if (probed) InterlockedIncrement64(&g_inputProbes);
+        if (waiting == sb::Waiting::Press && threshold == 0.0f) InterlockedIncrement64(&g_inputPress);
+        if (waiting == sb::Waiting::Motion) InterlockedIncrement64(&g_inputMotion);
+        if (threshold == game) return;
+        cpu.xmm[6].f32[0] = threshold;
+        InterlockedIncrement64(&g_replaced);
+        InterlockedIncrement64(&EU4SB_FramePacingStats.hits);
     });
     undo.add(g_compare);
     g_render = host.mid_hook(sym::nested_frame_render, [](anvil::Cpu& cpu) {
@@ -111,9 +162,9 @@ bool InstallFramePacing(anvil::Host& host, Mode mode) {
     InterlockedExchange(&EU4SB_FramePacingStats.mode, 1);
     InterlockedExchange(&EU4SB_FramePacingStats.initialized, 1);
     if (g_intervalMs > 0) {
-        Log(ANVIL_LOG_INFO, "frame_pacing: frames inside the daily tick at most every %lld ms at the fastest speed; "
+        Log(ANVIL_LOG_INFO, "frame_pacing: frames inside the daily tick at most every %lld ms at the fastest speed%s; "
                             "counters in frame_pacing.tsv every 5 s",
-            static_cast<long long>(g_intervalMs));
+            static_cast<long long>(g_intervalMs), g_drawOnInput ? ", at the game's interval while input waits" : "");
     } else {
         Log(ANVIL_LOG_INFO, "frame_pacing: the game's own interval, counting only; counters in frame_pacing.tsv every 5 s");
     }
@@ -123,6 +174,7 @@ bool InstallFramePacing(anvil::Host& host, Mode mode) {
 void ReportFramePacing() {
     if (EU4SB_FramePacingStats.initialized == 0) return;
     bench::Get().set("frame_pacing.interval_ms", g_intervalMs);
+    bench::Get().set("frame_pacing.draw_on_input", g_drawOnInput);
 }
 
 }  // namespace sb

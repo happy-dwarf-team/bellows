@@ -31,7 +31,8 @@ bool InstallFramePacing(anvil::Host& host, Mode mode);
 bool InstallTickProfile(anvil::Host& host, Mode mode);  // diagnostic
 bool InstallArmySearchProfile(anvil::Host& host, Mode mode);  // diagnostic
 bool InstallScoreProbe(anvil::Host& host, Mode mode);  // diagnostic
-void SetFramePacingInterval(std::int64_t milliseconds);  // before InstallFramePacing; 0 = count only
+// Before InstallFramePacing; 0 ms = count only. draw_on_input: the game's interval while input waits.
+void SetFramePacingInterval(std::int64_t milliseconds, bool draw_on_input);
 
 // mimalloc = "startup": returns the pages freed since the switch to Windows
 // (on the main thread, at the game-ready and session events). Without

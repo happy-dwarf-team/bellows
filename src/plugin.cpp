@@ -130,7 +130,8 @@ struct Bellows : anvil::Plugin {
             }
         }
         sb::SetRamPrefetchBudget(static_cast<std::uint64_t>(budget));
-        sb::SetFramePacingInterval(cfg::frame_pacing_interval_ms.get());
+        sb::SetFramePacingInterval(cfg::frame_pacing_interval_ms.get(),
+                                   cfg::frame_pacing_input.get() == cfg::frame_pacing_input.draw);
 
         std::string summary;
         for (const auto& m : modules) {

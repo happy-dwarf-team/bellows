@@ -98,6 +98,7 @@ const AnvilBenchmarkField kModuleFields[] = {
     B::int_field("range_witness.originals", kCount, "Sent to the game's check"),
 
     B::int_field("frame_pacing.interval_ms", kMs, "Interval at the fastest speed (0: the game's)"),
+    B::flag_field("frame_pacing.draw_on_input", "The game's interval while input waits"),
 };
 
 }  // namespace

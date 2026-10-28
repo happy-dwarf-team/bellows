@@ -306,7 +306,15 @@ note = "0x769EA0 (draw a frame from inside the daily tick when enough time passe
 rva = 0x769F78
 bytes = "0F 28 F8 F2 0F 5C BE 20 1E 00 00"   # movaps xmm7,xmm0; subsd xmm7,[rsi+1E20h]
 memory = "code"
-note = "0x769EA0 after the clock read: xmm6 = threshold (float), rsi = game state; the time since the last frame is compared with it next"
+values.last_frame_offset = { at = 7, size = 4 }
+note = "0x769EA0 after the clock read: xmm6 = threshold (float), xmm0 = the clock now (double), rsi = game state with the last frame's time at +last_frame_offset; the time since the last frame is compared with xmm6 next"
+
+[symbol.sdl_peep_events]
+rva = 0x17467A0
+bytes = "40 53 55 41 55 41 57 48 83 EC 68 8B 05 67 AB 86 00 45 8B E9 4C 63 FA"
+memory = "code"
+signature = "int (void* events, int numevents, int action, uint32_t min_type, uint32_t max_type)"
+note = "SDL_PeepEvents of the statically linked SDL 2.0.4 (dynapi slot 80): with no buffer and SDL_PEEKEVENT it counts the queued events of the type range, as SDL_HasEvents does"
 
 [symbol.nested_frame_render]
 rva = 0x769F9A

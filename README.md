@@ -100,8 +100,9 @@ starts normally.
 ## Settings
 
 Each module is a setting `on`, `off` or (where the module has it) `verify`,
-plus `ram_prefetch_budget_mb` (64–8192) and `frame_pacing_interval_ms`
-(0–1000; 0 keeps the game's own interval); the defaults, labels and
+plus `ram_prefetch_budget_mb` (64–8192), `frame_pacing_interval_ms`
+(0–1000; 0 keeps the game's own interval) and `frame_pacing_input` (`draw`, the
+default, or `wait`, the 0.12.0 behaviour); the defaults, labels and
 descriptions are in [`plugin/settings.toml`](plugin/settings.toml). Your
 values go into `anvil/data/bellows/settings.toml`, one line each, only those
 that differ from the default, for example:
