@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.0](https://github.com/happy-dwarf-team/bellows/compare/v0.12.0...v0.13.0) (2026-10-28)
+
+
+### Features
+
+* **frame_pacing:** react at once to a waiting key press or click ([#67](https://github.com/happy-dwarf-team/bellows/issues/67)) ([1d16602](https://github.com/happy-dwarf-team/bellows/commit/1d166023b1b83bf3bc65cb2da9d156516b8b56d1))
+
 ## [0.12.0](https://github.com/happy-dwarf-team/bellows/compare/v0.11.0...v0.12.0) (2026-10-27)
 
 
