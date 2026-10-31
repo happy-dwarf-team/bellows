@@ -104,6 +104,7 @@ struct Bellows : anvil::Plugin {
             {"tick_profile", cfg::tick_profile.id, sb::InstallTickProfile},
             {"army_search_profile", cfg::army_search_profile.id, sb::InstallArmySearchProfile},  // diagnostic
             {"score_probe", cfg::score_probe.id, sb::InstallScoreProbe},  // diagnostic
+            {"monthly_probe", cfg::monthly_probe.id, sb::InstallMonthlyProbe},  // diagnostic
         };
         std::vector<const char*> names;
         for (const auto& m : modules) names.push_back(m.name);

@@ -32,6 +32,7 @@ bool InstallFramePacing(anvil::Host& host, Mode mode);
 bool InstallTickProfile(anvil::Host& host, Mode mode);  // diagnostic
 bool InstallArmySearchProfile(anvil::Host& host, Mode mode);  // diagnostic
 bool InstallScoreProbe(anvil::Host& host, Mode mode);  // diagnostic
+bool InstallMonthlyProbe(anvil::Host& host, Mode mode);  // diagnostic
 // Before InstallFramePacing; 0 ms = count only. draw_on_input: the game's interval while input waits.
 void SetFramePacingInterval(std::int64_t milliseconds, bool draw_on_input);
 

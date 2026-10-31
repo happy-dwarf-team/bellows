@@ -142,6 +142,15 @@ description = "Diagnostic: how often the inputs of the AI army search's scoring 
 group = "Diagnostics"
 restart = true
 
+[setting.monthly_probe]
+type = "enum"
+values = [{ name = "off", label = "Off" }, { name = "on", label = "On" }]
+default = "off"
+label = "Monthly tick probe"
+description = "Diagnostic: time of the monthly tick's country, province and unit updates, modifier merges and random draws, in monthly_probe*.tsv."
+group = "Diagnostics"
+restart = true
+
 [setting.frame_pacing]
 type = "enum"
 values = [{ name = "off", label = "Off" }, { name = "on", label = "On" }]
