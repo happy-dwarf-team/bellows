@@ -7,6 +7,8 @@ EU4 spends a long time staring at its own files before you get to the main menu.
 
 On our test machine (10 mods) the trip to the main menu went from about 39 seconds to about 12. Your mileage may vary, but it should not get worse, and you can measure it on your own computer (see below).
 
+At speed 5 it also lets the years pass about 10% sooner: while you just watch, the map is drawn about 16 instead of 22 times a second, and a key press or click still gets an answer at once (even a little sooner than without Bellows). You can turn this off in the settings as “Frame pacing at speed 5”.
+
 ![](https://i.imgur.com/Uf8Z21n.png)
 
 ## Before you subscribe

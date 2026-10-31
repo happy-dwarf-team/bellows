@@ -99,7 +99,7 @@ struct Bellows : anvil::Plugin {
             {"range_profile", cfg::range_profile.id, sb::InstallRangeProfile},  // diagnostic
             // range_witness answers before 0x3526B0 runs: range_profile then sees only the walks it still makes.
             {"range_witness", cfg::range_witness.id, sb::InstallRangeWitness},
-            {"frame_pacing", cfg::frame_pacing.id, sb::InstallFramePacing},  // experimental, off by default
+            {"frame_pacing", cfg::frame_pacing.id, sb::InstallFramePacing},
             // diagnostic; its hook on 0x769EA0 sits at the entry, frame_pacing's inside the function.
             {"tick_profile", cfg::tick_profile.id, sb::InstallTickProfile},
             {"army_search_profile", cfg::army_search_profile.id, sb::InstallArmySearchProfile},  // diagnostic

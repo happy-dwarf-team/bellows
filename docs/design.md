@@ -29,7 +29,7 @@ code only.
 | `trigger_intern` | Skips redundant trigger-interning work at the end of loading (empty map), linear algorithm otherwise | tail −0.8 s |
 | `metascript_subst` | Single-pass `$param$` substitution in scripted effects/triggers | −0.75 s |
 | `metascript_blocks` | Single-pass resolution of the `[[param] ...]` blocks of scripted effects/triggers | Anbennar: 34.4 → 24.0 s; lab playset: no change |
-| `frame_pacing` | Simulation, experimental, off by default: at speed 5, frames drawn from inside the daily tick at most every 100 ms instead of 50 ms while no input waits, at once for a waiting press | year 1720: 23.4 → 20.8 s; key press 51.5 → 21 ms |
+| `frame_pacing` | Simulation, on by default since 0.15: at speed 5, frames drawn from inside the daily tick at most every 100 ms instead of 50 ms while no input waits, at once for a waiting press | year 1720: 23.4 → 20.8 s; key press 51.5 → 21 ms |
 | `open_warmup` | Opens the files the game will need on parallel threads (learned list per mod set) so first-open costs after a reboot or antivirus update are paid off the critical path | cold start 61 → 15 s |
 
 Diagnostics from the lab (`file_trace`, deep API counters, heap sampling) are
@@ -316,9 +316,9 @@ On by default since then, like `token_dict_cache` (kept out of the written
 `config.toml`, so existing files get it too). Still open: other saves, mod
 sets and much later dates.
 
-### frame_pacing (simulation, experimental)
+### frame_pacing (simulation)
 
-Off by default. At speed 5 the lab's profile of year 1720 put about 16% of the
+On by default since 0.15 (off and experimental in 0.12–0.14). At speed 5 the lab's profile of year 1720 put about 16% of the
 main thread's samples inside frames the game draws from within the daily tick
 (lab `docs/simulation-profile.md`, "Klatki rysowane w trakcie ticku").
 `0x769EA0` is called about 40 times between the stages of the tick and draws a
@@ -373,6 +373,15 @@ wejście"; EU4 1.37.5, Russia 1719 save, Bellows defaults plus this module):
   21.1–33.9), -10.9%, permutation p = 0.09; `"wait"` 19.4 s (7 trials). In
   the same series `"draw"` and `"wait"` differed by +2.3% (p = 0.94): the
   probes cost no measurable time.
+- Real key presses (Space through `SendInput` to the game window, 53 presses
+  each, sessions ABBA, the 0.13.0 release build): median 21.6 ms (p90 66 ms)
+  against 56.8 ms (p90 114 ms) without the module; the module drew 27-33
+  frames per session for the presses it found in the Windows queue.
+- Frame rate at speed 5 with no input (Tongs `frames`, 30 s windows, Russia
+  1719 and a 1 January 1821 save): 16.4 and 15.8 frames a second against 22.5
+  and 22.7 without the module. The frames between days stay (one per day);
+  the frames inside the tick drop from 8.5-9.4 to 1.5-2.6 a second, and the
+  longest gap between frames stays the same (575 against 585 ms in 1719).
 
 Lab (EU4 1.37.5, Russia 1719 save, 8 workers per pool, Bellows defaults plus
 this module, year 1720 at speed 5 through Tongs; lab `docs/bellows-frame-pacing.md`):
