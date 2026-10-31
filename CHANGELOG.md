@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.0](https://github.com/happy-dwarf-team/bellows/compare/v0.14.0...v0.15.0) (2026-10-31)
+
+
+### Features
+
+* **frame_pacing:** on by default ([#73](https://github.com/happy-dwarf-team/bellows/issues/73)) ([cc7e4e0](https://github.com/happy-dwarf-team/bellows/commit/cc7e4e0221ba72f54f3131911ae30947b01f92c2))
+
 ## [0.14.0](https://github.com/happy-dwarf-team/bellows/compare/v0.13.0...v0.14.0) (2026-10-28)
 
 
