@@ -360,7 +360,7 @@ int main(int argc, char** argv) {
     assert(Logged("config.toml migrated to settings.toml (1 value(s)"));
 
     const std::string rest = ", metascript_subst=off, metascript_blocks=on, attr_cache=verify, zip_profile=on, token_dict_cache=on, "
-                             "token_dict_profile=off, range_profile=on, range_witness=on, frame_pacing=on, tick_profile=on, army_search_profile=on, score_probe=on";
+                             "token_dict_profile=off, range_profile=on, range_witness=on, frame_pacing=on, tick_profile=on, army_search_profile=on, score_probe=on, monthly_probe=on";
     if (g_scenario != "refuse") {
         assert(Logged("modules: mimalloc=startup, open_warmup=off, ram_prefetch=off, verifypath_listing=on, "
                       "exists_index=on, trigger_intern=on" + rest));
@@ -387,6 +387,13 @@ int main(int argc, char** argv) {
         assert(Live("hook_function " + std::to_string(SYM_SCORE_MOVE)));
         assert(Live("hook_function " + std::to_string(SYM_SCORE_STRENGTH)));
         assert(Live("hook_function " + std::to_string(SYM_SCORE_TABLE)));
+        assert(Live("hook_function " + std::to_string(SYM_MONTHLY_TICK)));
+        assert(Live("hook_function " + std::to_string(SYM_COUNTRY_MONTH)));
+        assert(Live("hook_function " + std::to_string(SYM_PROVINCE_MONTH)));
+        assert(Live("hook_function " + std::to_string(SYM_UNITS_MONTH)));
+        assert(Live("hook_function " + std::to_string(SYM_PORT_TABLE)));
+        assert(Live("hook_function " + std::to_string(SYM_MODIFIER_MERGE)));
+        assert(Live("hook_function " + std::to_string(SYM_GAME_RANDOM)));
     } else {
         // HeapAlloc refused: the three heap imports mimalloc already had are removed. The
         // second trigger_intern site refused: the first one is removed. The rest stays.
@@ -443,7 +450,7 @@ int main(int argc, char** argv) {
             {"verifypath_listing", "on"}, {"exists_index", "on"}, {"trigger_intern", ok ? "on" : "failed"},
             {"metascript_subst", "off"}, {"metascript_blocks", "on"}, {"attr_cache", "verify"}, {"zip_profile", "on"},
             {"token_dict_cache", "on"}, {"token_dict_profile", "off"}, {"range_profile", "on"},
-            {"range_witness", "on"}, {"frame_pacing", "on"}, {"tick_profile", "on"}, {"army_search_profile", "on"}, {"score_probe", "on"},
+            {"range_witness", "on"}, {"frame_pacing", "on"}, {"tick_profile", "on"}, {"army_search_profile", "on"}, {"score_probe", "on"}, {"monthly_probe", "on"},
         };
         for (const auto& [module, mode] : modes) assert(g_values.at(module + ".mode") == mode);
         for (const char* field : {"exists_index.requests", "exists_index.listings", "verifypath_listing.mismatches",

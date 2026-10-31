@@ -485,6 +485,31 @@ oceniające da się zapamiętać"): every repeated full key gave the same output
 unit out of the key changes the output (0.25-5.6%), so no function can be
 shared between armies. No module followed.
 
+### monthly_probe (diagnostic, simulation)
+
+Off by default. Where the monthly tick spends its time and whether its loops
+could run on several threads with the same game. It hooks, only to observe,
+the monthly tick `0x75D690`, the per-country (`0x2F36C0`), per-province
+(`0x9F35C0`) and unit (`0x763470`) updates it runs in serial loops, the
+nearest-own-port table `0x350B80` (rebuilt for every province of the map by
+each country's monthly update), the modifier-list merge `0x8EA420` and the
+game's Mersenne Twister `0x14C71B0`. Random draws are counted per context: a
+loop whose items draw from the shared generator gives a different game when
+the items run in another order. Per merge it records the shape (dense or
+sparse lists, counts, entries that take the linear scan of the destination)
+per context, scan size and call site. `monthly_probe.tsv`,
+`monthly_probe_countries.tsv` and `monthly_probe_merges.tsv` every 5 s.
+
+Lab (Russia 1719 to 1730 and the 1821 autosave in observe mode; lab
+`docs/simulation-profile.md`, "Tick miesięczny"): the monthly tick is about
+19% of the tick (270 ms a month). 99% of the country updates draw from the
+game's generator (1.07 million draws in 10.8 years), so that loop cannot run in
+parallel and give the same game; the province updates draw rarely but do
+(0.2% of calls); the unit update draws nothing and spends 89% of its time in
+one merge site (each country's dense list of about 700 modifiers added to
+every unit's list with a linear scan per entry, 44,000 compared entries a
+call), which `modifier_merge` targets. The port table is 0.5% of the run.
+
 ### attr_cache
 
 Ported in the lab's "negative" policy only: `GetFileAttributesExW` and
