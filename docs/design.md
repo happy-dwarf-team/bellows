@@ -467,7 +467,10 @@ observe: the day is cut into segments at the `0x769EA0` calls, named by the
 return addresses at both ends, and the time inside `0x769EA0` is counted apart.
 Every 5 s the module writes `tick_profile_segments.tsv` (from, to, calls,
 total and max ms), `tick_profile_frames.tsv` (per checkpoint) and
-`tick_profile_days.tsv` (date, ms, frame ms, checkpoints per game day). The
+`tick_profile_days.tsv` (date, ms, frame ms, checkpoints per game day), and
+`tick_profile_segments_first.tsv`: the segments of the days dated the 1st of a
+month only (a day row carries the date before it moves on, so the monthly tick
+is in a month's last row and the 1st is the day after it). The
 logic is in `tick_profile_core.hpp`, tested by `tests/test_tick_profile.cpp`.
 
 Lab (Russia 1719 save driven to 1770 at speed 5 with the defaults plus this

@@ -198,6 +198,7 @@ void WriteFiles() {
             MoveFileExW(temp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING);
         };
         write(L"tick_profile_segments.tsv", [&](std::ostream& out) { g_profile->WriteSegments(out, msPerTick); });
+        write(L"tick_profile_segments_first.tsv", [&](std::ostream& out) { g_profile->WriteSegments(out, msPerTick, true); });
         write(L"tick_profile_frames.tsv", [&](std::ostream& out) { g_profile->WriteFrames(out, msPerTick); });
         write(L"tick_profile_days.tsv", [&](std::ostream& out) { g_profile->WriteDays(out, msPerTick); });
         write(L"tick_profile_jobs.tsv", [&](std::ostream& out) { g_profile->WriteJobs(out, msPerTick); });
