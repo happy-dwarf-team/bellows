@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.17.0](https://github.com/happy-dwarf-team/bellows/compare/v0.16.0...v0.17.0) (2026-11-01)
+
+
+### Features
+
+* **monthly_probe:** the first day of a month: segments, daily country parts and CalculateModifier sites ([#80](https://github.com/happy-dwarf-team/bellows/issues/80)) ([2ff0c4c](https://github.com/happy-dwarf-team/bellows/commit/2ff0c4c0bb115e901842bfde906fc3e9401e77ba))
+* **province_modifier_view:** read a province's modifier value without copying its list ([#82](https://github.com/happy-dwarf-team/bellows/issues/82)) ([07fcb65](https://github.com/happy-dwarf-team/bellows/commit/07fcb6573784a9dcde98e35816775d51c1b56761))
+
 ## [0.16.0](https://github.com/happy-dwarf-team/bellows/compare/v0.15.0...v0.16.0) (2026-11-01)
 
 
