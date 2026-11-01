@@ -446,8 +446,13 @@ miesięczny"): Russia 1719 to 1730, 822,919 merges compared in `"verify"`, 0
 mismatches, 8.26 s in the game's function; in `"on"` 815,897 merges took
 0.89 s (10.1 µs a call against 1.08 µs), about 0.68 s a game year of ~23 s.
 The 1821 autosave in observe mode, 300 s: 697,631 compared, 0 mismatches,
-7.44 s against 0.78 s. Not yet measured: a SIMULATION series of whole years
-with the module off and on.
+7.44 s against 0.78 s.
+
+SIMULATION (lab, ABBA x3 per series, the same build in both arms, defaults
+against defaults plus `modifier_merge`): the year 1720 took 19.45 s instead of
+20.64 s (medians, 5 and 6 valid runs, -5.7%, permutation p = 0.02); the year
+from 1 March 1821 took 26.25 s instead of 30.17 s (6 and 6, -13%, p = 0.40, the
+late-game years vary by ±3 s between runs, so not conclusive).
 
 ### tick_profile (diagnostic, simulation)
 
