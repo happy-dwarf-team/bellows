@@ -394,6 +394,8 @@ int main(int argc, char** argv) {
         assert(Live("hook_function " + std::to_string(SYM_PORT_TABLE)));
         assert(Live("hook_function " + std::to_string(SYM_MODIFIER_MERGE)));
         assert(Live("hook_function " + std::to_string(SYM_GAME_RANDOM)));
+        assert(Live("hook_function " + std::to_string(SYM_COUNTRY_DAY)));
+        assert(Live("hook_function " + std::to_string(SYM_COUNTRY_MODIFIERS)));
     } else {
         // HeapAlloc refused: the three heap imports mimalloc already had are removed. The
         // second trigger_intern site refused: the first one is removed. The rest stays.

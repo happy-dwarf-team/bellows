@@ -9,9 +9,13 @@
 // country, province or unit update tie the result to the order of the updates, so they decide
 // whether such a loop could run in parallel and still give the same game.
 //
+// The day after the monthly tick is about 40 ms slower, almost all in the daily country loop: the daily
+// country update 0x2EE280 and its largest parts are timed apart on days dated the 1st of a month.
+//
 // All hooks only observe (inline, through Anvil): they call the original and count. Nothing the game
 // computes is changed. The game is usually closed without a clean exit, so a background thread
-// writes the counters every 5 s to monthly_probe*.tsv in the data directory.
+// writes the counters every 5 s to monthly_probe*.tsv in the data directory (monthly_probe_days.tsv:
+// the daily country parts per day class).
 #include "modules.hpp"
 #include "monthly_probe_core.hpp"
 
@@ -92,6 +96,56 @@ constexpr int kTwisters = 8;
 volatile LONG64 g_draws[kContexts];
 volatile LONG g_twisterRva[kTwisters];
 volatile LONG64 g_twisterDraws[kTwisters][kContexts];
+
+// The day after the monthly tick (rows dated the 1st of a month in tick_profile) costs about 40 ms more,
+// almost all in the daily country loop. Its parts are timed per day class: dated the 1st of a month or not.
+const unsigned char* const* g_rootGlobal = nullptr;
+std::size_t g_rootDate = 0;  // int32 hours since year -5000 in the game root object
+
+bool FirstOfMonth() noexcept {
+    const unsigned char* root = *g_rootGlobal;
+    if (root == nullptr) return false;
+    static constexpr int kMonths[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    const std::int64_t day = (static_cast<std::int64_t>(sb::Read<std::int32_t>(root, g_rootDate)) - 43'800'000) / 24;
+    int rest = static_cast<int>(((day % 365) + 365) % 365), month = 0;
+    while (month < 11 && rest >= kMonths[month]) rest -= kMonths[month++];
+    return rest == 0;
+}
+
+struct DayPart {
+    const char* name;
+    volatile LONG64 calls[2] = {0, 0}, ticks[2] = {0, 0};  // [0] other days, [1] days dated the 1st
+
+    void Add(LONG64 t) noexcept {
+        const int k = FirstOfMonth() ? 1 : 0;
+        InterlockedIncrement64(&calls[k]);
+        InterlockedExchangeAdd64(&ticks[k], t);
+    }
+};
+
+// One hook per part: its own detour and chain, timed around the call.
+#define SB_DAY_PART(id, symbol, label, params, args)                                      \
+    DayPart g_part_##id{label};                                                           \
+    anvil::HookOf<sym::symbol> g_partHook_##id;                                           \
+    void (*g_partNext_##id) params = nullptr;                                             \
+    void PartDetour_##id params {                                                         \
+        const LONG64 start = sb::Ticks();                                                 \
+        g_partNext_##id args;                                                             \
+        g_part_##id.Add(sb::Ticks() - start);                                             \
+    }
+SB_DAY_PART(country, country_day, "country_day 0x2EE280", (void* a), (a))
+SB_DAY_PART(armies, country_day_armies, "army 0x1A2D30", (void* a), (a))
+SB_DAY_PART(p93fe30, country_day_93fe30, "0x93FE30", (void* a, char* b), (a, b))
+SB_DAY_PART(p327dc0, country_day_327dc0, "0x327DC0", (void* a, char* b, std::uint8_t c), (a, b, c))
+SB_DAY_PART(fleets, country_day_fleets, "fleet 0x90E410", (void* a), (a))
+SB_DAY_PART(p18e7f0, country_day_18e7f0, "0x18E7F0", (void* a), (a))
+SB_DAY_PART(p37c730, country_day_37c730, "0x37C730", (void* a, std::uint8_t b, std::uint64_t c), (a, b, c))
+SB_DAY_PART(p358ee0, country_day_358ee0, "0x358EE0", (void* a), (a))
+SB_DAY_PART(p3288b0, country_day_3288b0, "0x3288B0", (void* a, void* b), (a, b))
+SB_DAY_PART(modifiers, country_modifiers, "country modifiers 0x93D130", (void* a), (a))
+#undef SB_DAY_PART
+DayPart* const kDayParts[] = {&g_part_country, &g_part_armies, &g_part_p93fe30, &g_part_p327dc0, &g_part_fleets,
+                              &g_part_p18e7f0, &g_part_p37c730, &g_part_p358ee0, &g_part_p3288b0, &g_part_modifiers};
 
 // Modifier merges: per context and destination/source density, and per call site (return address).
 struct MergeCell {
@@ -276,6 +330,13 @@ void WriteFiles() {
                     << g_cPortTicks[c] * ms << "\t" << g_cProvinces[c] << "\n";
             }
         });
+        Replace(L"monthly_probe_days.tsv", [](std::ostream& out, double ms) {
+            out << "part\tcalls_other\tms_other\tcalls_first\tms_first\n";
+            for (const DayPart* d : kDayParts) {
+                out << d->name << "\t" << d->calls[0] << "\t" << d->ticks[0] * ms << "\t" << d->calls[1] << "\t"
+                    << d->ticks[1] * ms << "\n";
+            }
+        });
         Replace(L"monthly_probe_merges.tsv", [](std::ostream& out, double ms) {
             out << "key\tcalls\ttotal_ms\tsrc_entries\tdest_entries\tscanned\tscan_steps\n";
             const char* const kinds[4] = {"sparse<sparse", "sparse<dense", "dense<sparse", "dense<dense"};
@@ -319,6 +380,8 @@ bool InstallMonthlyProbe(anvil::Host& host, Mode mode) {
         return false;
     }
     g_imageBase = host.game().image_base;
+    g_rootGlobal = host.data(sym::game_root);
+    g_rootDate = static_cast<std::size_t>(host.value(sym::root_and_date, "date_offset"));
     Undo undo;
     host.hook(g_monthlyHook, sym::monthly_tick, &MonthlyDetour);
     undo.add(g_monthlyHook);
@@ -333,6 +396,21 @@ bool InstallMonthlyProbe(anvil::Host& host, Mode mode) {
     host.hook(g_mergeHook, sym::modifier_merge, &MergeDetour);
     undo.add(g_mergeHook);
     host.hook(g_randomHook, sym::game_random, &RandomDetour);
+#define SB_HOOK_PART(id, symbol)                                \
+    host.hook(g_partHook_##id, sym::symbol, &PartDetour_##id); \
+    undo.add(g_partHook_##id);                                 \
+    g_partNext_##id = g_partHook_##id.next_pointer();
+    SB_HOOK_PART(country, country_day)
+    SB_HOOK_PART(armies, country_day_armies)
+    SB_HOOK_PART(p93fe30, country_day_93fe30)
+    SB_HOOK_PART(p327dc0, country_day_327dc0)
+    SB_HOOK_PART(fleets, country_day_fleets)
+    SB_HOOK_PART(p18e7f0, country_day_18e7f0)
+    SB_HOOK_PART(p37c730, country_day_37c730)
+    SB_HOOK_PART(p358ee0, country_day_358ee0)
+    SB_HOOK_PART(p3288b0, country_day_3288b0)
+    SB_HOOK_PART(modifiers, country_modifiers)
+#undef SB_HOOK_PART
     undo.add(g_randomHook);
     g_monthly = g_monthlyHook.next_pointer();
     g_country = g_countryHook.next_pointer();

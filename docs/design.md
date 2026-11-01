@@ -540,8 +540,11 @@ game's Mersenne Twister `0x14C71B0`. Random draws are counted per context: a
 loop whose items draw from the shared generator gives a different game when
 the items run in another order. Per merge it records the shape (dense or
 sparse lists, counts, entries that take the linear scan of the destination)
-per context, scan size and call site. `monthly_probe.tsv`,
-`monthly_probe_countries.tsv` and `monthly_probe_merges.tsv` every 5 s.
+per context, scan size and call site. The daily country update `0x2EE280`
+and its largest parts are also timed apart on the days dated the 1st of a
+month, which `tick_profile` shows about 40 ms slower than the others.
+`monthly_probe.tsv`, `monthly_probe_countries.tsv`, `monthly_probe_merges.tsv`
+and `monthly_probe_days.tsv` every 5 s.
 
 Lab (Russia 1719 to 1730 and the 1821 autosave in observe mode; lab
 `docs/simulation-profile.md`, "Tick miesięczny"): the monthly tick is about

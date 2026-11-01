@@ -463,3 +463,75 @@ bytes = "48 89 5C 24 20 55 56 41 54 48 83 EC 20"
 memory = "code"
 signature = "void* (void* vector, void* where, void** value)"
 note = "std::vector<T*> reallocating insert, which 0x8EA420 calls when its vector of sources is full"
+
+# --- monthly_probe: daily country parts ---------------------------------------------
+
+[symbol.country_day]
+rva = 0x2EE280
+bytes = "40 55 53 56 57 41 54 41 55 41 56 41 57"
+memory = "code"
+signature = "void (void* country)"
+note = "country.cpp: one country's daily update, called in a loop from 0x75B0D0"
+
+[symbol.country_day_armies]
+rva = 0x1A2D30
+bytes = "40 57 48 83 EC 40 4C 89 74 24 30 48 8B F9"
+memory = "code"
+signature = "void (void* unit)"
+note = "daily update of an army (0xD3E110, then 0x195E10), from the daily country update"
+
+[symbol.country_day_93fe30]
+rva = 0x93FE30
+bytes = "48 89 5C 24 08 55 56 57 41 54 41 55 41 56 41 57"
+memory = "code"
+signature = "void (void* country, char* a2)"
+note = "part of the daily country update (0x93FB80 under it)"
+
+[symbol.country_day_327dc0]
+rva = 0x327DC0
+bytes = "48 89 5C 24 10 55 56 57 41 54 41 55 41 56 41 57"
+memory = "code"
+signature = "void (void* country, char* a2, uint8_t a3)"
+note = "part of the daily country update (the country's modifiers through 0x93D130)"
+
+[symbol.country_day_fleets]
+rva = 0x90E410
+bytes = "40 53 57 48 83 EC 48 48 8B 99 E8 00 00 00 48 8B F9"
+memory = "code"
+signature = "void (void* unit)"
+note = "daily update of a fleet (0xD3E110), from the daily country update"
+
+[symbol.country_day_18e7f0]
+rva = 0x18E7F0
+bytes = "48 89 5C 24 10 48 89 6C 24 18 48 89 74 24 20 57"
+memory = "code"
+signature = "void (void* object)"
+note = "part of the daily country update"
+
+[symbol.country_day_37c730]
+rva = 0x37C730
+bytes = "44 88 44 24 18 88 54 24 10 48 89 4C 24 08 55 53"
+memory = "code"
+signature = "void (void* country, uint8_t a2, uint64_t a3)"
+note = "part of the daily country update"
+
+[symbol.country_day_358ee0]
+rva = 0x358EE0
+bytes = "48 89 4C 24 08 55 53 56 57 41 54 41 55 41 56"
+memory = "code"
+signature = "void (void* country)"
+note = "called by the daily country update 0x2EE280"
+
+[symbol.country_day_3288b0]
+rva = 0x3288B0
+bytes = "48 89 5C 24 18 48 89 54 24 10 55 56 57 41 54"
+memory = "code"
+signature = "void (void* country, void* a2)"
+note = "called by the daily country update 0x2EE280"
+
+[symbol.country_modifiers]
+rva = 0x93D130
+bytes = "48 89 5C 24 18 48 89 6C 24 20 56 57 41 54 41 56"
+memory = "code"
+signature = "void (void* holder)"
+note = "recomputes a country's modifier list (date checks, 0x93ba00, 0x93D750), from 0x327DC0"
