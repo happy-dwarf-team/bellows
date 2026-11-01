@@ -30,6 +30,7 @@ bool InstallRangeProfile(anvil::Host& host, Mode mode);  // diagnostic
 bool InstallRangeWitness(anvil::Host& host, Mode mode);
 bool InstallFramePacing(anvil::Host& host, Mode mode);
 bool InstallModifierMerge(anvil::Host& host, Mode mode);
+bool InstallProvinceModifierView(anvil::Host& host, Mode mode);
 bool InstallTickProfile(anvil::Host& host, Mode mode);  // diagnostic
 bool InstallArmySearchProfile(anvil::Host& host, Mode mode);  // diagnostic
 bool InstallScoreProbe(anvil::Host& host, Mode mode);  // diagnostic
@@ -68,6 +69,7 @@ void ReportTokenDictCache();
 void ReportRangeProfile();
 void ReportRangeWitness();
 void ReportModifierMerge();
+void ReportProvinceModifierView();
 void ReportFramePacing();
 
 }  // namespace sb

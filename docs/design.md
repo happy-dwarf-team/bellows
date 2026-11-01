@@ -456,6 +456,55 @@ late-game years vary by ±3 s between runs, so not conclusive). The module gives
 the game's own lists and checks itself against the game's merge in the running
 game, so it is on by default.
 
+### province_modifier_view (simulation)
+
+Off by default. `0x2FFC60` (country, out, province, culture) copies the
+province's modifier list (`+0x998`) into a sparse list: every entry in order
+except the placeholders with id `0x286`, growing the buffer from 8 entries by
+doubling, plus the list's vector of sources with its reference counts. It then
+calls `0x3003B0`, which takes the country's modifiers and, through `0x300720`,
+reads one value from the copy: the first entry with id `0x266` or `0x267`
+(which one depends on the culture), or nothing when the country accepts the
+culture. `0x300720` hands the copy on only to the value object of that modifier
+(registry `+0xE680` / `+0xE6E0`) when one is set. The daily knowledge refresh
+of a country (`0x93FE30` > `0x93FB80`, `country_knowledge.cpp`) calls
+`0x2FFC60` for every province the country owns; AI code calls it as well.
+
+Filtering out id `0x286` keeps the order, so for any other id the first entry
+of the copy is the first entry of the province's own list. The hook calls the
+game's `0x3003B0` itself with a sparse view of the province's entries (dense
+flag 0, the province's entry pointer and count, the rest zero) instead of the
+copy, while both value objects are unset; with either set, and for calls
+without a province, the game's function runs. Nothing the game keeps changes:
+the copy only lived for the call. `province_modifier_view_core.hpp` has the
+copy and the read written out; the test compares the value read from the copy
+and from the view on 4,000 random lists of both shapes. `"verify"` runs the
+game's function and compares the value read through the view; `"on"` does that
+for every 1,024th call and goes back to the game's function for good after a
+mismatch. Counters and the time of both paths: `province_modifier_view.tsv`
+every 5 s.
+
+Lab (lab `docs/simulation-profile.md`, "RefreshKnowledge"): `0x93FE30` is about
+9% of the tick without frames in 1720 and 1821; in the samples of the 1821
+autosave `0x2FFC60` is 2.2% of the main thread (0.7% in 1720), mostly its copy
+loop and the allocations.
+
+Lab, game sessions (normal Process Lasso rule, 300 s each, lab
+`results/province-modifier-view-verify.csv`): 12,168,481 values compared with
+the game's function, 0 mismatches; the value objects of `0x266` and `0x267`
+were unset in every call. The game's function took 0.83 µs a call on the 1719
+save and 0.80 µs on the 1821 autosave, the view 0.11 µs and 0.07 µs. With about
+0.59 million calls a game year in 1720 and 1.37 million in 1821 that is about
+0.4 s and 1.0 s less a game year (by the module's clocks, over all threads;
+some calls may run on the AI pool's threads). No SIMULATION series yet.
+
+It stays off by default for now: without the copy the hot path allocates less,
+which changes the heap layout the way mimalloc and `range_witness` do, and AI
+ties broken by address (#79) could then go another way in single player, every
+answer still being correct. On by default only after #79 is settled, a
+determinism pair with `-randomlog` with and without the module (as for 0.15.0)
+and a SIMULATION series.
+
 ### tick_profile (diagnostic, simulation)
 
 Off by default. Where the daily tick spends its time, without a sampler.

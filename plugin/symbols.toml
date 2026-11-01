@@ -535,3 +535,47 @@ bytes = "48 89 5C 24 18 48 89 6C 24 20 56 57 41 54 41 56"
 memory = "code"
 signature = "void (void* holder)"
 note = "recomputes a country's modifier list (date checks, 0x93ba00, 0x93D750), from 0x327DC0"
+
+# --- province_modifier_view ------------------------------------------------------------
+
+[symbol.province_culture_value]
+rva = 0x2FFC60
+bytes = "4C 89 4C 24 20 48 89 54 24 10 48 89 4C 24 08 55 53 56 57 41 54"
+memory = "code"
+signature = "int32_t* (void* country, int32_t* out, void* province, void* culture)"
+note = "copies the province's modifier list without id 0x286, then 0x3003B0 reads one value from the copy"
+
+[symbol.province_culture_value_list]
+rva = 0x2FFCB7
+bytes = "4D 8D A0 98 09 00 00"          # lea r12,[r8+998h]: the province's modifier list
+memory = "code"
+values.province_modifiers = { at = 3, size = 4 }
+note = "0x2FFC60: the offset of the province's modifier list it copies"
+
+[symbol.culture_modifier_value]
+rva = 0x3003B0
+bytes = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57"
+memory = "code"
+signature = "int32_t* (void* country, int32_t* out, void* modifiers, void* culture)"
+note = "the value 0x2FFC60 returns, from the country's modifiers and (through 0x300720) the province list"
+
+[symbol.modifier_value_registry]
+rva = 0x3007BF
+bytes = "4C 8B 05 BA 78 05 02"          # mov r8,[registry] in 0x300720
+memory = "code"
+values.modifier_registry = { at = 3, rip_relative = 7, type = "const unsigned char* const" }
+note = "0x300720: the registry of per-modifier value objects"
+
+[symbol.modifier_value_post_267]
+rva = 0x30080A
+bytes = "49 8B 88 E0 E6 00 00"          # mov rcx,[r8+0E6E0h]
+memory = "code"
+values.post_267 = { at = 3, size = 4 }
+note = "0x300720: the value object of modifier 0x267, called with the province list when set"
+
+[symbol.modifier_value_post_266]
+rva = 0x300959
+bytes = "49 8B 88 80 E6 00 00"          # mov rcx,[r8+0E680h]
+memory = "code"
+values.post_266 = { at = 3, size = 4 }
+note = "0x300720: the value object of modifier 0x266, called with the province list when set"
