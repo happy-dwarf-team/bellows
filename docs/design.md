@@ -498,6 +498,13 @@ save and 0.80 µs on the 1821 autosave, the view 0.11 µs and 0.07 µs. With abo
 0.4 s and 1.0 s less a game year (by the module's clocks, over all threads;
 some calls may run on the AI pool's threads). No SIMULATION series yet.
 
+It stays off by default for now: without the copy the hot path allocates less,
+which changes the heap layout the way mimalloc and `range_witness` do, and AI
+ties broken by address (#79) could then go another way in single player, every
+answer still being correct. On by default only after #79 is settled, a
+determinism pair with `-randomlog` with and without the module (as for 0.15.0)
+and a SIMULATION series.
+
 ### tick_profile (diagnostic, simulation)
 
 Off by default. Where the daily tick spends its time, without a sampler.
