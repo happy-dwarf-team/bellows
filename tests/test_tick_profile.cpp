@@ -1,5 +1,5 @@
 // TickProfile (tick_profile counters): segments between checkpoints, frame time left out,
-// day rows, checkpoints outside a day, dates.
+// day rows, checkpoints outside a day, dates, segments of the days dated the 1st of a month.
 #include "../src/modules/tick_profile_core.hpp"
 
 #include <cassert>
@@ -73,6 +73,26 @@ int main() {
     assert(sb::TickProfile::Date(0) == "0.1.1");
     assert(sb::TickProfile::Date(1720 * 365 + 364) == "1720.12.31");
     assert(sb::TickProfile::Date(1720 * 365 + 59) == "1720.3.1");
+    // The same segments for the days dated the 1st only: both days so far are the 1st of a month.
+    {
+        std::ostringstream first;
+        p.WriteSegments(first, 1.0, true);
+        assert(first.str() == s);
+        // A day dated 1720.2.2 counts in all segments, not in the first-of-month ones.
+        p.DayStart(day + 32, 400);
+        p.CheckpointEnter(0xA, 405);
+        p.CheckpointLeave(0xA, 405, 405);
+        p.DayEnd(410);
+        std::ostringstream all, onlyFirst;
+        p.WriteSegments(all, 1.0);
+        p.WriteSegments(onlyFirst, 1.0, true);
+        assert(Has(all.str(), "start\t0xA\t3\t95\t60"));
+        assert(Has(onlyFirst.str(), "start\t0xA\t2\t90\t60"));
+        assert(Has(all.str(), "0xA\tend\t1\t5\t5"));
+        assert(onlyFirst.str().find("0xA\tend") == std::string::npos);
+        assert(sb::TickProfile::DayOfMonth(day + 32) == 2 && sb::TickProfile::DayOfMonth(day + 364) == 31);
+    }
+
     std::printf("tick_profile ok\n");
     return 0;
 }

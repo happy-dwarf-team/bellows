@@ -56,6 +56,7 @@ public:
 
     void DayStart(std::int32_t day, std::int64_t now) {
         in_day_ = true;
+        first_of_month_ = DayOfMonth(day) == 1;
         current_ = TickDay{day, 0, 0, 0};
         day_start_ = now;
         last_site_ = kDayStart;
@@ -65,7 +66,7 @@ public:
     // Entering 0x769EA0 from `site`; `now` is before the original runs.
     void CheckpointEnter(std::uint32_t site, std::int64_t now) {
         if (!in_day_) return;
-        segments_[{last_site_, site}].Add(now - last_time_);
+        AddSegment({last_site_, site}, now - last_time_);
         ++current_.checkpoints;
     }
 
@@ -80,7 +81,7 @@ public:
 
     void DayEnd(std::int64_t now) {
         if (!in_day_) return;
-        segments_[{last_site_, kDayEnd}].Add(now - last_time_);
+        AddSegment({last_site_, kDayEnd}, now - last_time_);
         current_.total = now - day_start_;
         days_.push_back(current_);
         in_day_ = false;
@@ -108,9 +109,12 @@ public:
         }
     }
 
-    void WriteSegments(std::ostream& out, double ms_per_tick) const {
+    // All days, or (first_of_month) only the days whose row is dated the 1st of a month. The day row
+    // carries the date on entering 0x758430, before the date moves on, so the monthly tick is in the
+    // row of a month's last day and the 1st is the day after it.
+    void WriteSegments(std::ostream& out, double ms_per_tick, bool first_of_month = false) const {
         out << "from\tto\tcalls\ttotal_ms\tmax_ms\n";
-        for (const auto& [key, span] : segments_) {
+        for (const auto& [key, span] : first_of_month ? segments_first_ : segments_) {
             out << Site(key.first) << "\t" << Site(key.second) << "\t" << span.calls << "\t"
                 << span.total * ms_per_tick << "\t" << span.max * ms_per_tick << "\n";
         }
@@ -132,6 +136,15 @@ public:
         }
     }
 
+    // 1..31 for a day index (EU4's calendar: 365-day years, no leap days).
+    static int DayOfMonth(std::int32_t day) {
+        static constexpr int kMonths[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+        int rest = day % 365;
+        int month = 0;
+        while (month < 11 && rest >= kMonths[month]) rest -= kMonths[month++];
+        return rest + 1;
+    }
+
     // "1720.3.1" for a day index (EU4's calendar: 365-day years, no leap days).
     static std::string Date(std::int32_t day) {
         static constexpr int kMonths[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
@@ -143,6 +156,11 @@ public:
     }
 
 private:
+    void AddSegment(const std::pair<std::uint32_t, std::uint32_t>& key, std::int64_t ticks) {
+        segments_[key].Add(ticks);
+        if (first_of_month_) segments_first_[key].Add(ticks);
+    }
+
     static std::string Site(std::uint32_t site) {
         if (site == kDayStart) return "start";
         if (site == kDayEnd) return "end";
@@ -152,11 +170,13 @@ private:
     }
 
     bool in_day_ = false;
+    bool first_of_month_ = false;
     TickDay current_;
     std::int64_t day_start_ = 0;
     std::uint32_t last_site_ = kDayStart;
     std::int64_t last_time_ = 0;
     std::map<std::pair<std::uint32_t, std::uint32_t>, TickSpan> segments_;
+    std::map<std::pair<std::uint32_t, std::uint32_t>, TickSpan> segments_first_;  // days dated the 1st
     std::map<std::uint32_t, TickSpan> frames_;
     std::vector<TickDay> days_;
     std::vector<TickJob> jobs_;

@@ -467,7 +467,10 @@ observe: the day is cut into segments at the `0x769EA0` calls, named by the
 return addresses at both ends, and the time inside `0x769EA0` is counted apart.
 Every 5 s the module writes `tick_profile_segments.tsv` (from, to, calls,
 total and max ms), `tick_profile_frames.tsv` (per checkpoint) and
-`tick_profile_days.tsv` (date, ms, frame ms, checkpoints per game day). The
+`tick_profile_days.tsv` (date, ms, frame ms, checkpoints per game day), and
+`tick_profile_segments_first.tsv`: the segments of the days dated the 1st of a
+month only (a day row carries the date before it moves on, so the monthly tick
+is in a month's last row and the 1st is the day after it). The
 logic is in `tick_profile_core.hpp`, tested by `tests/test_tick_profile.cpp`.
 
 Lab (Russia 1719 save driven to 1770 at speed 5 with the defaults plus this
@@ -537,8 +540,21 @@ game's Mersenne Twister `0x14C71B0`. Random draws are counted per context: a
 loop whose items draw from the shared generator gives a different game when
 the items run in another order. Per merge it records the shape (dense or
 sparse lists, counts, entries that take the linear scan of the destination)
-per context, scan size and call site. `monthly_probe.tsv`,
-`monthly_probe_countries.tsv` and `monthly_probe_merges.tsv` every 5 s.
+per context, scan size and call site. The daily country update `0x2EE280`,
+its largest parts and every call site of `CalculateModifier` (`0x327DC0`,
+with the caller's source file it is given) are also timed per day class, from
+the date on entering the daily tick as in `tick_profile`'s rows: dated the 1st
+of a month, dated a month's last day (the call that runs the monthly tick) and
+the others.
+
+Lab (Russia 1719, 360 s): on the day dated the 1st the daily country update
+takes 48.8 ms instead of 7.8 ms. About 90 countries have their modifier flag
+`+0x2882` set after the monthly tick, and the daily update then runs
+`0x93FE30` (+18 ms) and `CalculateModifier` from `country.cpp:9210` (+13 ms,
+almost all in the full recompute `0x93D130`) for each of them, a day after the
+monthly tick recalculated the modifiers of all 1,378 countries.
+`monthly_probe.tsv`, `monthly_probe_countries.tsv`, `monthly_probe_merges.tsv`
+and `monthly_probe_days.tsv` every 5 s.
 
 Lab (Russia 1719 to 1730 and the 1821 autosave in observe mode; lab
 `docs/simulation-profile.md`, "Tick miesięczny"): the monthly tick is about
