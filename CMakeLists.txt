@@ -79,6 +79,7 @@ set(SB_SOURCES
     src/modules/range_witness.cpp
     src/modules/frame_pacing.cpp
     src/modules/modifier_merge.cpp
+    src/modules/province_modifier_view.cpp
     src/modules/tick_profile.cpp
     src/modules/army_search_profile.cpp
     src/modules/score_probe.cpp
@@ -114,7 +115,7 @@ endif()
 
 if(SB_BUILD_TESTS)
     enable_testing()
-    foreach(test rename trigger_intern token_dict_cache metascript_subst metascript_blocks settings access_profile path_rules zip_reader range_stats range_witness tick_profile army_search score_probe monthly_probe modifier_merge frame_pacing)
+    foreach(test rename trigger_intern token_dict_cache metascript_subst metascript_blocks settings access_profile path_rules zip_reader range_stats range_witness tick_profile army_search score_probe monthly_probe modifier_merge province_modifier_view frame_pacing)
         add_executable(test_${test} tests/test_${test}.cpp src/benchmark.cpp src/common.cpp src/settings.cpp src/rename.cpp
             src/modules/access_profile.cpp src/modules/zip_reader.cpp)
         # The SDK headers and the generated symbols.gen.hpp / settings.gen.hpp of the plugin.
