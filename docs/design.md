@@ -540,9 +540,19 @@ game's Mersenne Twister `0x14C71B0`. Random draws are counted per context: a
 loop whose items draw from the shared generator gives a different game when
 the items run in another order. Per merge it records the shape (dense or
 sparse lists, counts, entries that take the linear scan of the destination)
-per context, scan size and call site. The daily country update `0x2EE280`
-and its largest parts are also timed apart on the days dated the 1st of a
-month, which `tick_profile` shows about 40 ms slower than the others.
+per context, scan size and call site. The daily country update `0x2EE280`,
+its largest parts and every call site of `CalculateModifier` (`0x327DC0`,
+with the caller's source file it is given) are also timed per day class, from
+the date on entering the daily tick as in `tick_profile`'s rows: dated the 1st
+of a month, dated a month's last day (the call that runs the monthly tick) and
+the others.
+
+Lab (Russia 1719, 360 s): on the day dated the 1st the daily country update
+takes 48.8 ms instead of 7.8 ms. About 90 countries have their modifier flag
+`+0x2882` set after the monthly tick, and the daily update then runs
+`0x93FE30` (+18 ms) and `CalculateModifier` from `country.cpp:9210` (+13 ms,
+almost all in the full recompute `0x93D130`) for each of them, a day after the
+monthly tick recalculated the modifiers of all 1,378 countries.
 `monthly_probe.tsv`, `monthly_probe_countries.tsv`, `monthly_probe_merges.tsv`
 and `monthly_probe_days.tsv` every 5 s.
 
