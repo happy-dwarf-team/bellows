@@ -11,6 +11,8 @@ At speed 5 it also lets the years pass about 10% sooner: while you just watch, t
 
 The monthly update of the units is also faster: the game adds every country’s modifiers to each of its units by searching a list entry by entry, and Bellows does the same with an index. The result is exactly the game’s own, and a year at speed 5 passes about 5% sooner (“Modifier merge index” in the settings).
 
+New and still off by default: “Province modifier view”. Every day each country looks up one value in the modifiers of every province it owns, and the game copies the province’s whole list first just to read it; Bellows reads it in place. In our tests all of about 12 million values it read matched the game’s own. By its own clocks a year might pass about 2–4% sooner, but that is an estimate, not a timed year, and we keep it off until we know it can’t nudge the AI into other choices.
+
 ![](https://i.imgur.com/Uf8Z21n.png)
 
 ## Before you subscribe
