@@ -154,9 +154,9 @@ restart = true
 [setting.modifier_merge]
 type = "enum"
 values = [{ name = "off", label = "Off" }, { name = "on", label = "On" }, { name = "verify", label = "Verify" }]
-default = "off"
+default = "on"
 label = "Modifier merge index"
-description = "Adds large modifier lists (each country's modifiers to every unit's in the monthly update) with an index instead of a scan per entry: the same entries, order and values. Verify runs the game's merge and compares."
+description = "Simulation: adds large modifier lists (each country's modifiers to every unit's in the monthly update) with an index instead of a scan per entry, so a year at speed 5 passes about 5% sooner; the same entries, order and values. Verify runs the game's merge and compares."
 group = "Simulation"
 restart = true
 

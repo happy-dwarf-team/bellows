@@ -418,7 +418,7 @@ this module, year 1720 at speed 5 through Tongs; lab `docs/bellows-frame-pacing.
 
 ### modifier_merge (simulation)
 
-Off by default. `0x8EA420` adds the (id, value) entries of one modifier list
+On by default. `0x8EA420` adds the (id, value) entries of one modifier list
 to another: into a dense list (static ids `0..0x285` at their own index) a
 static id goes in place; every other id is looked up by a linear scan of the
 whole destination and appended when missing, doubling the capacity; at the end
@@ -452,7 +452,9 @@ SIMULATION (lab, ABBA x3 per series, the same build in both arms, defaults
 against defaults plus `modifier_merge`): the year 1720 took 19.45 s instead of
 20.64 s (medians, 5 and 6 valid runs, -5.7%, permutation p = 0.02); the year
 from 1 March 1821 took 26.25 s instead of 30.17 s (6 and 6, -13%, p = 0.40, the
-late-game years vary by ±3 s between runs, so not conclusive).
+late-game years vary by ±3 s between runs, so not conclusive). The module gives
+the game's own lists and checks itself against the game's merge in the running
+game, so it is on by default.
 
 ### tick_profile (diagnostic, simulation)
 

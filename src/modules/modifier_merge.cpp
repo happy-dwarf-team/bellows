@@ -1,4 +1,4 @@
-// modifier_merge: the game's modifier-list merge 0x8EA420 with an index instead of a linear scan per
+// modifier_merge (on by default): the game's modifier-list merge 0x8EA420 with an index instead of a linear scan per
 // entry (lab docs: docs/simulation-profile.md, "Tick miesięczny"; the loop in modifier_merge_core.hpp).
 //
 // The hook takes calls whose scans would compare many entries (the monthly unit update adds each

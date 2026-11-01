@@ -9,6 +9,8 @@ On our test machine (10 mods) the trip to the main menu went from about 39 secon
 
 At speed 5 it also lets the years pass about 10% sooner: while you just watch, the map is drawn about 16 instead of 22 times a second, and a key press or click still gets an answer at once (even a little sooner than without Bellows). You can turn this off in the settings as “Frame pacing at speed 5”.
 
+The monthly update of the units is also faster: the game adds every country’s modifiers to each of its units by searching a list entry by entry, and Bellows does the same with an index. The result is exactly the game’s own, and a year at speed 5 passes about 5% sooner (“Modifier merge index” in the settings).
+
 ![](https://i.imgur.com/Uf8Z21n.png)
 
 ## Before you subscribe
