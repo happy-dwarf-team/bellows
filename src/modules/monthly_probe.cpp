@@ -98,26 +98,38 @@ volatile LONG g_twisterRva[kTwisters];
 volatile LONG64 g_twisterDraws[kTwisters][kContexts];
 
 // The day after the monthly tick (rows dated the 1st of a month in tick_profile) costs about 40 ms more,
-// almost all in the daily country loop. Its parts are timed per day class: dated the 1st of a month or not.
+// almost all in the daily country loop. Its parts are timed per day class (g_dayClass below).
 const unsigned char* const* g_rootGlobal = nullptr;
 std::size_t g_rootDate = 0;  // int32 hours since year -5000 in the game root object
 
-bool FirstOfMonth() noexcept {
-    const unsigned char* root = *g_rootGlobal;
-    if (root == nullptr) return false;
+// The class of the game day in progress, set on entering 0x758430 from the date then (before the date
+// moves on, as tick_profile's day rows): 0 other, 1 dated the 1st of a month, 2 dated a month's last day
+// (the day whose call runs the monthly tick, with the date already on the 1st).
+volatile LONG g_dayClass = 0;
+anvil::HookOf<sym::daily_tick> g_dayHook;
+void (*g_dayNext)(void*) = nullptr;
+
+int DayClassOf(std::int32_t raw) noexcept {
     static constexpr int kMonths[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-    const std::int64_t day = (static_cast<std::int64_t>(sb::Read<std::int32_t>(root, g_rootDate)) - 43'800'000) / 24;
+    const std::int64_t day = (static_cast<std::int64_t>(raw) - 43'800'000) / 24;
     int rest = static_cast<int>(((day % 365) + 365) % 365), month = 0;
     while (month < 11 && rest >= kMonths[month]) rest -= kMonths[month++];
-    return rest == 0;
+    if (rest == 0) return 1;
+    return rest == kMonths[month] - 1 ? 2 : 0;
+}
+
+void DayDetour(void* state) {
+    const unsigned char* root = *g_rootGlobal;
+    InterlockedExchange(&g_dayClass, root != nullptr ? DayClassOf(sb::Read<std::int32_t>(root, g_rootDate)) : 0);
+    g_dayNext(state);
 }
 
 struct DayPart {
     const char* name;
-    volatile LONG64 calls[2] = {0, 0}, ticks[2] = {0, 0};  // [0] other days, [1] days dated the 1st
+    volatile LONG64 calls[3] = {0, 0, 0}, ticks[3] = {0, 0, 0};  // per day class (g_dayClass)
 
     void Add(LONG64 t) noexcept {
-        const int k = FirstOfMonth() ? 1 : 0;
+        const int k = g_dayClass;
         InterlockedIncrement64(&calls[k]);
         InterlockedExchangeAdd64(&ticks[k], t);
     }
@@ -381,10 +393,10 @@ void WriteFiles() {
             }
         });
         Replace(L"monthly_probe_days.tsv", [](std::ostream& out, double ms) {
-            out << "part\tcalls_other\tms_other\tcalls_first\tms_first\n";
+            out << "part\tcalls_other\tms_other\tcalls_first\tms_first\tcalls_last\tms_last\n";
             for (const DayPart* d : kDayParts) {
                 out << d->name << "\t" << d->calls[0] << "\t" << d->ticks[0] * ms << "\t" << d->calls[1] << "\t"
-                    << d->ticks[1] * ms << "\n";
+                    << d->ticks[1] * ms << "\t" << d->calls[2] << "\t" << d->ticks[2] * ms << "\n";
             }
             for (int s = 0; s < kModSites; ++s) {
                 if (g_modSiteRva[s] == 0) continue;
@@ -392,9 +404,9 @@ void WriteFiles() {
                 char key[48];
                 std::snprintf(key, sizeof key, "site 0x%X ", static_cast<unsigned>(g_modSiteRva[s]));
                 out << key << FileName(g_modSiteFile[s]) << "\t" << d.calls[0] << "\t" << d.ticks[0] * ms << "\t"
-                    << d.calls[1] << "\t" << d.ticks[1] * ms << "\n";
+                    << d.calls[1] << "\t" << d.ticks[1] * ms << "\t" << d.calls[2] << "\t" << d.ticks[2] * ms << "\n";
             }
-            out << "site_overflow\t" << g_modSiteOverflow << "\t\t\t\n";
+            out << "site_overflow\t" << g_modSiteOverflow << "\t\t\t\t\t\n";
         });
         Replace(L"monthly_probe_merges.tsv", [](std::ostream& out, double ms) {
             out << "key\tcalls\ttotal_ms\tsrc_entries\tdest_entries\tscanned\tscan_steps\n";
@@ -455,6 +467,9 @@ bool InstallMonthlyProbe(anvil::Host& host, Mode mode) {
     host.hook(g_mergeHook, sym::modifier_merge, &MergeDetour);
     undo.add(g_mergeHook);
     host.hook(g_randomHook, sym::game_random, &RandomDetour);
+    host.hook(g_dayHook, sym::daily_tick, &DayDetour);
+    undo.add(g_dayHook);
+    g_dayNext = g_dayHook.next_pointer();
 #define SB_HOOK_PART(id, symbol)                                \
     host.hook(g_partHook_##id, sym::symbol, &PartDetour_##id); \
     undo.add(g_partHook_##id);                                 \
