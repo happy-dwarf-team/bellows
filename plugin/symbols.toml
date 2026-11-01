@@ -396,7 +396,7 @@ memory = "code"
 signature = "int* (int* out, int64_t* entry, int delta, int64_t table, int64_t* extra)"
 note = "value of a per-province table entry at a date delta (called from 0x198C70)"
 
-# --- monthly_probe -----------------------------------------------------------------
+# --- monthly_probe (modifier_merge also hooks 0x8EA420) ---------------------------
 
 [symbol.monthly_tick]
 rva = 0x75D690
@@ -433,6 +433,7 @@ memory = "code"
 signature = "void (void* country)"
 note = "rebuilds the country's nearest-own-port table for every province (+0x2320), from 0x2F36C0"
 
+
 [symbol.modifier_merge]
 rva = 0x8EA420
 bytes = "40 55 41 55 48 83 EC 48 4C 63 4A 64 45 33 C0 4C 89 7C 24 20"
@@ -446,3 +447,19 @@ bytes = "48 89 5C 24 08 8B 91 C0 09 00 00 48 8B D9 85 D2"
 memory = "code"
 signature = "uint32_t (void* twister)"
 note = "Mersenne Twister draw (the game's random generator object at 0x2325220 among others)"
+
+# --- modifier_merge ----------------------------------------------------------------
+
+[symbol.game_operator_new]
+rva = 0x1A332D4
+bytes = "40 53 48 83 EC 20 48 8B D9"
+memory = "code"
+signature = "void* (size_t size)"
+note = "the game's operator new (_malloc_base with the new handler), which 0x8EA420 calls through a thunk"
+
+[symbol.pointer_vector_emplace]
+rva = 0x8F0E0
+bytes = "48 89 5C 24 20 55 56 41 54 48 83 EC 20"
+memory = "code"
+signature = "void* (void* vector, void* where, void** value)"
+note = "std::vector<T*> reallocating insert, which 0x8EA420 calls when its vector of sources is full"

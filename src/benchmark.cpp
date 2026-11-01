@@ -31,6 +31,7 @@ constexpr CounterModule kCounterModules[] = {
     {"attr_cache", "paths", "Paths remembered"},
     {"ram_prefetch", "prefetched", "Members prefetched"},
     {"token_dict_cache", "flushes", "Cache flushes"},
+    {"modifier_merge", nullptr, nullptr},
 };
 
 struct Counter {

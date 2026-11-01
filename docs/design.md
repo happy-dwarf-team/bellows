@@ -416,6 +416,46 @@ this module, year 1720 at speed 5 through Tongs; lab `docs/bellows-frame-pacing.
 - Not measured: time until the reaction is on screen, other saves and dates.
   Experimental and off by default, since the median latency cost stays.
 
+### modifier_merge (simulation)
+
+On by default. `0x8EA420` adds the (id, value) entries of one modifier list
+to another: into a dense list (static ids `0..0x285` at their own index) a
+static id goes in place; every other id is looked up by a linear scan of the
+whole destination and appended when missing, doubling the capacity; at the end
+the source is recorded in the destination's vector at `+0x38`. The monthly
+unit update adds each country's dense list (about 700 entries) to every unit's
+sparse list, about 44,000 compared entries a call, 4,850 calls a month.
+
+The hook takes the calls whose scans would compare at least 4,096 entries
+(counting the entries appended during the call) and merges with an index of
+the destination's ids (a stamped array per thread), then records the source the
+way the game does. The result is the same entries in the same order with the
+same values, count and capacity; the buffer grows at the same points with the
+game's operator new and the list's own release call. Calls outside what the
+index covers (ids outside `0..65535`, a dense list with a dynamic id in a static
+slot, the source being the destination) and small calls go to the game's
+function. `modifier_merge_core.hpp` has the game's loop written out
+(`MergeReference`); the test compares it with `MergeFast` on 4,000 random
+merges of every shape. `"verify"` runs the game's merge and compares a copy
+merged by `MergeFast`; `"on"` does that for every 1,024th call and goes back to
+the game's function for good after a mismatch. Counters and the time of both
+paths: `modifier_merge.tsv` every 5 s.
+
+Lab (normal Process Lasso rule; lab `docs/simulation-profile.md`, "Tick
+miesięczny"): Russia 1719 to 1730, 822,919 merges compared in `"verify"`, 0
+mismatches, 8.26 s in the game's function; in `"on"` 815,897 merges took
+0.89 s (10.1 µs a call against 1.08 µs), about 0.68 s a game year of ~23 s.
+The 1821 autosave in observe mode, 300 s: 697,631 compared, 0 mismatches,
+7.44 s against 0.78 s.
+
+SIMULATION (lab, ABBA x3 per series, the same build in both arms, defaults
+against defaults plus `modifier_merge`): the year 1720 took 19.45 s instead of
+20.64 s (medians, 5 and 6 valid runs, -5.7%, permutation p = 0.02); the year
+from 1 March 1821 took 26.25 s instead of 30.17 s (6 and 6, -13%, p = 0.40, the
+late-game years vary by ±3 s between runs, so not conclusive). The module gives
+the game's own lists and checks itself against the game's merge in the running
+game, so it is on by default.
+
 ### tick_profile (diagnostic, simulation)
 
 Off by default. Where the daily tick spends its time, without a sampler.

@@ -34,6 +34,7 @@ DWORD WINAPI FinishAfterReady(void*) {
     sb::ReportRangeProfile();
     sb::ReportRangeWitness();
     sb::ReportFramePacing();
+    sb::ReportModifierMerge();
     sb::bench::Done();  // the profiles are saved and the reports made
     return 0;
 }
@@ -100,6 +101,7 @@ struct Bellows : anvil::Plugin {
             // range_witness answers before 0x3526B0 runs: range_profile then sees only the walks it still makes.
             {"range_witness", cfg::range_witness.id, sb::InstallRangeWitness},
             {"frame_pacing", cfg::frame_pacing.id, sb::InstallFramePacing},
+            {"modifier_merge", cfg::modifier_merge.id, sb::InstallModifierMerge},
             // diagnostic; its hook on 0x769EA0 sits at the entry, frame_pacing's inside the function.
             {"tick_profile", cfg::tick_profile.id, sb::InstallTickProfile},
             {"army_search_profile", cfg::army_search_profile.id, sb::InstallArmySearchProfile},  // diagnostic
