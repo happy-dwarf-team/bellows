@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.16.0](https://github.com/happy-dwarf-team/bellows/compare/v0.15.0...v0.16.0) (2026-11-01)
+
+
+### Features
+
+* **modifier_merge:** index the large modifier-list merges of 0x8EA420, on by default ([#78](https://github.com/happy-dwarf-team/bellows/issues/78)) ([44a841f](https://github.com/happy-dwarf-team/bellows/commit/44a841f678664701d1cd0346f7e8f04e407c0165))
+* **monthly_probe:** diagnostic counters for the monthly tick ([#76](https://github.com/happy-dwarf-team/bellows/issues/76)) ([f3d136a](https://github.com/happy-dwarf-team/bellows/commit/f3d136a1bef439d5f2c4998571d5276232f276db))
+
 ## [0.15.0](https://github.com/happy-dwarf-team/bellows/compare/v0.14.0...v0.15.0) (2026-10-31)
 
 
