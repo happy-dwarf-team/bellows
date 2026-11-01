@@ -489,6 +489,15 @@ Lab (lab `docs/simulation-profile.md`, "RefreshKnowledge"): `0x93FE30` is about
 autosave `0x2FFC60` is 2.2% of the main thread (0.7% in 1720), mostly its copy
 loop and the allocations.
 
+Lab, game sessions (normal Process Lasso rule, 300 s each, lab
+`results/province-modifier-view-verify.csv`): 12,168,481 values compared with
+the game's function, 0 mismatches; the value objects of `0x266` and `0x267`
+were unset in every call. The game's function took 0.83 µs a call on the 1719
+save and 0.80 µs on the 1821 autosave, the view 0.11 µs and 0.07 µs. With about
+0.59 million calls a game year in 1720 and 1.37 million in 1821 that is about
+0.4 s and 1.0 s less a game year (by the module's clocks, over all threads;
+some calls may run on the AI pool's threads). No SIMULATION series yet.
+
 ### tick_profile (diagnostic, simulation)
 
 Off by default. Where the daily tick spends its time, without a sampler.
