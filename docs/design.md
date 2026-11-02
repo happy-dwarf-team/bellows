@@ -556,6 +556,44 @@ determinism pair with `-randomlog` with and without the module (as for 0.15.0,
 with the lab's tie-break plugin so that address ties do not count) and a
 SIMULATION series.
 
+### army_search_memo (simulation)
+
+Off by default. The AI searches the province graph once a day for every army
+(`0x1022B0`, called only from `0xEAB50` in `ai_army.cpp`; the lab's
+`army_search_profile` session counted one search per AI army a day, about half
+of the AI's time). For each move it considers, the scoring functor's method
+`0x96F860` ends in `0xD45250`, which checks whether a fort's zone of control
+blocks the move. Its first step is `0xD40AE0(army, 0xE0, 0)`: whether modifier
+`0xE0` applies to the army. That looks at the leader's modifiers, a second
+modifier list of the army, a modifier list `0xD4C6E0` builds for the call from
+the army's regiments (`0xD4CA70`: a loop over the regiments, a merge and a
+scale into a temporary list that is freed again), the country's cached
+modifiers (`0x93D750`, `kraj+0x28C0`) and, through a callback, each
+sub-unit. None of it depends on the move; all of it is the same army's state.
+
+The module redirects the call of `0x1022B0` (`0xEBB5F`) to mark a search on the
+current thread and the call of `0xD40AE0` in `0xD45250` (`0xD45291`). Inside a
+search the first call runs the game's function and later calls for the same
+army get its answer; a search entered inside another one gets its own memo, and
+calls outside a search (`0xD45250` has two more callers) always run the game's
+function. Why the answer cannot change during a search: the search runs in the
+AI's daily task (`0x77D8A0`, in parallel on the pool threads, where the game
+also forbids random draws), which reads game state and hands its decisions on
+as commands; `0xD40AE0` and the functions it calls only read (the country
+getter writes a log line if the modifiers are being recalculated, and returns
+the same empty list then). That is a statement about the code, so `"verify"`
+runs the game's function for every call and compares it with the memo, and
+`"on"` does that for every 1,024th answer and goes back to the game's function
+for good after a mismatch. `army_search_memo_core.hpp` holds the memo; its test
+covers the scope (outside a search, another army, nested searches). Counters,
+calls of the game's function and their time: `army_search_memo.tsv` every 5 s.
+
+Lab, statically and from samples (lab `docs/simulation-profile.md`, "AI army
+search: the zone-of-control flag"): the path `0x96F860 > 0xD45250 > 0xD40AE0`
+held 22.9% of the samples inside the search in the lab's 1720 sampler session,
+and the search about half of the AI's daily work. Not measured with the module
+yet: the hit rate, the time saved and the year.
+
 ### save_compress (saving)
 
 On by default since 0.18.0 (`save_compress_parallel` stays off). With `compress_autosave = yes` (and for every other compressed
