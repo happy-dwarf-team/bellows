@@ -528,9 +528,14 @@ The hook replaces `0x153C790` as a whole. `"on"` runs `CompressEntry`
 `deflateInit2_`, `deflate` and `deflateEnd`, the same reads, seeks, buffers and
 flushes (and the same failure when the end of the stream does not fit the
 output half), with a slice-by-8 CRC-32 instead of the byte loop. The CRC is a
-function of the bytes, so the file is byte for byte the game's. `"verify"` also
-runs the game's byte loop over the same bytes, keeps its value and counts a
-difference. `symbols.toml` checks the function's entry, its zlib calls, the
+function of the bytes, so the file is byte for byte the game's. `"verify"` runs
+the game's own `0x153C790` first, on the same input into a capture writer
+(only its write slot, `+0x50`, is expected), then `CompressEntry` with the
+game's byte loop as well into another; the game's writes, CRC and result go
+into the archive, and a difference in the bytes, the CRC, the result or between
+the two CRC loops is counted and logged. It compares the module with the game
+on the very state being saved, which two games cannot do (two runs of the same
+save do not reach the same state). `symbols.toml` checks the function's entry, its zlib calls, the
 CRC loop and the finish loop, so another build of the function is refused.
 
 `save_compress_parallel = "on"` (separate, off by default) compresses members of

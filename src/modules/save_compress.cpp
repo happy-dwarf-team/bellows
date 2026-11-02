@@ -7,8 +7,9 @@
 // replaces 0x153C790 as a whole:
 //   - "on": CompressEntry (save_compress_core.hpp), the function call for call with the game's own zlib
 //     1.2.8, the same reads, buffers and flushes, and a slice-by-8 CRC: the file is byte for byte the game's.
-//   - "verify": the same, and the game's byte loop runs as well; its CRC goes into the file, a difference is
-//     counted and logged.
+//   - "verify": the game's own function runs as well, on the same input into a capture; its bytes and CRC go
+//     into the file, and a difference in bytes, CRC or result (or between the two CRC loops) is counted and
+//     logged.
 //   - save_compress_parallel = "on": members of at least four 1 MiB chunks are read whole and compressed
 //     in chunks on several threads (save_compress_parallel.hpp, Bellows' zlib): a valid ZIP member with the
 //     same name, method, CRC and sizes, but other DEFLATE bytes than the game's. "verify" also decodes the
@@ -26,6 +27,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <vector>
 
 extern "C" {
 // requests = members compressed, hits = members compressed in parallel, misses = parallel attempts that fell
@@ -39,6 +41,7 @@ namespace {
 using MemberFn = int (*)(void* writer, void* input, std::uint8_t* buffer, std::uint64_t size, std::uint32_t* crc, int level);
 
 anvil::HookOf<sym::zip_deflate_member> g_hook;
+MemberFn g_next = nullptr;
 sb::savez::Deflater g_game;
 bool g_verifyCrc = false;
 int g_parallel = 0;  // 0 off, 1 on, 2 verify
@@ -98,6 +101,69 @@ void AppendRow(const Row& row) {
 struct FreeVirtual {
     void operator()(std::uint8_t* p) const noexcept { VirtualFree(p, 0, MEM_RELEASE); }
 };
+
+// An archive writer that keeps what is written to it ("verify"): the game's own function writes into one
+// through its vtable (only the write slot, +0x50; any other slot marks the capture unusable), CompressEntry
+// into another through EntryIo.
+struct Capture {
+    void** vtable;
+    std::vector<std::uint8_t> bytes;
+    std::vector<std::int64_t> writes;  // the length of each write, in order
+    bool failed = false;
+};
+
+void CaptureWrite(void* self, const std::uint8_t* data, std::int64_t length) {
+    auto* capture = static_cast<Capture*>(self);
+    try {
+        capture->bytes.insert(capture->bytes.end(), data, data + length);
+        capture->writes.push_back(length);
+    } catch (...) {
+        capture->failed = true;
+    }
+}
+
+void CaptureOther(void* self) { static_cast<Capture*>(self)->failed = true; }
+
+void* g_captureVtable[32] = {};
+
+// "verify": the game's own 0x153C790 into one capture, CompressEntry (with the game's CRC loop as well) into
+// another, both from the start of the same input; the game's writes, CRC and result go into the archive, and
+// a difference in bytes, CRC or result is counted. Without the game's capture (memory) the member goes the
+// "on" way unchecked.
+int VerifyEntry(const sb::savez::EntryIo& io, void* input, std::uint8_t* buffer, std::uint64_t size, std::uint32_t* crc,
+                int level, Row& row, sb::savez::EntryTimes& times) {
+    Capture game{g_captureVtable};
+    Capture ours{g_captureVtable};
+    std::uint32_t gameCrc = *crc;
+    std::uint32_t ourCrc = *crc;
+    void* gameWriter = &game;
+    const std::int64_t start = Now();
+    const int gameWritten = g_next(&gameWriter, input, buffer, size, &gameCrc, level);
+    row.checkTicks = Now() - start;
+    if (game.failed) return sb::savez::CompressEntry(g_game, io, buffer, size, crc, level, false, &times, &Now);
+    sb::savez::EntryIo captured = io;
+    captured.writer = &ours;
+    captured.write = CaptureWrite;
+    const int ourWritten = sb::savez::CompressEntry(g_game, captured, buffer, size, &ourCrc, level, true, &times, &Now);
+    if (!ours.failed) {
+        InterlockedIncrement64(&EU4SB_SaveCompressStats.verifications);
+        if (ourWritten != gameWritten || ourCrc != gameCrc || ours.bytes != game.bytes || times.crcMismatch) {
+            InterlockedIncrement64(&EU4SB_SaveCompressStats.mismatches);
+            row.mismatch = true;
+            sb::Log(ANVIL_LOG_WARNING,
+                    "save_compress: a member differed from the game's (%d and %d bytes, CRC %08X and %08X, CRC loop %s); "
+                    "the game's is used",
+                    ourWritten, gameWritten, ourCrc, gameCrc, times.crcMismatch ? "differed" : "the same");
+        }
+    }
+    std::int64_t offset = 0;
+    for (const std::int64_t length : game.writes) {
+        io.write(io.writer, game.bytes.data() + offset, length);
+        offset += length;
+    }
+    *crc = gameCrc;
+    return gameWritten;
+}
 
 // The parallel way; false (nothing written) when the member goes the game's way instead.
 bool CompressInParallel(const sb::savez::EntryIo& io, std::uint32_t* crc, int level, Row& row, int& written) {
@@ -167,19 +233,12 @@ int Detour(void* writer, void* input, std::uint8_t* buffer, std::uint64_t size, 
     }
     if (!done) {
         sb::savez::EntryTimes times;
-        written = sb::savez::CompressEntry(g_game, io, buffer, size, crc, level, g_verifyCrc, &times, &Now);
+        written = g_verifyCrc ? VerifyEntry(io, input, buffer, size, crc, level, row, times)
+                              : sb::savez::CompressEntry(g_game, io, buffer, size, crc, level, false, &times, &Now);
         row.path = row.tried ? "fallback" : g_verifyCrc ? "verify" : "game";
         row.crcTicks = times.crcTicks;
         row.gameCrcTicks = times.referenceCrcTicks;
         row.input = times.inputSize;
-        if (g_verifyCrc) {
-            InterlockedIncrement64(&EU4SB_SaveCompressStats.verifications);
-            if (times.crcMismatch) {
-                InterlockedIncrement64(&EU4SB_SaveCompressStats.mismatches);
-                row.mismatch = true;
-                sb::Log(ANVIL_LOG_WARNING, "save_compress: the CRC-32 differed from the game's loop (the game's is used)");
-            }
-        }
     }
     row.output = written;
     row.totalTicks = Now() - start;
@@ -205,11 +264,14 @@ bool InstallSaveCompress(anvil::Host& host, Mode mode) {
     g_game.init2 = host.function(sym::zlib_deflate_init2);
     g_game.deflate = host.function(sym::zlib_deflate);
     g_game.end = host.function(sym::zlib_deflate_end);
+    for (auto& slot : g_captureVtable) slot = reinterpret_cast<void*>(&CaptureOther);
+    g_captureVtable[0x50 / 8] = reinterpret_cast<void*>(&CaptureWrite);
     host.hook(g_hook, sym::zip_deflate_member, &Detour);
+    g_next = g_hook.next_pointer();
     InterlockedExchange(&EU4SB_SaveCompressStats.mode, g_verifyCrc ? 2 : 1);
     InterlockedExchange(&EU4SB_SaveCompressStats.initialized, 1);
     static const char* const kParallel[] = {"off", "on", "verify"};
-    Log(ANVIL_LOG_INFO, "save_compress: %s, parallel %s", g_verifyCrc ? "verifying the CRC" : "on",
+    Log(ANVIL_LOG_INFO, "save_compress: %s, parallel %s", g_verifyCrc ? "verifying against the game's function" : "on",
         kParallel[std::clamp(g_parallel, 0, 2)]);
     return true;
 }
