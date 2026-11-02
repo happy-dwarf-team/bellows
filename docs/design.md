@@ -507,7 +507,7 @@ and a SIMULATION series.
 
 ### save_compress (saving)
 
-Off by default. With `compress_autosave = yes` (and for every other compressed
+On by default since 0.18.0 (`save_compress_parallel` stays off). With `compress_autosave = yes` (and for every other compressed
 save) the game writes a ZIP archive in memory and compresses each member on the
 calling thread: `gamestate`, `meta`, `ai` and, with a random New World, its
 archive. One function does all of it, `0x153C790` (writer, input, buffer, size,
@@ -565,9 +565,37 @@ does not fit, and the function returns 0 as the game's would; the game passes
 gamestate took 22 ms slice-by-8 against 85 ms byte by byte. In parallel the
 gamestate took 57 ms on 7 threads against about 320 ms on one; it decodes to
 the same bytes with zlib's inflate, Python's `zipfile` and Windows `tar`, with
-the CRC in the headers, and is 0.1–0.24% smaller than the game's. Not measured
-in the game: the time of a real autosave with the module, and a save written
-with `save_compress_parallel` loaded by the game.
+the CRC in the headers, and is 0.1–0.24% smaller than the game's.
+
+In the game (lab `docs/autosave-cost.md`, 2 November 2026): the Russia save of
+17 March 1719 with `compress_autosave = yes`, a separate game profile, the
+process on CPUs 1–7, observer mode at speed 5 to 10 January 1722 (autosaves of
+1720–1722), Bellows with default settings otherwise. Interleaved games with
+`save_compress` off, `"on"` and `"on"` with `save_compress_parallel = "on"`,
+two games of three autosaves each per setting; the time from the game's
+`autosave.tmp` to its rename:
+
+| Setting | Autosaves | Median | Range | Gamestate member |
+| --- | ---: | ---: | --- | --- |
+| off | 6 | 0.873 s | 0.871–0.900 s | – |
+| `"on"` | 6 | 0.831 s | 0.823–0.842 s | 296–302 ms |
+| `"on"`, parallel `"on"` | 6 | 0.612 s | 0.575–0.637 s | 80–95 ms, 7 threads |
+
+The ranges do not overlap. `"verify"` (one game each) compared every member
+with the game's own function on the same input: 10 members with
+`save_compress = "verify"` (three autosaves and one level 9 member, below) and
+the small members with both settings on `"verify"`, 0 differences; every
+parallel member decoded to its input. Offline, the members of all 15 autosaves
+written with the module off, `"on"` and `"verify"` are byte for byte what the
+game's function gives with zlib 1.2.8. A save written with
+`save_compress_parallel` loaded in a game without Bellows (single player, the
+game then ran a month); Python's `zipfile`, Windows `tar`, NanaZip and Etch's
+save reader read it with the CRCs of its headers. Loading a plain-text save
+also goes through the function once: the game's load path (`0xD84B80`) compresses
+the whole file at level 9 into an archive in memory (64.5 MB in about 2.4 s on
+the game's function, 0.74 s in parallel); what the game uses that copy for was
+not followed further. Not tested: multiplayer (joining, host transfer) with a
+parallel save, ironman and cloud saves.
 
 ### tick_profile (diagnostic, simulation)
 

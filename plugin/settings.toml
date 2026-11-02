@@ -172,7 +172,7 @@ restart = true
 [setting.save_compress]
 type = "enum"
 values = [{ name = "off", label = "Off" }, { name = "on", label = "On" }, { name = "verify", label = "Verify" }]
-default = "off"
+default = "on"
 label = "Save compression"
 description = "Saving: compressed saves (compress_autosave and the like) without the game's byte-at-a-time CRC-32; the file is byte for byte the game's. Verify runs the game's own compression as well, writes its result and compares the two."
 group = "Saving"
