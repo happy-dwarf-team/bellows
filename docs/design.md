@@ -591,8 +591,18 @@ calls of the game's function and their time: `army_search_memo.tsv` every 5 s.
 Lab, statically and from samples (lab `docs/simulation-profile.md`, "AI army
 search: the zone-of-control flag"): the path `0x96F860 > 0xD45250 > 0xD40AE0`
 held 22.9% of the samples inside the search in the lab's 1720 sampler session,
-and the search about half of the AI's daily work. Not measured with the module
-yet: the hit rate, the time saved and the year.
+and the search about half of the AI's daily work.
+
+Lab, game sessions (normal Process Lasso rule, 300 s at speed 5 each, the 1719
+save and the 1821 autosave in observe mode): 183.3 million answers of the memo
+compared with the game's function (`verify` and the samples of `"on"`), 0
+mismatches. A search makes 375 (1720) to 670 (1821) calls, of which the memo
+answered 99.6% and 99.8% in `"on"`; one call of the game's function took about
+0.2 µs (with two clock reads). That is about 2.2 s of thread time per game year,
+roughly 6–7% of the AI's work; the year itself (bounded by the slowest country's
+AI) is not measured yet, so the module stays off until a SIMULATION series.
+`0xD45250` also gets 42–104 million calls per session from outside the search
+(`0xD4A9E0`, `0xD4B270`), which the module leaves alone.
 
 ### save_compress (saving)
 
