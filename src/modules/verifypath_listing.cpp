@@ -21,7 +21,7 @@
 // a disagreement disables the module ("verify" mode compares every answer).
 // Assumes game and mod files do not change while the game starts.
 //
-// verifypath_session = "on" (off by default) keeps the module past the ready
+// verifypath_session = "on" (on by default since 1.2) keeps the module past the ready
 // event: loading a save or starting a game makes the game look for thousands
 // of textures in every mod, and each look stats every prefix in every search
 // path (lab docs: docs/autosave-cost.md, "Co zostaje w Continue"). After the
