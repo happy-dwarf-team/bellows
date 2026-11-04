@@ -1,4 +1,4 @@
-// history_add (off by default): adding an entry a save just gave the game to a dated list, without walking the
+// history_add (on by default since 1.2): adding an entry the game just read to a dated list, without walking the
 // whole list first to see whether that new entry is in it (the reasoning in history_add_core.hpp).
 //
 // Mid hooks on the two adds in 0xDA66A0 (to the owner's list, then to the list of all such entries) note the
@@ -114,7 +114,7 @@ bool InstallHistoryAdd(anvil::Host& host, Mode mode) {
         SetThreadDescription(thread, L"bellows history_add writer");
         CloseHandle(thread);
     }
-    Log(ANVIL_LOG_INFO, "history_add: %s the walk over a dated list for an entry just read from a save",
+    Log(ANVIL_LOG_INFO, "history_add: %s the walk over a dated list for an entry just read",
         g_verifyOnly ? "verifying" : "skipping");
     return true;
 }

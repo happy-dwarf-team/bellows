@@ -220,9 +220,9 @@ restart = true
 [setting.history_add]
 type = "enum"
 values = [{ name = "off", label = "Off" }, { name = "on", label = "On" }, { name = "verify", label = "Verify" }]
-default = "off"
+default = "on"
 label = "Dated lists while loading"
-description = "Loading: adds an entry a save just gave the game to a dated list without first walking the whole list to see whether that new entry is in it. The list comes out the same. Verify lets the game walk and compares."
+description = "Loading: adds an entry the game just read to a dated list without first walking the whole list to see whether that new entry is in it. The list comes out the same. Verify lets the game walk and compares."
 group = "Loading"
 restart = true
 
