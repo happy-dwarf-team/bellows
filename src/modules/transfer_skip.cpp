@@ -105,7 +105,9 @@ void CheckCopy(void* manager, int index, Row& row) {
     }
     row.checkTicks = sb::Ticks() - start;
     InterlockedIncrement64(&EU4SB_TransferSkipStats.verifications);
-    if (!same) {
+    if (same) {
+        sb::Log(ANVIL_LOG_INFO, "transfer_skip: the game's copy of %lld bytes decodes to the save (%lld bytes)", row.copy, row.input);
+    } else {
         Mismatch(&row);
         sb::Log(ANVIL_LOG_WARNING, "transfer_skip: the game's transfer copy is not the save it was made from");
     }
@@ -125,11 +127,14 @@ int AddFileDetour(void* manager, const char* name, void** data, bool compress) {
     if (action == Action::Skip) {
         InterlockedIncrement64(&EU4SB_TransferSkipStats.hits);
         row.action = "skipped";
+        sb::Log(ANVIL_LOG_INFO, "transfer_skip: no transfer copy of a save of %lld bytes (single player)", row.input);
     } else if (action == Action::Check) {
         row.action = "verify";
         CheckCopy(manager, index, row);
     } else {
         InterlockedIncrement64(&EU4SB_TransferSkipStats.skips);
+        sb::Log(ANVIL_LOG_INFO, "transfer_skip: the game keeps its copy of a save of %lld bytes (server %d, dummy %d)", row.input,
+                row.kind.server ? 1 : 0, row.kind.dummy ? 1 : 0);
     }
     AppendRow(row);
     return index;
@@ -142,6 +147,8 @@ std::uint64_t LoadFileDetour(void* handler, const char* name, void* data, bool c
             Mismatch(nullptr);
             sb::Log(ANVIL_LOG_WARNING, "transfer_skip: the load did not get the entry's Data with the flag 0 (flag %d)",
                     compressed ? 1 : 0);
+        } else {
+            sb::Log(ANVIL_LOG_INFO, "transfer_skip: the load got the entry's Data with the flag 0");
         }
         g_expectedData = nullptr;
     }
