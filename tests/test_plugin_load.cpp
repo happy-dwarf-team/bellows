@@ -450,11 +450,12 @@ int main(int argc, char** argv) {
         const std::map<std::string, std::string> modes = {
             {"mimalloc", ok ? "startup" : "failed"}, {"open_warmup", "off"}, {"ram_prefetch", "off"},
             {"verifypath_listing", "on"}, {"exists_index", "on"}, {"trigger_intern", ok ? "on" : "failed"},
-            {"metascript_subst", "off"}, {"metascript_blocks", "on"}, {"attr_cache", "verify"}, {"zip_profile", "on"},
-            {"token_dict_cache", "on"}, {"token_dict_profile", "off"}, {"range_profile", "on"},
-            {"range_witness", "on"}, {"frame_pacing", "on"}, {"pops_pacing", "on"}, {"modifier_merge", "on"}, {"province_modifier_view", "on"}, {"army_search_memo", "on"}, {"save_compress", "on"}, {"transfer_skip", "on"}, {"tick_profile", "on"}, {"army_search_profile", "on"}, {"score_probe", "on"}, {"monthly_probe", "on"},
+            {"metascript_subst", "off"}, {"metascript_blocks", "on"}, {"attr_cache", "verify"},
+            {"token_dict_cache", "on"},
+            {"range_witness", "on"}, {"frame_pacing", "on"}, {"pops_pacing", "on"}, {"modifier_merge", "on"}, {"province_modifier_view", "on"}, {"army_search_memo", "on"}, {"save_compress", "on"}, {"transfer_skip", "on"},
         };
         for (const auto& [module, mode] : modes) assert(g_values.at(module + ".mode") == mode);
+        assert(!g_fields.contains("tick_profile.mode"));  // the diagnostics have no mode field
         for (const char* field : {"exists_index.requests", "exists_index.listings", "verifypath_listing.mismatches",
                                   "attr_cache.verifications", "token_dict_cache.entries", "range_profile.checks",
                                   "range_witness.answered"}) {
