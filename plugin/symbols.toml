@@ -832,6 +832,13 @@ note = "0xDA66A0 (reads one entry of a dated list from a save): the add of the e
 build."eu4-1.37.5-steam-win64" = { rva = 0xDA69E5 }
 build."eu4-1.37.5.2-gog-win64" = { rva = 0xDA5195 }
 
+[symbol.history_add_global_call]
+bytes = "FF 90 A0 00 00 00"            # call [rax+0A0h], after mov rdx,[rdx]; mov rcx,[rax+38h]; mov rax,[rcx]
+memory = "code"
+note = "0xDA66A0: the same entry goes to the list of all such entries (0x7EC6C0 + 0x38) too, rdx = the entry"
+build."eu4-1.37.5-steam-win64" = { rva = 0xDA6A1D }
+build."eu4-1.37.5.2-gog-win64" = { rva = 0xDA51CD }
+
 [symbol.history_add_walk]
 bytes = "48 8B 41 20 48 8B FA 48 8B F1"  # mov rax,[rcx+20h]; mov rdi,rdx; mov rsi,rcx
 memory = "code"

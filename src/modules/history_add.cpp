@@ -1,8 +1,9 @@
 // history_add (off by default): adding an entry a save just gave the game to a dated list, without walking the
 // whole list first to see whether that new entry is in it (the reasoning in history_add_core.hpp).
 //
-// A mid hook on the call in 0xDA66A0 notes the entry on this thread. A mid hook at the start of 0x7E7CD0, before
-// the walk, jumps past it when the call adds that entry. Nothing else about the add changes: the game finds the
+// Mid hooks on the two adds in 0xDA66A0 (to the owner's list, then to the list of all such entries) note the
+// entry on this thread. A mid hook at the start of 0x7E7CD0, before the walk, jumps past it when the call adds
+// that entry. Nothing else about the add changes: the game finds the
 // entry's place and links it as it always does. "verify" lets the game walk and walks the list as well, comparing
 // the answers; "on" does that for every 1024th entry and goes back to the game's walk for good after a mismatch.
 // A background thread writes the counters every 5 s to history_add.tsv in the data directory.
@@ -21,7 +22,7 @@ __declspec(dllexport) sb::Stats EU4SB_HistoryAddStats = SB_STATS_INIT;
 
 namespace {
 
-anvil::Change g_addCall, g_walk;
+anvil::Change g_addCall, g_globalCall, g_walk;
 std::uintptr_t g_afterWalk = 0;
 bool g_verifyOnly = false;
 volatile LONG64 g_sequence = 0;
@@ -103,6 +104,8 @@ bool InstallHistoryAdd(anvil::Host& host, Mode mode) {
     undo.add(g_walk);
     g_addCall = host.mid_hook(sym::history_add_call, [](anvil::Cpu& cpu) { t_fresh = cpu.rdx; });
     undo.add(g_addCall);
+    g_globalCall = host.mid_hook(sym::history_add_global_call, [](anvil::Cpu& cpu) { t_fresh = cpu.rdx; });
+    undo.add(g_globalCall);
     undo.keep();
     InterlockedExchange(&EU4SB_HistoryAddStats.mode, g_verifyOnly ? 2 : 1);
     InterlockedExchange(&EU4SB_HistoryAddStats.initialized, 1);

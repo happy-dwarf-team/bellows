@@ -6,8 +6,9 @@
 // 0x7E7CD0 adds an entry to a list ordered by date: it first walks the whole list from its head (+0x20,
 // nodes { entry, previous, next }) to see whether the entry is in it already, then finds its place from the
 // tail, usually at once. A list of n entries read from a save costs n * n / 2 node reads, all of them
-// cache misses in the late game. 0xDA66A0, which reads one entry of such a list from a save, allocates the entry
-// and adds it in the same breath, so that entry cannot be in any list yet.
+// cache misses in the late game. 0xDA66A0, which reads one entry of such a list from a save, adds the entry
+// to its owner's list and to one list of all such entries, tens of thousands long in a late save. The entry was
+// made while reading it, so neither list can hold it yet.
 
 #include <cstddef>
 #include <cstdint>
