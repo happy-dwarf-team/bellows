@@ -6,7 +6,6 @@ Bellows makes EU4 reach the main menu much sooner and lets the years pass a litt
 - **A much shorter start:** about 13 seconds instead of 41 on our test machine (10 mods). Big mod sets gain the most: Anbennar went from about 85 seconds to about 22.
 - **Faster years at speed 5:** a year passes about 10% sooner, and the game still answers every click at once.
 - **Quicker compressed autosaves,** with the same file the game would write.
-- **A quicker Continue** in single player: about 2 seconds less on a large late-game text save (64 MB), about 1.4 on a 40 MB one.
 - **Safe to keep on:** no game files or rules change, so ironman achievements stay available and multiplayer stays in sync.
 - **Measure it yourself:** the Benchmark tab in Anvil Manager compares starts with and without Bellows on your computer.
 
@@ -30,11 +29,11 @@ Anvil asks again after every update. Until you approve, the version you trusted 
 
 ## In the settings
 In Anvil's panel (**Ctrl+Shift+F12**, Settings) or in Anvil Manager:
-- **Frame pacing at speed 5** (on): while you just watch, the map is drawn about 16 instead of 22 times a second, so the years pass about 10% sooner. A click still gets an answer at once.
+- **Frame pacing at speed 5** (on): while you just watch, the map is drawn about 16 instead of 22 times a second, so the years pass about 10% sooner.
 - **Modifier merge index** (on): the monthly update of the units finds modifiers with an index instead of searching a list. Exactly the game's result, and a year passes about 5% sooner.
-- **Province modifier view** (new, off): reads province modifiers in place instead of copying them first. All of about 12 million values matched the game's own; off until we know it can't nudge the AI.
+- **Province modifier view** (off): reads province modifiers in place instead of copying them first. About 12 million values matched the game's; off until we know it can't nudge the AI.
 - **Save compression** (on, for compressed saves): an autosave in about 0.83 instead of 0.87 seconds, byte for byte the game's file. **Parallel save compression** (off) packs it on several cores in about 0.6 seconds: laid out a little differently, the same save.
-- **Skip transfer compression** (new, on): in single player, Continue no longer compresses a text save for a multiplayer transfer nobody receives; the game loads the same file. Hosted multiplayer is left as it is.
+- **Skip transfer compression** (new, on): Continue in single player, about 2 seconds sooner on a 64 MB text save.
 
 ![](https://i.imgur.com/Uf8Z21n.png)
 
