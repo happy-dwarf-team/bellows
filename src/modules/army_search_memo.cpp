@@ -1,6 +1,6 @@
-// army_search_memo (off by default): within one AI army search (0x1022B0), the zone-of-control flag of the
-// army from 0xD40AE0 once instead of for every move (lab docs: docs/simulation-profile.md; the reasoning in
-// army_search_memo_core.hpp).
+// army_search_memo (off by default): within one AI army search (0x1022B0), one path search (0x96C520) or one look at
+// a unit's moves from a province (0x195750), the zone-of-control flag of the army from 0xD40AE0 once instead of for
+// every move (lab docs: docs/simulation-profile.md; the reasoning in army_search_memo_core.hpp).
 //
 // The module redirects the only call of 0x1022B0 (0xEBB5F in 0xEAB50, ai_army.cpp) to mark the search on
 // this thread, and the call of 0xD40AE0(army, 0xE0, 0) in 0xD45250 (0xD45291). Inside a search the first
@@ -36,6 +36,10 @@ anvil::FunctionHook<std::uint64_t(void*, int, void*, std::uint64_t, float*, std:
                                   std::uint8_t*, std::uint8_t, std::uint8_t, void*)>
     g_searchSite;
 anvil::FunctionHook<std::uint8_t(void*, std::uint32_t, std::uint8_t, std::int64_t)> g_flagSite;
+anvil::HookOf<sym::unit_path_search> g_pathHook;
+anvil::HookOf<sym::unit_neighbour_moves> g_movesHook;
+sym::Types::unit_path_search::Pointer g_path = nullptr;
+sym::Types::unit_neighbour_moves::Pointer g_moves = nullptr;
 SearchFn g_search = nullptr;
 FlagFn g_flag = nullptr;
 bool g_verifyOnly = false;
@@ -54,6 +58,19 @@ std::uint64_t SearchDetour(void* scorer, int mode, void* army, std::uint64_t arg
     const std::uint64_t result = g_search(scorer, mode, army, arg, score, a6, a7, a8, a9, a10, a11, path);
     sb::LeaveSearch(t_memo, saved);
     return result;
+}
+
+std::uint8_t PathDetour(void* a1, void* a2, void* a3, void* a4, void* a5, void* a6, void* a7, void* a8) {
+    const sb::SearchMemo saved = sb::EnterSearch(t_memo);
+    const std::uint8_t result = g_path(a1, a2, a3, a4, a5, a6, a7, a8);
+    sb::LeaveSearch(t_memo, saved);
+    return result;
+}
+
+void MovesDetour(void* a1, void* unit, int province, std::uint8_t a4, void* a5, void* a6) {
+    const sb::SearchMemo saved = sb::EnterSearch(t_memo);
+    g_moves(a1, unit, province, a4, a5, a6);
+    sb::LeaveSearch(t_memo, saved);
 }
 
 std::uint8_t TimedFlag(void* army, std::uint32_t modifier, std::uint8_t viaLocation, std::int64_t arg) {
@@ -136,6 +153,10 @@ bool InstallArmySearchMemo(anvil::Host& host, Mode mode) {
     g_search = g_searchSite.next_pointer();
     host.redirect(g_flagSite, sym::zoc_flag_call, &FlagDetour);
     g_flag = g_flagSite.next_pointer();
+    host.hook(g_pathHook, sym::unit_path_search, &PathDetour);
+    g_path = g_pathHook.next_pointer();
+    host.hook(g_movesHook, sym::unit_neighbour_moves, &MovesDetour);
+    g_moves = g_movesHook.next_pointer();
     InterlockedExchange(&EU4SB_ArmySearchMemoStats.mode, g_verifyOnly ? 2 : 1);
     InterlockedExchange(&EU4SB_ArmySearchMemoStats.initialized, 1);
     HANDLE thread = CreateThread(nullptr, 0, WriterThread, nullptr, 0, nullptr);
