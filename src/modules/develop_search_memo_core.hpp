@@ -1,6 +1,6 @@
 #pragma once
 // develop_search_memo: the memo of one scan of a country's provinces for development (lab docs:
-// docs/simulation-profile.md, "AI: the search for a province to develop").
+// docs/simulation-profile.md, "AI: szukanie prowincji do rozwoju").
 //
 // 0x1B5170 walks every province of an AI country and, for each one that passes a check, draws a number, takes it
 // modulo 3 as a kind of development, and calls 0xBDE10, which goes through all the provinces of the country and of
