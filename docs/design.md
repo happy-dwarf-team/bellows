@@ -821,8 +821,9 @@ On vanilla it is 4,300 adds and 2 million reads. So the gain depends on the mods
 Mid hooks on the two adds note the entry on the thread, and a mid hook at the start of `0x7E7CD0` jumps past the
 walk when the call adds that entry. The entry was allocated while it was read, so it cannot be in a list yet;
 the place in the list and the links are the game's own. The second add is also reached after a key that is no
-date, with the owner's last entry, which the list of all entries can hold already (a key after a dated block in a
-`history/wars` file), so that add skips the walk only for the entry the first add just took. `"verify"` lets the
+date (`name`, `war_goal`), with the owner's last entry. That is the key's new entry, unless the key made none or
+its entry did not go last, and then it is one the list of all entries holds already. So that add skips the walk
+only for the entry the first add just took: a few hundred short walks stay with the game. `"verify"` lets the
 game walk and walks as well; `"on"` does that for every 1024th entry and goes back to the game's walk for good
 after a mismatch.
 
