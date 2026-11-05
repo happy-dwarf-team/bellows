@@ -921,6 +921,18 @@ note = "the moves of a unit from one province, in its daily update: it asks 0xD4
 build."eu4-1.37.5-steam-win64" = { rva = 0x195750 }
 build."eu4-1.37.5.2-gog-win64" = { rva = 0x195780 }
 
+[symbol.army_speed_modifier_call]
+memory = "code"
+note = "0x1A6800 (an army's speed through a province): 0xD40790(army, &out, 0xFB, 0, 0), the speed modifier of the army"
+
+[symbol.army_speed_modifier_call.build."eu4-1.37.5-steam-win64"]
+rva = 0x1A6988
+bytes = "E8 03 9E B9 00"
+
+[symbol.army_speed_modifier_call.build."eu4-1.37.5.2-gog-win64"]
+rva = 0x1A69B8
+bytes = "E8 83 85 B9 00"
+
 [symbol.zoc_flag_call]
 bytes = "E8 4A B8 FF FF"               # call 0xD40AE0, after mov edx,0E0h and xor r8d,r8d
 memory = "code"

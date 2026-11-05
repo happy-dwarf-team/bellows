@@ -36,6 +36,8 @@ anvil::FunctionHook<std::uint64_t(void*, int, void*, std::uint64_t, float*, std:
                                   std::uint8_t*, std::uint8_t, std::uint8_t, void*)>
     g_searchSite;
 anvil::FunctionHook<std::uint8_t(void*, std::uint32_t, std::uint8_t, std::int64_t)> g_flagSite;
+anvil::FunctionHook<int*(void*, int*, std::uint64_t, char, void*)> g_speedSite;
+int* (*g_speed)(void*, int*, std::uint64_t, char, void*) = nullptr;
 anvil::HookOf<sym::unit_path_search> g_pathHook;
 anvil::HookOf<sym::unit_neighbour_moves> g_movesHook;
 sym::Types::unit_path_search::Pointer g_path = nullptr;
@@ -44,7 +46,7 @@ SearchFn g_search = nullptr;
 FlagFn g_flag = nullptr;
 bool g_verifyOnly = false;
 volatile LONG64 g_checkSequence = 0;
-volatile LONG64 g_gameTicks = 0, g_gameCalls = 0;
+volatile LONG64 g_gameTicks = 0, g_gameCalls = 0, g_speedRequests = 0, g_speedHits = 0;
 std::wstring* g_dir = nullptr;
 constexpr DWORD kWriteEveryMs = 5000;
 
@@ -109,6 +111,30 @@ std::uint8_t FlagDetour(void* army, std::uint32_t modifier, std::uint8_t viaLoca
     return t_memo.value;
 }
 
+int* SpeedDetour(void* army, int* out, std::uint64_t id, char a4, void* a5) {
+    const sb::MemoAnswer answer = sb::LookupSpeed(t_memo, army);
+    if (answer == sb::MemoAnswer::Outside || EU4SB_ArmySearchMemoStats.cacheDisabled != 0) return g_speed(army, out, id, a4, a5);
+    InterlockedIncrement64(&g_speedRequests);
+    if (answer == sb::MemoAnswer::Miss) {
+        int* result = g_speed(army, out, id, a4, a5);
+        sb::StoreSpeed(t_memo, army, *result);
+        return result;
+    }
+    if (g_verifyOnly || (InterlockedIncrement64(&g_checkSequence) & 1023) == 0) {
+        int* result = g_speed(army, out, id, a4, a5);
+        InterlockedIncrement64(&EU4SB_ArmySearchMemoStats.verifications);
+        if (*result != t_memo.speed) {
+            InterlockedIncrement64(&EU4SB_ArmySearchMemoStats.mismatches);
+            if (!g_verifyOnly && InterlockedExchange(&EU4SB_ArmySearchMemoStats.cacheDisabled, 1) == 0)
+                sb::Log(ANVIL_LOG_WARNING, "army_search_memo: a speed differed from the game's; back to the game's function");
+        }
+        return result;
+    }
+    InterlockedIncrement64(&g_speedHits);
+    *out = t_memo.speed;
+    return out;
+}
+
 void WriteFile() {
     const sb::Stats& s = EU4SB_ArmySearchMemoStats;
     try {
@@ -116,10 +142,10 @@ void WriteFile() {
         const std::wstring temp = path + L".tmp";
         {
             std::ofstream out(temp, std::ios::binary | std::ios::trunc);
-            out << "mode\tsearches\trequests\thits\tmisses\toutside\tverifications\tmismatches\tdisabled\tgame_calls\tgame_ms\n"
+            out << "mode\tsearches\trequests\thits\tmisses\toutside\tverifications\tmismatches\tdisabled\tgame_calls\tgame_ms\tspeed_requests\tspeed_hits\n"
                 << (g_verifyOnly ? "verify" : "on") << "\t" << s.duplicateKeys << "\t" << s.requests << "\t" << s.hits << "\t"
                 << s.misses << "\t" << s.skips << "\t" << s.verifications << "\t" << s.mismatches << "\t" << s.cacheDisabled
-                << "\t" << g_gameCalls << "\t" << g_gameTicks * sb::TicksToMs(1) << "\n";
+                << "\t" << g_gameCalls << "\t" << g_gameTicks * sb::TicksToMs(1) << "\t" << g_speedRequests << "\t" << g_speedHits << "\n";
         }
         MoveFileExW(temp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING);
     } catch (...) {
@@ -153,6 +179,8 @@ bool InstallArmySearchMemo(anvil::Host& host, Mode mode) {
     g_search = g_searchSite.next_pointer();
     host.redirect(g_flagSite, sym::zoc_flag_call, &FlagDetour);
     g_flag = g_flagSite.next_pointer();
+    host.redirect(g_speedSite, sym::army_speed_modifier_call, &SpeedDetour);
+    g_speed = g_speedSite.next_pointer();
     host.hook(g_pathHook, sym::unit_path_search, &PathDetour);
     g_path = g_pathHook.next_pointer();
     host.hook(g_movesHook, sym::unit_neighbour_moves, &MovesDetour);
