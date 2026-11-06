@@ -13,9 +13,10 @@
 // Two rebuilds in three leave the table as it was: the flag is set by far more than what moves a port.
 // WorldPrint hashes everything the game's loop and its distance read, so a rebuild with the same print
 // over the same table can be left out. What the distance reads, from the decompiled 0x2D2520: of every
-// province the owner, the group +0x338 with its two member lists, whether +0x550 is set and the flags;
-// of every country its overlord. The rest (the map's coordinates and its table of distances, a
-// province's neighbours) does not change during a game.
+// province whether it has an owner, whether that owner is this country or a subject of it (not who it
+// is, or any war elsewhere on the map would change every country's print), the group +0x338 with its
+// two member lists, whether +0x550 is set and the port flag. The rest (the map's coordinates and its
+// table of distances, a province's neighbours) does not change during a game.
 //
 // Plain memory reads at the game's offsets, no Windows calls, so a test can lay out its own structures.
 
@@ -165,25 +166,45 @@ inline std::uint64_t TablePrint(const std::int16_t* table, std::size_t cells) no
     return hash;
 }
 
-// Everything a rebuild of this country reads. `groups` is scratch space.
+// Which tags count as this country in the distance: itself and its subjects, by tag.
+inline void MarkOwnTags(Bytes root, Bytes country, std::vector<std::uint8_t>& own) {
+    own.assign(0x8000, 0);
+    const std::int16_t tag = TagOf(At<std::uint64_t>(country, kCountryId));
+    if (tag >= 0) own[static_cast<std::size_t>(tag)] = 1;
+    const auto rows = At<Bytes>(country, kCountryRows);
+    const std::int64_t rowCount = (At<Bytes>(country, kCountryRowsEnd) - rows) / static_cast<std::int64_t>(kRowStride);
+    const auto countries = At<Bytes>(root, kRootCountries);
+    for (std::int64_t r = 0; r < rowCount; ++r) {
+        const auto other = At<Bytes>(countries, static_cast<std::size_t>(r) * 8);
+        const std::int16_t otherTag = TagOf(At<std::uint64_t>(other, kCountryId));
+        if (otherTag >= 0 && TagOf(At<std::uint64_t>(other, kCountryOverlord)) == tag) own[static_cast<std::size_t>(otherTag)] = 1;
+    }
+}
+
+// Everything a rebuild of this country reads. `groups` and `own` are scratch space.
 inline std::uint64_t WorldPrint(Bytes root, Bytes country, const std::vector<Bytes>& ports, std::int32_t reach,
-                                std::vector<Bytes>& groups) {
+                                std::vector<Bytes>& groups, std::vector<std::uint8_t>& own) {
     const auto id = At<std::uint64_t>(country, kCountryId);
     const bool open = OpenToAllProvinces(country);
     std::uint64_t hash = Mix(Mix(Mix(0x50525431, id), open), static_cast<std::uint32_t>(reach));
     for (Bytes port : ports) hash = Mix(hash, reinterpret_cast<std::uintptr_t>(port));
     const auto provinces = At<Bytes>(root, kRootProvinces);
     const auto count = static_cast<std::int32_t>((At<Bytes>(root, kRootProvinceIdsEnd) - At<Bytes>(root, kRootProvinceIdsBegin)) >> 3);
+    MarkOwnTags(root, country, own);
     groups.clear();
     for (std::int32_t p = 0; p < count; ++p) {
         Bytes province = ProvinceAt(provinces, p);
-        hash = Mix(hash, At<std::uint64_t>(province, kProvinceOwner));
+        const auto owner = At<std::uint64_t>(province, kProvinceOwner);
+        const std::int16_t tag = TagOf(owner);
         const auto group = At<Bytes>(province, kProvinceGroup);
         hash = Mix(hash, reinterpret_cast<std::uintptr_t>(group));
         if (group != nullptr) groups.push_back(group);
-        const auto flags = At<std::uint8_t>(province, kProvinceFlags);
-        const auto building = At<const void*>(province, kProvinceBuilding) != nullptr;
-        hash = Mix(hash, static_cast<std::uint64_t>(flags) | (building ? 0x100u : 0u) | (TargetCounts(province, id, open) ? 0x200u : 0u));
+        std::uint64_t bits = (At<std::uint8_t>(province, kProvinceFlags) & kFlagPort) != 0;
+        bits |= At<const void*>(province, kProvinceBuilding) != nullptr ? 2u : 0u;
+        bits |= TargetCounts(province, id, open) ? 4u : 0u;
+        bits |= (owner >> 56) != 0 ? 8u : 0u;
+        bits |= tag >= 0 && own[static_cast<std::size_t>(tag)] != 0 ? 16u : 0u;
+        hash = Mix(hash, bits);
     }
     std::sort(groups.begin(), groups.end());
     groups.erase(std::unique(groups.begin(), groups.end()), groups.end());
@@ -195,12 +216,6 @@ inline std::uint64_t WorldPrint(Bytes root, Bytes country, const std::vector<Byt
         for (auto node = At<Bytes>(group, kGroupList); node != nullptr; node = At<Bytes>(node, kGroupNodeNext)) {
             hash = Mix(hash, At<std::uint64_t>(node, 0));
         }
-    }
-    const auto rows = At<Bytes>(country, kCountryRows);
-    const std::int64_t rowCount = (At<Bytes>(country, kCountryRowsEnd) - rows) / static_cast<std::int64_t>(kRowStride);
-    const auto countries = At<Bytes>(root, kRootCountries);
-    for (std::int64_t r = 0; r < rowCount; ++r) {
-        hash = Mix(hash, At<std::uint64_t>(At<Bytes>(countries, static_cast<std::size_t>(r) * 8), kCountryOverlord));
     }
     return hash;
 }
