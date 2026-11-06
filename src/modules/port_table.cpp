@@ -56,7 +56,6 @@ std::mutex* g_lastLock = nullptr;
 std::unordered_map<const void*, Last>* g_last = nullptr;
 thread_local std::vector<port::Bytes>* t_ports = nullptr;
 thread_local std::vector<port::Bytes>* t_groups = nullptr;
-thread_local std::vector<std::uint8_t>* t_own = nullptr;
 
 struct Prepared {
     std::int32_t reach = 0;
@@ -68,7 +67,6 @@ struct Prepared {
 Prepared Prepare(const unsigned char* root, unsigned char* country, const std::int16_t* table, std::size_t cells) {
     if (t_ports == nullptr) t_ports = new std::vector<port::Bytes>();
     if (t_groups == nullptr) t_groups = new std::vector<port::Bytes>();
-    if (t_own == nullptr) t_own = new std::vector<std::uint8_t>();
     t_ports->clear();
     Prepared p;
     LONG64 start = sb::Ticks();
@@ -77,7 +75,7 @@ Prepared Prepare(const unsigned char* root, unsigned char* country, const std::i
     InterlockedExchangeAdd64(&g_ports, static_cast<LONG64>(t_ports->size()));
     g_range(country, &p.reach);
     start = sb::Ticks();
-    p.world = port::WorldPrint(root, country, *t_ports, p.reach, *t_groups, *t_own);
+    p.world = port::WorldPrint(root, country, *t_ports, p.reach, *t_groups);
     const std::uint64_t now = port::TablePrint(table, cells);
     InterlockedExchangeAdd64(&g_printTicks, sb::Ticks() - start);
     std::lock_guard lock(*g_lastLock);

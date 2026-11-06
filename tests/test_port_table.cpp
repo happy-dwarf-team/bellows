@@ -208,27 +208,19 @@ void TestWorldPrint() {
     World w(40, 4, random);
     unsigned char* country = w.countries[1].data();
     std::vector<Bytes> ports, groups;
-    std::vector<std::uint8_t> own;
     CollectPorts(w.root.data(), country, ports);
-    const auto print = [&] { return WorldPrint(w.root.data(), country, ports, 7, groups, own); };
+    const auto print = [&] { return WorldPrint(w.root.data(), country, ports, 7, groups); };
     const std::uint64_t first = print();
     assert(print() == first);
-    assert(WorldPrint(w.root.data(), country, ports, 8, groups, own) != first);  // the range
+    assert(WorldPrint(w.root.data(), country, ports, 8, groups) != first);  // the range
 
-    // Each thing the distance reads moves the print: a province that passes to this country...
-    assert(!w.owned[2].empty());
-    unsigned char* province = w.Province(w.owned[2][0]);
+    // Each thing the distance reads moves the print: the owner of any province.
+    unsigned char* province = w.Province(9);
     const auto owner = At<std::uint64_t>(province, kProvinceOwner);
-    Put(province, kProvinceOwner, Id(1));
-    assert(print() != first);
-    Put(province, kProvinceOwner, owner);
-    assert(print() == first);
-    // ...one that changes between two other countries does not...
     Put(province, kProvinceOwner, Id(3));
-    assert(print() == first);
-    Put(province, kProvinceOwner, Id(2, 0, 0));  // ...but one that loses its owner does.
     assert(print() != first);
     Put(province, kProvinceOwner, owner);
+    assert(print() == first);
 
     // A port's flag and whether +0x550 is set.
     const auto flags = At<std::uint8_t>(province, kProvinceFlags);
@@ -240,10 +232,8 @@ void TestWorldPrint() {
     assert(print() != first);
     Put(province, kProvinceBuilding, building);
 
-    // A country that becomes this country's subject, or another's: only the first matters.
-    Put(w.countries[2].data(), kCountryOverlord, Id(3));
-    assert(print() == first);
-    Put(w.countries[2].data(), kCountryOverlord, Id(1));
+    // The overlord of any country.
+    Put(w.countries[2].data(), kCountryOverlord, std::uint64_t{0x123});
     assert(print() != first);
     Put(w.countries[2].data(), kCountryOverlord, std::uint64_t{0});
 

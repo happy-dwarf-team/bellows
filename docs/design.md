@@ -508,9 +508,8 @@ the game's function for good after a mismatch. `port_table.tsv` has the counters
 
 Two rebuilds in three leave the table as it was: the flag is set by far more than
 what moves a port. `WorldPrint` hashes what the loop and the distance read (of
-every province whether it has an owner and whether that is this country or a
-subject of it, the group with its member lists, the port flag and whether `+0x550`
-is set; the list of ports and the range).
+every province the owner, the group with its member lists, the flags and whether
+`+0x550` is set; of every country its overlord; the list of ports and the range).
 A rebuild with the same print over the same table is left out, and `"verify"`
 checks that such a rebuild would really have changed nothing.
 
