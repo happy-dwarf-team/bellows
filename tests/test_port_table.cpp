@@ -194,67 +194,19 @@ void TestAgainstGame() {
             GameLoop(w, country, game.data(), range);
             std::vector<Bytes> ports;
             CollectPorts(w.root.data(), country, ports);
+            int rangeCalls = 0;
             Fill(
-                w.root.data(), country, ports, ours.data(), [&](Bytes from, Bytes to) { return w.Distance(from, to); }, range);
+                w.root.data(), country, ports, ours.data(), [&](Bytes from, Bytes to) { return w.Distance(from, to); },
+                [&] {
+                    ++rangeCalls;
+                    return range;
+                });
             assert(game == ours);
+            assert(rangeCalls <= 1);
             for (auto v : ours) differentRanges += v < 0 && v != -1;
         }
     }
     assert(differentRanges > 0);  // the sign of out-of-range provinces was exercised
-}
-
-void TestWorldPrint() {
-    std::mt19937 random(11);
-    World w(40, 4, random);
-    unsigned char* country = w.countries[1].data();
-    std::vector<Bytes> ports, groups;
-    CollectPorts(w.root.data(), country, ports);
-    const auto print = [&] { return WorldPrint(w.root.data(), country, ports, 7, groups); };
-    const std::uint64_t first = print();
-    assert(print() == first);
-    assert(WorldPrint(w.root.data(), country, ports, 8, groups) != first);  // the range
-
-    // Each thing the distance reads moves the print: the owner of any province.
-    unsigned char* province = w.Province(9);
-    const auto owner = At<std::uint64_t>(province, kProvinceOwner);
-    Put(province, kProvinceOwner, Id(3));
-    assert(print() != first);
-    Put(province, kProvinceOwner, owner);
-    assert(print() == first);
-
-    // A port's flag and whether +0x550 is set.
-    const auto flags = At<std::uint8_t>(province, kProvinceFlags);
-    Put(province, kProvinceFlags, static_cast<std::uint8_t>(flags ^ kFlagPort));
-    assert(print() != first);
-    Put(province, kProvinceFlags, flags);
-    const auto building = At<void*>(province, kProvinceBuilding);
-    Put(province, kProvinceBuilding, building == nullptr ? reinterpret_cast<void*>(std::uintptr_t{1}) : nullptr);
-    assert(print() != first);
-    Put(province, kProvinceBuilding, building);
-
-    // The overlord of any country.
-    Put(w.countries[2].data(), kCountryOverlord, std::uint64_t{0x123});
-    assert(print() != first);
-    Put(w.countries[2].data(), kCountryOverlord, std::uint64_t{0});
-
-    // The group of a province, and the members in its two lists.
-    std::vector<unsigned char> group(0x60), node(0x20);
-    std::uint64_t member = 5;
-    Put(group.data(), kGroupArray, static_cast<void*>(&member));
-    Put(group.data(), kGroupCount, std::int32_t{1});
-    Put(province, kProvinceGroup, static_cast<void*>(group.data()));
-    const std::uint64_t grouped = print();
-    assert(grouped != first);
-    member = 6;
-    assert(print() != grouped);
-    member = 5;
-    assert(print() == grouped);
-    Put(group.data(), kGroupList, static_cast<void*>(node.data()));
-    assert(print() != grouped);
-
-    // A table changed by anything else shows too.
-    const std::int16_t a[3] = {1, 2, 3}, b[3] = {1, 2, 4};
-    assert(TablePrint(a, 3) == TablePrint(a, 3) && TablePrint(a, 3) != TablePrint(b, 3));
 }
 
 void TestApplies() {
@@ -300,7 +252,6 @@ void TestWarState() {
 
 int main() {
     TestAgainstGame();
-    TestWorldPrint();
     TestApplies();
     TestWarState();
     std::printf("port_table ok\n");

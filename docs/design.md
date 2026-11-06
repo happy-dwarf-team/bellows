@@ -503,15 +503,8 @@ distance (`0x2D2520`) and the range (`0x350A20`) are the game's own functions;
 the distance calls stay, so what is saved is the walks. A first build of the
 table and a country that has nothing to fill in go to the game's function.
 `"verify"` runs the game's function on the real table and `Fill` on a copy and
-compares every cell; `"on"` does that for every 16th rebuild and goes back to
+compares every cell; `"on"` does that for every 256th rebuild and goes back to
 the game's function for good after a mismatch. `port_table.tsv` has the counters.
-
-Two rebuilds in three leave the table as it was: the flag is set by far more than
-what moves a port. `WorldPrint` hashes what the loop and the distance read (of
-every province the owner, the group with its member lists, the flags and whether
-`+0x550` is set; of every country its overlord; the list of ports and the range).
-A rebuild with the same print over the same table is left out, and `"verify"`
-checks that such a rebuild would really have changed nothing.
 
 ### modifier_merge (simulation)
 

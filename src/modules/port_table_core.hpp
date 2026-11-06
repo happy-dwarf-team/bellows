@@ -10,16 +10,8 @@
 // game's order and the comparison stays strict, so a tie ends on the port the game ends on. The distance
 // and the range come from the game's own functions.
 //
-// Two rebuilds in three leave the table as it was: the flag is set by far more than what moves a port.
-// WorldPrint hashes everything the game's loop and its distance read, so a rebuild with the same print
-// over the same table can be left out. What the distance reads, from the decompiled 0x2D2520: of every
-// province the owner, the group +0x338 with its two member lists, whether +0x550 is set and the flags;
-// of every country its overlord. The rest (the map's coordinates and its table of distances, a
-// province's neighbours) does not change during a game.
-//
 // Plain memory reads at the game's offsets, no Windows calls, so a test can lay out its own structures.
 
-#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -36,7 +28,7 @@ constexpr std::size_t kProvinceStride = 0x2E10;
 
 // A country.
 constexpr std::size_t kCountryId = 0x20, kCountryType = 0x26, kCountryProvinces = 0x1338, kCountryProvinceCount = 0x1344;
-constexpr std::size_t kCountryPortCount = 0x1C78, kCountryWars = 0x1468, kCountryOverlord = 0x18F0;
+constexpr std::size_t kCountryPortCount = 0x1C78, kCountryWars = 0x1468;
 constexpr std::size_t kCountryRows = 0x1510, kCountryRowsEnd = 0x1518, kRowStride = 0x48, kRowId = 0x10;
 constexpr std::size_t kCountryTable = 0x2320, kCountryTableEnd = 0x2328, kCountryDirty = 0x2887;
 constexpr std::uint8_t kTypeWithoutProvinces = 7;
@@ -50,7 +42,6 @@ constexpr std::size_t kProvinceSelf = 0x20, kProvinceClass = 0x28, kProvinceAcce
 constexpr std::size_t kProvinceOwner = 0x468, kProvinceController = 0x470, kProvinceFriends = 0x490, kProvinceFriendsEnd = 0x498;
 constexpr std::size_t kProvinceBuilding = 0x550, kProvinceFlags = 0x958, kProvinceFlagsHigh = 0x959;
 constexpr std::size_t kClassFlags = 0x228;
-constexpr std::size_t kProvinceGroup = 0x338, kGroupList = 8, kGroupNodeNext = 0x10, kGroupArray = 0x40, kGroupCount = 0x4C;
 constexpr std::uint8_t kFlagPort = 0x10, kFlagBlocked = 0x40, kFlagHighRestricted = 0x10, kClassClosed = 8;
 
 constexpr std::int32_t kFarAway = 0x5F5DD18;
@@ -154,57 +145,6 @@ inline bool TargetCounts(Bytes target, std::uint64_t countryId, bool open) noexc
     return ((bits >> (index & 31)) & 1) != 0;
 }
 
-inline std::uint64_t Mix(std::uint64_t hash, std::uint64_t value) noexcept {
-    hash = (hash ^ value) * 0x9E3779B97F4A7C15ULL;
-    return hash ^ (hash >> 29);
-}
-
-inline std::uint64_t TablePrint(const std::int16_t* table, std::size_t cells) noexcept {
-    std::uint64_t hash = cells;
-    for (std::size_t i = 0; i < cells; ++i) hash = Mix(hash, static_cast<std::uint16_t>(table[i]));
-    return hash;
-}
-
-// Everything a rebuild of this country reads. `groups` is scratch space.
-inline std::uint64_t WorldPrint(Bytes root, Bytes country, const std::vector<Bytes>& ports, std::int32_t reach,
-                                std::vector<Bytes>& groups) {
-    const auto id = At<std::uint64_t>(country, kCountryId);
-    const bool open = OpenToAllProvinces(country);
-    std::uint64_t hash = Mix(Mix(Mix(0x50525431, id), open), static_cast<std::uint32_t>(reach));
-    for (Bytes port : ports) hash = Mix(hash, reinterpret_cast<std::uintptr_t>(port));
-    const auto provinces = At<Bytes>(root, kRootProvinces);
-    const auto count = static_cast<std::int32_t>((At<Bytes>(root, kRootProvinceIdsEnd) - At<Bytes>(root, kRootProvinceIdsBegin)) >> 3);
-    groups.clear();
-    for (std::int32_t p = 0; p < count; ++p) {
-        Bytes province = ProvinceAt(provinces, p);
-        hash = Mix(hash, At<std::uint64_t>(province, kProvinceOwner));
-        const auto group = At<Bytes>(province, kProvinceGroup);
-        hash = Mix(hash, reinterpret_cast<std::uintptr_t>(group));
-        if (group != nullptr) groups.push_back(group);
-        const auto flags = At<std::uint8_t>(province, kProvinceFlags);
-        const auto building = At<const void*>(province, kProvinceBuilding) != nullptr;
-        hash = Mix(hash, static_cast<std::uint64_t>(flags) | (building ? 0x100u : 0u) | (TargetCounts(province, id, open) ? 0x200u : 0u));
-    }
-    std::sort(groups.begin(), groups.end());
-    groups.erase(std::unique(groups.begin(), groups.end()), groups.end());
-    for (Bytes group : groups) {
-        const auto members = At<std::int32_t>(group, kGroupCount);
-        hash = Mix(hash, static_cast<std::uint32_t>(members));
-        const auto array = At<Bytes>(group, kGroupArray);
-        for (std::int32_t i = 0; i < members; ++i) hash = Mix(hash, At<std::uint64_t>(array, static_cast<std::size_t>(i) * 8));
-        for (auto node = At<Bytes>(group, kGroupList); node != nullptr; node = At<Bytes>(node, kGroupNodeNext)) {
-            hash = Mix(hash, At<std::uint64_t>(node, 0));
-        }
-    }
-    const auto rows = At<Bytes>(country, kCountryRows);
-    const std::int64_t rowCount = (At<Bytes>(country, kCountryRowsEnd) - rows) / static_cast<std::int64_t>(kRowStride);
-    const auto countries = At<Bytes>(root, kRootCountries);
-    for (std::int64_t r = 0; r < rowCount; ++r) {
-        hash = Mix(hash, At<std::uint64_t>(At<Bytes>(countries, static_cast<std::size_t>(r) * 8), kCountryOverlord));
-    }
-    return hash;
-}
-
 // True when Fill can stand in for the game's function on this country: a table of the right size that
 // the game would fill in. Everything else (the first build of the table, the empty country) goes to the
 // game's function, which is short for those anyway.
@@ -217,18 +157,24 @@ inline bool Applies(Bytes root, Bytes country) noexcept {
     return At<std::int32_t>(country, kCountryPortCount) != 0;
 }
 
-// The loop of 0x350B80 over the list `ports`: `distance(port, target)` and `reach` are the game's.
+// The loop of 0x350B80 over the list `ports`: `distance(port, target)` and `range()` are the game's.
 // `table` starts as the game's table: a province the game skips keeps its value.
-template <class Distance>
-void Fill(Bytes root, Bytes country, const std::vector<Bytes>& ports, std::int16_t* table, Distance&& distance, std::int32_t reach) {
+template <class Distance, class Range>
+void Fill(Bytes root, Bytes country, const std::vector<Bytes>& ports, std::int16_t* table, Distance&& distance, Range&& range) {
     const auto provinces = At<Bytes>(root, kRootProvinces);
     const auto count = static_cast<std::int32_t>((At<Bytes>(root, kRootProvinceIdsEnd) - At<Bytes>(root, kRootProvinceIdsBegin)) >> 3);
     const auto id = At<std::uint64_t>(country, kCountryId);
     const bool open = OpenToAllProvinces(country);
+    std::int32_t reach = 0;
+    bool reachKnown = false;
     for (std::int32_t p = 1; p < count; ++p) {
         Bytes target = ProvinceAt(provinces, p);
         if (!TargetCounts(target, id, open)) continue;
         table[p] = 0;
+        if (!reachKnown) {
+            reach = range();
+            reachKnown = true;
+        }
         std::int32_t best = kFarAway;
         Bytes nearest = nullptr;
         for (Bytes port : ports) {
