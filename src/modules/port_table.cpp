@@ -38,6 +38,8 @@ const unsigned char* const* g_root = nullptr;
 bool g_verifyOnly = false;
 volatile LONG64 g_checkSequence = 0;
 volatile LONG64 g_gameTicks = 0, g_fastTicks = 0, g_collectTicks = 0, g_ports = 0, g_gameCalls = 0;
+// Compared rebuilds that left the table as it was, and their time in the game's function.
+volatile LONG64 g_unchanged = 0, g_unchangedTicks = 0;
 std::wstring* g_dir = nullptr;
 constexpr DWORD kWriteEveryMs = 5000;
 constexpr LONG64 kCheckEvery = 256;
@@ -92,9 +94,10 @@ void Detour(void* countryPtr) {
         InterlockedIncrement64(&EU4SB_PortTableStats.hits);
         return;
     }
-    std::vector<std::int16_t> copy;
+    std::vector<std::int16_t> copy, before;
     try {
-        copy.assign(table, table + cells);
+        before.assign(table, table + cells);
+        copy = before;
         const LONG64 start = sb::Ticks();
         Rebuild(root, country, copy.data());
         InterlockedExchangeAdd64(&g_fastTicks, sb::Ticks() - start);
@@ -104,8 +107,13 @@ void Detour(void* countryPtr) {
     }
     const LONG64 start = sb::Ticks();
     g_next(countryPtr);
-    InterlockedExchangeAdd64(&g_gameTicks, sb::Ticks() - start);
+    const LONG64 gameTicks = sb::Ticks() - start;
+    InterlockedExchangeAdd64(&g_gameTicks, gameTicks);
     InterlockedIncrement64(&g_gameCalls);
+    if (std::equal(before.begin(), before.end(), table)) {
+        InterlockedIncrement64(&g_unchanged);
+        InterlockedExchangeAdd64(&g_unchangedTicks, gameTicks);
+    }
     InterlockedIncrement64(&EU4SB_PortTableStats.verifications);
     if (!std::equal(copy.begin(), copy.end(), table)) {
         InterlockedIncrement64(&EU4SB_PortTableStats.mismatches);
@@ -124,10 +132,11 @@ void WriteFile() {
             std::ofstream out(temp, std::ios::binary | std::ios::trunc);
             const double ms = sb::TicksToMs(1);
             out << "mode\trequests\thits\tskips\tverifications\tmismatches\tdisabled\tgame_calls\tgame_ms\tfast_ms\t"
-                   "collect_ms\tports\n"
+                   "collect_ms\tports\tunchanged\tunchanged_game_ms\n"
                 << (g_verifyOnly ? "verify" : "on") << "\t" << s.requests << "\t" << s.hits << "\t" << s.skips << "\t"
                 << s.verifications << "\t" << s.mismatches << "\t" << s.cacheDisabled << "\t" << g_gameCalls << "\t"
-                << g_gameTicks * ms << "\t" << g_fastTicks * ms << "\t" << g_collectTicks * ms << "\t" << g_ports << "\n";
+                << g_gameTicks * ms << "\t" << g_fastTicks * ms << "\t" << g_collectTicks * ms << "\t" << g_ports << "\t"
+                << g_unchanged << "\t" << g_unchangedTicks * ms << "\n";
         }
         MoveFileExW(temp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING);
     } catch (...) {
