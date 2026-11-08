@@ -524,7 +524,7 @@ distance (`0x2D2520`) and the range (`0x350A20`) are the game's own functions;
 the distance calls stay, so what is saved is the walks. A first build of the
 table and a country that has nothing to fill in go to the game's function.
 `"verify"` runs the game's function on the real table and `Fill` on a copy and
-compares every cell; `"on"` does that for every 256th rebuild and goes back to
+compares every cell; `"on"` does that for every 32nd rebuild and goes back to
 the game's function for good after a mismatch. `port_table.tsv` has the counters.
 
 ### modifier_merge (simulation)
