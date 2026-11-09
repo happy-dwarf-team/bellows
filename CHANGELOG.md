@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.6.0](https://github.com/happy-dwarf-team/bellows/compare/v1.5.0...v1.6.0) (2026-11-09)
+
+
+### Features
+
+* **checksum_defer:** start the checksum task after the databases load ([#172](https://github.com/happy-dwarf-team/bellows/issues/172)) ([26152fd](https://github.com/happy-dwarf-team/bellows/commit/26152fdbe42a12ce7de1a7feff392d9d16ddc0b6))
+* **never_throttle:** skip the main loop's waits while a minimized game runs at speed 5 ([#171](https://github.com/happy-dwarf-team/bellows/issues/171)) ([78d75b8](https://github.com/happy-dwarf-team/bellows/commit/78d75b88981fb86fe99699cebc3050a0c60d6455))
+
 ## [1.5.0](https://github.com/happy-dwarf-team/bellows/compare/v1.4.1...v1.5.0) (2026-11-09)
 
 ### Features
