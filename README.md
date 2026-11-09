@@ -19,7 +19,7 @@ Players can also subscribe on the
 The team's other tools for EU4 are on [happydwarf.dev](https://happydwarf.dev/).
 
 Bellows needs **Anvil 1.7 or newer** and EU4 1.37.5 (Steam, Windows 64-bit) or
-1.37.5.2 (GOG, Windows 64-bit). Anvil checks every game address against `eu4.exe`
+1.37.5.2 (GOG, Windows 64-bit); the GOG build 1.37.5.0 needs Anvil 1.16 or newer. Anvil checks every game address against `eu4.exe`
 before it loads Bellows ([`plugin/symbols.toml`](plugin/symbols.toml),
 [design §6d](docs/design.md#6d-the-gog-build-13752-d)). On another build, or on
 any mismatch, it skips the plugin, gives the reason in `anvil/anvil.log`, and the
@@ -279,11 +279,14 @@ have not been through it. Both orders are normal games.
 In multiplayer the known ties are safe. The host's AI makes these choices and sends them
 to every player as commands, so every game gets the same choices whoever runs Bellows.
 In the lab the host ran Bellows with default settings and the other computer ran
-no Bellows: 233 game days on 0.17.0, with the game's own out-of-sync check shown
-to catch a single extra random draw on the host, and 231 on the code of 1.3.0, at
-speed 3 because the other computer could not keep up at 5. With the defaults of
-1.4 the same test ran 203 game days at speed 3. None of the three runs went out
-of sync. All used one save of 1444, and none had Bellows on the other computer.
+no Bellows: 233 game days on 0.17.0 and 231 on the code of 1.3.0, at speed 3
+because the other computer could not keep up at 5. With the defaults of 1.4 the
+same test ran 203 game days at speed 3. In all three runs the game's usual
+out-of-sync check, the one players get, which compares the random-number count
+and seed, reported nothing; a single extra random draw on the host was shown to
+trip it within 2 game days. The runs did not use `-hardoos`, which compares all
+140 checksums of the game state, so they do not show that the whole state stayed
+the same. All used one save of 1444, and none had Bellows on the other computer.
 Details in [bellows#79](https://github.com/happy-dwarf-team/bellows/issues/79)
 and the [design notes](docs/design.md#4-correctness-safeguards-d).
 
