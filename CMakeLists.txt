@@ -111,6 +111,7 @@ set(SB_SOURCES
     src/modules/save_compress_parallel.cpp
     src/modules/transfer_skip.cpp
     src/modules/history_add.cpp
+    src/modules/checksum_defer.cpp
     src/modules/tick_profile.cpp
     src/modules/army_search_profile.cpp
     src/modules/score_probe.cpp

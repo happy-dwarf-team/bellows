@@ -836,6 +836,32 @@ signature = "int (void* strm)"
 note = "deflateEnd of the zlib 1.2.8 linked into eu4.exe"
 build."eu4-1.37.5-steam-win64" = { rva = 0x181FB90 }
 build."eu4-1.37.5.2-gog-win64" = { rva = 0x1809810 }
+# --- checksum_defer (prototype, lab #66) -------------------------------------------
+
+[symbol.checksum_task_invoke]
+bytes = "40 53 48 83 EC 60 48 8B D9 48 C7 44 24 40 00 00 00 00"
+memory = "code"
+signature = "void (void* buffer)"
+note = "boost function_obj_invoker0<CCreateChecksumTask>::invoke (0x2178D0): the checksum task's work on a LongTasks worker; CVersion::SetupFromManifestFile over checksum_manifest.txt"
+build."eu4-1.37.5-steam-win64" = { rva = 0x2178D0 }
+build."eu4-1.37.5.2-gog-win64" = { rva = 0x217890 }
+
+[symbol.load_databases]
+bytes = "40 53 56 57 41 54 41 55 41 56 41 57 B8 F0 F5 00 00"
+memory = "code"
+signature = "void (void* app)"
+note = "CEU4Application::LoadDatabases (0x208620), called once from InitGame (0x204918) right after the checksum task was pushed"
+build."eu4-1.37.5-steam-win64" = { rva = 0x208620 }
+build."eu4-1.37.5.2-gog-win64" = { rva = 0x2085E0 }
+
+[symbol.update_checksum_if_needed]
+bytes = "40 57 48 83 EC 20 48 8B 81 30 04 00 00 48 8B F9"
+memory = "code"
+signature = "bool (void* app)"
+note = "CEU4Application::UpdateChecksumIfNeeded (0x211100): true once it copied the finished task's checksum to the game version"
+build."eu4-1.37.5-steam-win64" = { rva = 0x211100 }
+build."eu4-1.37.5.2-gog-win64" = { rva = 0x2110C0 }
+
 # --- history_add -------------------------------------------------------------------
 
 [symbol.history_add_call]
