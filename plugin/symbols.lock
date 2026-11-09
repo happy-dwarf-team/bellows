@@ -1,8 +1,8 @@
 # Written by anvil check --exe; anvil check without the game fails when it does not match
 # symbols.toml. Commit it with symbols.toml.
 format = 2
-tool = "anvil 1.7.0"
-symbols_sha256 = "2904475EA437578B07E005B86AF6B905F7CEFD5E928E9340D2101809DCC15227"
+tool = "anvil 1.14.1"
+symbols_sha256 = "4547E6B0696FFD7971EF6C8A828B095C1232395B729DB63C4479D5590A872E76"
 
 [[check]]
 build = "eu4-1.37.5-steam-win64"
@@ -12,4 +12,9 @@ result = "ok"
 [[check]]
 build = "eu4-1.37.5.2-gog-win64"
 exe_sha256 = "D29CF745F245A5CDD74FE7B500599DDDD4A61089AFFB04B02044056F23155319"
+result = "ok"
+
+[[check]]
+build = "eu4-1.37.5.0-gog-win64"
+exe_sha256 = "5F4145CE5FF9A4140CC4D14440920382B698DD91E1CDAE1D1DC053357D9388EE"
 result = "ok"
