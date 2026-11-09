@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/happy-dwarf-team/bellows/compare/v1.4.1...v1.5.0) (2026-11-09)
+
+
+### Features
+
+* **symbols:** run on the GOG build 1.37.5.0 ([#169](https://github.com/happy-dwarf-team/bellows/issues/169)) ([c3f52a9](https://github.com/happy-dwarf-team/bellows/commit/c3f52a9b99381313223a0fd5b486445ffe7a1291))
+
 ## [1.4.1](https://github.com/happy-dwarf-team/bellows/compare/v1.4.0...v1.4.1) (2026-11-09)
 
 
