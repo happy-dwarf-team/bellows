@@ -152,14 +152,14 @@ on the base game (the save of Russia, the year 1720) and on the Anbennar mod set
 above (the year 1445). EU4 1.37.5 (Steam), original `eu4.exe` started from a copy
 of the game folder, Anvil 1.13.0, anvil-game and Tongs 0.26.1, a build of Bellows
 with the 1.4 defaults apart from `never_throttle`. Five games per setup and save,
-interleaved, one pair with the window visible, 9 November 2026:
+interleaved, 9 November 2026 (the visible games in a separate series):
 
 | Save | Window | `never_throttle` off | `never_throttle` on |
 | --- | --- | --- | --- |
 | Russia, 1720 | minimized | 81.35–83.86 s, median 82.94 s | 30.23–35.79 s, median **34.37 s** |
-| | visible | 21.01 s | 22.02 s |
+| | visible | 20.52–50.39 s, median 23.68 s | 21.70–33.82 s, median 24.13 s |
 | Anbennar, 1445 | minimized | 105.69–110.08 s, median 107.11 s | 61.78–66.47 s, median **65.26 s** |
-| | visible | 47.69 s | 50.15 s |
+| | visible | 42.69–48.39 s, median 46.03 s | 42.54–52.06 s, median 44.67 s |
 
 So a minimized year takes 59% less on the base game and 39% less on Anbennar; the
 ranges do not overlap, and a permutation test of the medians gives p = 0.048 on
@@ -169,9 +169,11 @@ about the same processor time for the year in less wall time. Paused and minimiz
 for 30 s after the year, it used 0.077 against 0.074 and 0.034 against 0.035 cores,
 and the flag was cleared in every game.
 
-With the window visible the game does not wait, so the module should change
-nothing there; the single pair per save, 4.8% and 5.1% slower with it, does not
-settle that either way. The game ran on processors 1–7 with its main thread on one
+With the window visible the game does not wait, and the module changes nothing
+there: the medians differ by +1.9% (base game) and −3.0% (Anbennar), the ranges
+overlap and the permutation tests give p = 1.0 and 0.71. Other work on the same
+computer slowed two visible base-game years (50.39 s off, 33.82 s on); the
+medians do not move with them. The game ran on processors 1–7 with its main thread on one
 of them and 6 workers in each pool. Not measured: a window covered but not
 minimized, full screen with alt-tab, laptops on battery, multiplayer.
 
