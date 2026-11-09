@@ -1,22 +1,22 @@
 // checksum_defer (PROTOTYPE, lab #66, off by default): the game's checksum task starts reading the files of
-// checksum_manifest.txt only once CEU4Application::LoadDatabases has returned, instead of right before it.
+// checksum_manifest.txt only once the game databases are loaded, instead of right before they start.
 //
-// InitGame pushes CCreateChecksumTask to the LongTasks pool just before LoadDatabases (lab #15, #47); the task then
-// competes with the databases for the VFS lock and the PhysFS state lock. Here the task's invoke (0x2178D0) waits on
-// an event that the return of LoadDatabases sets, then runs as the game wrote it: same files, same order, same
-// digest, same log lines (only their place in error.log moves). LongTasks has no other task during the databases
+// Start-up queues the checksum task on the long-task pool just before the databases load (lab #15, #47); the task
+// then competes with the databases for the VFS lock and the PhysFS state lock. Here the task's body (0x2178D0)
+// waits on an event that the end of the database load sets, then runs as the game wrote it: same files, same order,
+// same digest, same log lines (only their place in error.log moves). The pool has no other task during the databases
 // (lab #47), so the waiting worker holds up nobody. A timeout of 120 s runs the task anyway.
 //
 // The counters go to anvil.log, each as ms since the process was created (the harness's clock):
-// the task's start and wait, LoadDatabases' return, the task's end (its SetDone follows right after) and the first
-// CEU4Application::UpdateChecksumIfNeeded that returned true (the menu has the checksum from then on).
+// the task's start and wait, the end of the database load, the task's end (it marks itself done right after) and
+// the first menu poll that took the checksum (the menu has the checksum from then on).
 #include "modules.hpp"
 
 namespace {
 
 anvil::HookOf<sym::checksum_task_invoke> g_invokeHook;
-anvil::HookOf<sym::load_databases> g_loadHook;
-anvil::HookOf<sym::update_checksum_if_needed> g_updateHook;
+anvil::HookOf<sym::database_load> g_loadHook;
+anvil::HookOf<sym::menu_checksum_poll> g_updateHook;
 decltype(g_invokeHook.next_pointer()) g_invokeNext = nullptr;
 decltype(g_loadHook.next_pointer()) g_loadNext = nullptr;
 decltype(g_updateHook.next_pointer()) g_updateNext = nullptr;
@@ -49,16 +49,16 @@ void InvokeDetour(void* buffer) {
     sb::Log(ANVIL_LOG_INFO, "checksum_defer: task done %.0f ms (ran %.0f ms)", end, end - run);
 }
 
-void LoadDatabasesDetour(void* app) {
+void DatabaseLoadDetour(void* app) {
     g_loadNext(app);
     SetEvent(g_databasesDone);
-    sb::Log(ANVIL_LOG_INFO, "checksum_defer: LoadDatabases returned %.0f ms", SinceCreation());
+    sb::Log(ANVIL_LOG_INFO, "checksum_defer: databases loaded %.0f ms", SinceCreation());
 }
 
 bool UpdateDetour(void* app) {
     const bool got = g_updateNext(app);
     if (got && InterlockedExchange(&g_loggedUpdate, 1) == 0)
-        sb::Log(ANVIL_LOG_INFO, "checksum_defer: UpdateChecksumIfNeeded took the checksum %.0f ms", SinceCreation());
+        sb::Log(ANVIL_LOG_INFO, "checksum_defer: the menu took the checksum %.0f ms", SinceCreation());
     return got;
 }
 
@@ -78,15 +78,15 @@ bool InstallChecksumDefer(anvil::Host& host, Mode mode) {
     host.hook(g_invokeHook, sym::checksum_task_invoke, &InvokeDetour);
     undo.add(g_invokeHook);
     g_invokeNext = g_invokeHook.next_pointer();
-    host.hook(g_loadHook, sym::load_databases, &LoadDatabasesDetour);
+    host.hook(g_loadHook, sym::database_load, &DatabaseLoadDetour);
     undo.add(g_loadHook);
     g_loadNext = g_loadHook.next_pointer();
-    host.hook(g_updateHook, sym::update_checksum_if_needed, &UpdateDetour);
+    host.hook(g_updateHook, sym::menu_checksum_poll, &UpdateDetour);
     undo.add(g_updateHook);
     g_updateNext = g_updateHook.next_pointer();
     undo.keep();
     Log(ANVIL_LOG_INFO, "checksum_defer: %s (prototype)",
-        g_defer ? "the checksum task waits for LoadDatabases" : "verify: times only, the task is not moved");
+        g_defer ? "the checksum task waits for the databases" : "verify: times only, the task is not moved");
     return true;
 }
 
