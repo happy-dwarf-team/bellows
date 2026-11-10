@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0](https://github.com/happy-dwarf-team/bellows/compare/v1.6.0...v1.7.0) (2026-11-10)
+
+
+### Features
+
+* **listing_lookup:** answer PhysFS's second look at a folder from the listings ([#178](https://github.com/happy-dwarf-team/bellows/issues/178)) ([c21f117](https://github.com/happy-dwarf-team/bellows/commit/c21f117b0b0318546618c8bd065b230fd831a25c))
+
 ## [1.6.0](https://github.com/happy-dwarf-team/bellows/compare/v1.5.0...v1.6.0) (2026-11-09)
 
 ### Features
