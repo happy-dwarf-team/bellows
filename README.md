@@ -448,11 +448,11 @@ The defaults, labels and descriptions are in
 default, for example:
 
 ```toml
-attr_cache = "on"
+exists_index = "verify"
 ram_prefetch_budget_mb = 2048
 ```
 
-With Anvil 1.20 or newer, the Anvil panel and Anvil Manager show the labels and descriptions of these settings and Bellows' description in the player's
+The Anvil panel and Anvil Manager show the labels and descriptions of these settings and Bellows' description in the player's
 language: French, German, Spanish, Simplified and Traditional Chinese, Japanese, Korean or
 Polish, from [`plugin/translations/`](plugin/translations/). The translations are drafts that native speakers
 have not checked yet; a correction is welcome in an issue or a pull request.
@@ -552,7 +552,7 @@ release.
 
 ## Install / uninstall
 
-[Install Anvil](https://anvil.happydwarf.dev/docs/install/) 1.7 or newer first. It
+[Install Anvil](https://anvil.happydwarf.dev/docs/install/) 1.22 or newer first. It
 includes the `anvil-game` plugin Bellows needs. Then
 [install the plugin](https://anvil.happydwarf.dev/docs/install-plugins/) one of
 these ways:
