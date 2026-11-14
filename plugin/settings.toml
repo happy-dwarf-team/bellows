@@ -1,84 +1,21 @@
 # What the player can change (Anvil design §5.3, §11). Anvil keeps the values
 # that differ from these defaults in anvil/data/bellows/settings.toml, and the
 # environment variables ANVIL_BELLOWS_<NAME> override them for one start.
-# Every module is installed while the game starts, so a setting applies at the
-# next start (restart = true), except frame_pacing_interval_ms and
-# frame_pacing_input, which change while the game runs. "verify" also runs the game's own code and
-# keeps its result: slower, for checking correctness.
-# From 1.0 the names and values of these settings keep their meaning in every
-# 1.x release (README, "Compatibility"), except the group "Diagnostics": lab
-# tools whose names, counters and output files may change in a minor release.
+# Each feature is a module of plugin.toml's [[modules]], and its switch there is the only one
+# (Anvil ADR 0013): a setting here only refines its module (`module`). Every module is installed
+# while the game starts, so a setting applies at the next start (restart = true), except
+# frame_pacing_interval_ms and frame_pacing_input, which change while the game runs.
+# The names and values of these settings keep their meaning in every 2.x release (README,
+# "Compatibility"), except those of the Diagnostics module: lab tools whose names, counters and
+# output files may change in a minor release.
 
-[setting.mimalloc]
+[setting.mimalloc_scope]
 type = "enum"
-values = [{ name = "on", label = "On" }, { name = "startup", label = "Start-up only" }, { name = "off", label = "Off" }]
-default = "startup"
-label = "mimalloc"
-description = "Faster memory allocator for the game's C runtime: for the whole game session, or only until the main menu (later allocations use the Windows heap)."
-group = "Start-up"
-restart = true
-
-[setting.verifypath_listing]
-type = "enum"
-values = [{ name = "on", label = "On" }, { name = "off", label = "Off" }, { name = "verify", label = "Verify" }]
-default = "on"
-label = "PhysFS path checks"
-description = "Answers PhysFS path checks from directory listings."
-group = "Start-up"
-restart = true
-
-[setting.exists_index]
-type = "enum"
-values = [{ name = "on", label = "On" }, { name = "off", label = "Off" }, { name = "verify", label = "Verify" }]
-default = "on"
-label = "File existence index"
-description = "Answers \"does this file exist\" for the modifier icon check."
-group = "Start-up"
-restart = true
-
-[setting.trigger_intern]
-type = "enum"
-values = [{ name = "on", label = "On" }, { name = "off", label = "Off" }, { name = "verify", label = "Verify" }]
-default = "on"
-label = "Trigger profile lookup"
-description = "Faster lookup of each trigger in the game's trigger profile at the end of loading."
-group = "Start-up"
-restart = true
-
-[setting.metascript_subst]
-type = "enum"
-values = [{ name = "on", label = "On" }, { name = "off", label = "Off" }, { name = "verify", label = "Verify" }]
-default = "on"
-label = "Parameter substitution"
-description = "Single-pass $parameter$ substitution in scripted effects and triggers."
-group = "Start-up"
-restart = true
-
-[setting.metascript_blocks]
-type = "enum"
-values = [{ name = "on", label = "On" }, { name = "off", label = "Off" }, { name = "verify", label = "Verify" }]
-default = "on"
-label = "Conditional blocks"
-description = "Single-pass resolution of [[parameter] ...] blocks in scripted effects and triggers (big gain on mods with large scripted effects, e.g. Anbennar)."
-group = "Start-up"
-restart = true
-
-[setting.open_warmup]
-type = "enum"
-values = [{ name = "on", label = "On" }, { name = "off", label = "Off" }]
-default = "on"
-label = "Open warm-up"
-description = "Opens the files the game will need ahead of it on parallel threads (meant for the first start after a reboot)."
-group = "Start-up"
-restart = true
-
-[setting.ram_prefetch]
-type = "enum"
-values = [{ name = "on", label = "On" }, { name = "off", label = "Off" }, { name = "verify", label = "Verify" }]
-default = "on"
-label = "RAM prefetch"
-description = "Reads and unpacks the DLC archive members the game will need into RAM on worker threads."
-group = "Start-up"
+values = [{ name = "menu", label = "Until the main menu" }, { name = "session", label = "Whole session" }]
+default = "menu"
+label = "Used for"
+description = "Until the main menu, later allocations use the Windows heap again; or for the whole session."
+module = "mimalloc"
 restart = true
 
 [setting.ram_prefetch_budget_mb]
@@ -87,126 +24,9 @@ default = 1024
 min = 64
 max = 8192
 step = 64
-label = "RAM prefetch budget (MB)"
-description = "RAM for unpacked archive members the game has not taken yet. A start uses at most a quarter of the memory free at that moment."
-group = "Start-up"
-restart = true
-
-[setting.attr_cache]
-type = "enum"
-values = [{ name = "on", label = "On" }, { name = "off", label = "Off" }, { name = "verify", label = "Verify" }]
-default = "off"
-label = "Missing-file cache"
-description = "Remembers \"file not found\" answers for game and mod files during start-up (at most ~0.1 s next to the other modules)."
-group = "Start-up"
-restart = true
-
-[setting.token_dict_cache]
-type = "enum"
-values = [{ name = "on", label = "On" }, { name = "off", label = "Off" }, { name = "verify", label = "Verify" }]
-default = "on"
-label = "Tokenizer keyword cache"
-description = "Caches the script tokenizer's keyword lookups."
-group = "Start-up"
-restart = true
-
-[setting.verifypath_session]
-type = "enum"
-values = [{ name = "off", label = "Off" }, { name = "on", label = "On" }]
-default = "on"
-label = "PhysFS path checks after start-up"
-description = "Loading: keeps answering PhysFS path checks from directory listings after the main menu is up (used while verifypath_listing is on), so loading a save finds its textures about 1.8 s sooner. A listing is read again once it is 30 s old."
-group = "Loading"
-restart = true
-
-[setting.history_add]
-type = "enum"
-values = [{ name = "off", label = "Off" }, { name = "on", label = "On" }, { name = "verify", label = "Verify" }]
-default = "on"
-label = "Dated lists while loading"
-description = "Loading: adds an entry the game just read to a dated list without first walking the whole list to see whether that new entry is in it. The list comes out the same. Verify lets the game walk and compares."
-group = "Loading"
-restart = true
-
-[setting.listing_lookup]
-type = "enum"
-values = [{ name = "off", label = "Off" }, { name = "on", label = "On" }, { name = "verify", label = "Verify" }]
-default = "off"
-label = "PhysFS lookups from listings"
-description = "Start-up: answers the file system's second look at a folder (does the file exist, open a file that is not there) from the directory listings of PhysFS path checks (used while verifypath_listing is on). Existing files are still opened by the game. Saves the failed opens a big mod set such as Anbennar makes in every folder it overrides. Verify asks the game every time and counts differences."
-group = "Start-up"
-restart = true
-
-[setting.checksum_defer]
-type = "enum"
-values = [{ name = "off", label = "Off" }, { name = "on", label = "On" }, { name = "verify", label = "Verify" }]
-default = "off"
-label = "Checksum after the databases"
-description = "Loading: the game's checksum task starts reading files only once the databases are loaded, so it no longer competes with them for the file system lock. Same files, order and checksum shown in the menu; about 1 s off the start of a big mod set such as Anbennar, nothing measurable on the base game. Verify only logs the task's times."
-group = "Loading"
-restart = true
-
-[setting.range_witness]
-type = "enum"
-values = [{ name = "on", label = "On" }, { name = "off", label = "Off" }, { name = "verify", label = "Verify" }]
-default = "on"
-label = "Country range check"
-description = "Simulation, not start-up: answers the country range check from the province that was in range last time; same answers as the game's code."
-group = "Simulation"
-restart = true
-
-[setting.modifier_merge]
-type = "enum"
-values = [{ name = "off", label = "Off" }, { name = "on", label = "On" }, { name = "verify", label = "Verify" }]
-default = "on"
-label = "Modifier merge index"
-description = "Simulation: adds large modifier lists (each country's modifiers to every unit's in the monthly update) with an index instead of a scan per entry, so a year at speed 5 passes about 5% sooner; the same entries, order and values. Verify runs the game's merge and compares."
-group = "Simulation"
-restart = true
-
-[setting.pops_pacing]
-type = "enum"
-values = [{ name = "off", label = "Off" }, { name = "on", label = "On" }, { name = "verify", label = "Verify" }]
-default = "on"
-label = "Online service pacing"
-description = "Simulation: at the fastest speed, runs the game's Paradox online-service callbacks every 500 ms instead of twice a frame. With nothing to deliver, each run makes the main thread sleep 1 ms. Multiplayer keeps the game's rate. Verify runs them as the game does and counts what would be left out."
-group = "Simulation"
-restart = true
-
-[setting.province_modifier_view]
-type = "enum"
-values = [{ name = "off", label = "Off" }, { name = "on", label = "On" }, { name = "verify", label = "Verify" }]
-default = "on"
-label = "Province modifier view"
-description = "Simulation: reads one value from a province's modifiers in place instead of copying the whole list first (in the daily country update and the AI); the same value. Verify runs the game's copy and compares."
-group = "Simulation"
-restart = true
-
-[setting.port_table]
-type = "enum"
-values = [{ name = "off", label = "Off" }, { name = "on", label = "On" }, { name = "verify", label = "Verify" }]
-default = "on"
-label = "Port table"
-description = "Simulation: rebuilds a country's table of the nearest port from one list of its ports instead of walking its provinces and relations again for every province of the map; the same table. Verify runs the game's function and compares."
-group = "Simulation"
-restart = true
-
-[setting.army_search_memo]
-type = "enum"
-values = [{ name = "off", label = "Off" }, { name = "on", label = "On" }, { name = "verify", label = "Verify" }]
-default = "on"
-label = "AI army search memo"
-description = "Simulation: in the AI's daily search for each army, in a path search and when a unit's moves from a province are listed, works out once whether the army ignores forts' zones of control and what its speed modifier is, instead of for every move; the same answers. Verify runs the game's check every time and compares."
-group = "Simulation"
-restart = true
-
-[setting.frame_pacing]
-type = "enum"
-values = [{ name = "off", label = "Off" }, { name = "on", label = "On" }]
-default = "on"
-label = "Frame pacing at speed 5"
-description = "Simulation: at the fastest speed, draws frames from inside the daily tick less often while you do nothing (see the interval), so a year passes about 10% sooner; a key press or click still gets a frame at once. The simulation is the same; the map updates about 16 instead of 22 times a second at speed 5."
-group = "Simulation"
+label = "Memory budget (MB)"
+description = "RAM for unpacked files the game has not taken yet; a start uses at most a quarter of free memory."
+module = "ram_prefetch"
 restart = true
 
 [setting.frame_pacing_interval_ms]
@@ -215,115 +35,367 @@ default = 100
 min = 0
 max = 1000
 step = 10
-label = "Frame pacing interval (ms)"
-description = "Shortest time between frames drawn inside the daily tick at the fastest speed (the game's own is 50 ms; a shorter value keeps the game's). 0 keeps the game's interval and only counts frames. Applies at once while frame pacing is on."
-group = "Simulation"
+label = "Interval (ms)"
+description = "Shortest time between frames at speed 5 while you do nothing (the game's is 50 ms); 0 keeps the game's."
+module = "frame_pacing"
 restart = false
 
 [setting.frame_pacing_input]
 type = "enum"
 values = [{ name = "draw", label = "React at once" }, { name = "wait", label = "Wait for the interval" }]
 default = "draw"
-label = "Frame pacing while you play"
-description = "What frame pacing does when you press a key, click or turn the wheel at speed 5: draw a frame at once, so the game reacts at least as fast as without frame pacing (frames are skipped only while you do nothing), or wait for the longer interval (0.12.0). Applies at once while frame pacing is on."
-group = "Simulation"
+label = "When you press a key or click"
+description = "React at once draws a frame for every input; waiting skips more frames."
+module = "frame_pacing"
 restart = false
 
-[setting.never_throttle]
-type = "enum"
-values = [{ name = "off", label = "Off" }, { name = "on", label = "On" }]
-default = "off"
-label = "Full speed while minimized"
-description = "Simulation: while a single-player game runs at speed 5, the game skips its own waits of up to 100 ms a frame, which it makes while the window is minimized. A minimized year then takes about 40-60% less time; with the window visible nothing changes. Uses more processor time per second while minimized at speed 5. Pauses, menus, other speeds and multiplayer keep the game's waits."
-group = "Simulation"
-restart = true
-
-[setting.save_compress]
-type = "enum"
-values = [{ name = "off", label = "Off" }, { name = "on", label = "On" }, { name = "verify", label = "Verify" }]
-default = "on"
-label = "Save compression"
-description = "Saving: compressed saves (compress_autosave and the like) without the game's byte-at-a-time CRC-32; the file is byte for byte the game's. Verify runs the game's own compression as well, writes its result and compares the two."
-group = "Saving"
-restart = true
-
 [setting.save_compress_parallel]
-type = "enum"
-values = [{ name = "off", label = "Off" }, { name = "on", label = "On" }, { name = "verify", label = "Verify" }]
-default = "off"
-label = "Parallel save compression"
-description = "Saving, with save compression on: compresses large members of a compressed save (the gamestate) on several threads. The save is a valid archive that the game and other tools read as before, but its compressed bytes differ from the game's. Verify decodes each member again before writing it."
-group = "Saving"
+type = "bool"
+default = false
+label = "Compress on several threads"
+description = "Faster for large saves; the file is a valid save, but its bytes differ from the game's."
+module = "save_compress"
 restart = true
 
-[setting.transfer_skip]
-type = "enum"
-values = [{ name = "off", label = "Off" }, { name = "on", label = "On" }, { name = "verify", label = "Verify" }]
-default = "on"
-label = "Skip transfer compression"
-description = "Loading in single player: does not compress a text save for a multiplayer transfer that nobody receives; the game loads the same file as before. Hosted multiplayer is left as it is. Verify keeps the game's copy and checks that nothing reads it."
-group = "Saving"
-restart = true
+# Diagnostics: the timing profiles (off until chosen) ...
 
 [setting.tick_profile]
-type = "enum"
-values = [{ name = "off", label = "Off" }, { name = "on", label = "On" }]
-default = "off"
+type = "bool"
+default = false
 label = "Daily tick profile"
-description = "Diagnostic: time of each stage of the daily, monthly and yearly tick and of the frames drawn inside it, per game day, in tick_profile*.tsv."
-group = "Diagnostics"
+description = "Time of each stage of the daily, monthly and yearly tick, in tick_profile*.tsv."
+module = "diagnostics"
+group = "Profiles"
 restart = true
 
 [setting.army_search_profile]
-type = "enum"
-values = [{ name = "off", label = "Off" }, { name = "on", label = "On" }]
-default = "off"
+type = "bool"
+default = false
 label = "AI army search profile"
-description = "Diagnostic: calls, time and repeated answers of the AI army search, in army_search*.tsv."
-group = "Diagnostics"
+description = "Calls, time and repeated answers of the AI army search, in army_search*.tsv."
+module = "diagnostics"
+group = "Profiles"
 restart = true
 
 [setting.score_probe]
-type = "enum"
-values = [{ name = "off", label = "Off" }, { name = "on", label = "On" }]
-default = "off"
+type = "bool"
+default = false
 label = "AI scoring probe"
-description = "Diagnostic: how often the inputs of the AI army search's scoring functions repeat within a game day, in score_probe.tsv."
-group = "Diagnostics"
+description = "How often the AI army search's scoring inputs repeat within a day, in score_probe.tsv."
+module = "diagnostics"
+group = "Profiles"
 restart = true
 
 [setting.monthly_probe]
-type = "enum"
-values = [{ name = "off", label = "Off" }, { name = "on", label = "On" }]
-default = "off"
+type = "bool"
+default = false
 label = "Monthly tick probe"
-description = "Diagnostic: time of the monthly tick's country, province and unit updates, modifier merges and random draws, in monthly_probe*.tsv."
-group = "Diagnostics"
+description = "Time of the monthly tick's updates, modifier merges and random draws, in monthly_probe*.tsv."
+module = "diagnostics"
+group = "Profiles"
 restart = true
 
 [setting.zip_profile]
-type = "enum"
-values = [{ name = "off", label = "Off" }, { name = "on", label = "On" }]
-default = "off"
+type = "bool"
+default = false
 label = "ZIP read profile"
-description = "Diagnostic: time spent in ZIP reads and inflate per thread, in anvil.log."
-group = "Diagnostics"
+description = "Time spent in ZIP reads and inflate per thread, in anvil.log."
+module = "diagnostics"
+group = "Profiles"
 restart = true
 
 [setting.token_dict_profile]
-type = "enum"
-values = [{ name = "off", label = "Off" }, { name = "on", label = "On" }]
-default = "off"
-label = "Tokenizer lookup profile"
-description = "Diagnostic: the tokenizer's keyword lookups. Shares its call site with the tokenizer keyword cache; turn that off for clean counts."
-group = "Diagnostics"
+type = "bool"
+default = false
+label = "Keyword lookup profile"
+description = "The script reader's keyword lookups; turn the keyword cache off for clean counts."
+module = "diagnostics"
+group = "Profiles"
 restart = true
 
 [setting.range_profile]
-type = "enum"
-values = [{ name = "off", label = "Off" }, { name = "on", label = "On" }]
-default = "off"
+type = "bool"
+default = false
 label = "Range check profile"
-description = "Diagnostic: counters of the country range check in range_profile*.tsv. Turn the country range check off for the game's own walk."
-group = "Diagnostics"
+description = "Counters of the country range check, in range_profile*.tsv; turn that module off for the game's walk."
+module = "diagnostics"
+group = "Profiles"
 restart = true
+
+# ... and a check per feature (the "verify" mode of 1.x): the module runs the game's own code as
+# well and compares. A check works while Diagnostics and its module are on.
+
+[setting.verifypath_listing_check]
+type = "bool"
+default = false
+label = "Check: Path check cache"
+description = "Runs the game's own code as well and counts differences. Slower."
+module = "diagnostics"
+advanced = true
+restart = true
+
+[setting.listing_lookup_check]
+type = "bool"
+default = false
+label = "Check: Lookups from listings"
+description = "Runs the game's own code as well and counts differences. Slower."
+module = "diagnostics"
+advanced = true
+restart = true
+
+[setting.exists_index_check]
+type = "bool"
+default = false
+label = "Check: File existence index"
+description = "Runs the game's own code as well and counts differences. Slower."
+module = "diagnostics"
+advanced = true
+restart = true
+
+[setting.trigger_intern_check]
+type = "bool"
+default = false
+label = "Check: Trigger profile lookup"
+description = "Runs the game's own code as well and counts differences. Slower."
+module = "diagnostics"
+advanced = true
+restart = true
+
+[setting.metascript_subst_check]
+type = "bool"
+default = false
+label = "Check: Parameter substitution"
+description = "Runs the game's own code as well and counts differences. Slower."
+module = "diagnostics"
+advanced = true
+restart = true
+
+[setting.metascript_blocks_check]
+type = "bool"
+default = false
+label = "Check: Conditional blocks"
+description = "Runs the game's own code as well and counts differences. Slower."
+module = "diagnostics"
+advanced = true
+restart = true
+
+[setting.ram_prefetch_check]
+type = "bool"
+default = false
+label = "Check: RAM prefetch"
+description = "Runs the game's own code as well and counts differences. Slower."
+module = "diagnostics"
+advanced = true
+restart = true
+
+[setting.attr_cache_check]
+type = "bool"
+default = false
+label = "Check: Missing-file cache"
+description = "Runs the game's own code as well and counts differences. Slower."
+module = "diagnostics"
+advanced = true
+restart = true
+
+[setting.token_dict_cache_check]
+type = "bool"
+default = false
+label = "Check: Keyword cache"
+description = "Runs the game's own code as well and counts differences. Slower."
+module = "diagnostics"
+advanced = true
+restart = true
+
+[setting.history_add_check]
+type = "bool"
+default = false
+label = "Check: Dated lists while loading"
+description = "Runs the game's own code as well and counts differences. Slower."
+module = "diagnostics"
+advanced = true
+restart = true
+
+[setting.checksum_defer_check]
+type = "bool"
+default = false
+label = "Check: Checksum after the databases"
+description = "Logs the checksum task's times."
+module = "diagnostics"
+advanced = true
+restart = true
+
+[setting.range_witness_check]
+type = "bool"
+default = false
+label = "Check: Country range check"
+description = "Runs the game's own code as well and counts differences. Slower."
+module = "diagnostics"
+advanced = true
+restart = true
+
+[setting.pops_pacing_check]
+type = "bool"
+default = false
+label = "Check: Online service pacing"
+description = "Runs the callbacks as the game does and counts what pacing would leave out."
+module = "diagnostics"
+advanced = true
+restart = true
+
+[setting.modifier_merge_check]
+type = "bool"
+default = false
+label = "Check: Modifier merge index"
+description = "Runs the game's own code as well and counts differences. Slower."
+module = "diagnostics"
+advanced = true
+restart = true
+
+[setting.port_table_check]
+type = "bool"
+default = false
+label = "Check: Port table"
+description = "Runs the game's own code as well and counts differences. Slower."
+module = "diagnostics"
+advanced = true
+restart = true
+
+[setting.province_modifier_view_check]
+type = "bool"
+default = false
+label = "Check: Province modifier view"
+description = "Runs the game's own code as well and counts differences. Slower."
+module = "diagnostics"
+advanced = true
+restart = true
+
+[setting.army_search_memo_check]
+type = "bool"
+default = false
+label = "Check: AI army search memo"
+description = "Runs the game's own code as well and counts differences. Slower."
+module = "diagnostics"
+advanced = true
+restart = true
+
+[setting.save_compress_check]
+type = "bool"
+default = false
+label = "Check: Save compression"
+description = "Compresses as the game does as well and compares; on several threads, decodes each part again."
+module = "diagnostics"
+advanced = true
+restart = true
+
+[setting.transfer_skip_check]
+type = "bool"
+default = false
+label = "Check: Skip transfer compression"
+description = "Keeps the game's copy and checks that nothing reads it."
+module = "diagnostics"
+advanced = true
+restart = true
+
+# The mode settings of 1.x, which the modules' switches replace (Anvil ADR 0013, point 4). At the
+# first start of 2.0, Anvil turns the module off for a player whose file says "off" (and on for one
+# of a module off by default that the file turned on), and removes the value from the file.
+
+[retired.mimalloc]
+module = "mimalloc"
+off = ["off"]
+
+[retired.open_warmup]
+module = "open_warmup"
+off = ["off"]
+
+[retired.ram_prefetch]
+module = "ram_prefetch"
+off = ["off"]
+
+[retired.verifypath_listing]
+module = "verifypath_listing"
+off = ["off"]
+
+[retired.listing_lookup]
+module = "listing_lookup"
+off = ["off"]
+on = ["on", "verify"]
+
+[retired.exists_index]
+module = "exists_index"
+off = ["off"]
+
+[retired.trigger_intern]
+module = "trigger_intern"
+off = ["off"]
+
+[retired.metascript_subst]
+module = "metascript_subst"
+off = ["off"]
+
+[retired.metascript_blocks]
+module = "metascript_blocks"
+off = ["off"]
+
+[retired.attr_cache]
+module = "attr_cache"
+off = ["off"]
+on = ["on", "verify"]
+
+[retired.token_dict_cache]
+module = "token_dict_cache"
+off = ["off"]
+
+[retired.history_add]
+module = "history_add"
+off = ["off"]
+
+[retired.checksum_defer]
+module = "checksum_defer"
+off = ["off"]
+on = ["on", "verify"]
+
+[retired.verifypath_session]
+module = "verifypath_session"
+off = ["off"]
+
+[retired.range_witness]
+module = "range_witness"
+off = ["off"]
+
+[retired.frame_pacing]
+module = "frame_pacing"
+off = ["off"]
+
+[retired.pops_pacing]
+module = "pops_pacing"
+off = ["off"]
+
+[retired.never_throttle]
+module = "never_throttle"
+off = ["off"]
+on = ["on"]
+
+[retired.modifier_merge]
+module = "modifier_merge"
+off = ["off"]
+
+[retired.port_table]
+module = "port_table"
+off = ["off"]
+
+[retired.province_modifier_view]
+module = "province_modifier_view"
+off = ["off"]
+
+[retired.army_search_memo]
+module = "army_search_memo"
+off = ["off"]
+
+[retired.save_compress]
+module = "save_compress"
+off = ["off"]
+
+[retired.transfer_skip]
+module = "transfer_skip"
+off = ["off"]

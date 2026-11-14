@@ -878,7 +878,7 @@ changing. Loading a save builds the in-game interface, and that looks up thousan
 profile of "Continue" (1821 save, 10 mods) more than half of the last 3 s of an 8.6 s load were PhysFS
 stat calls, about 225,000 of them through `verifyPath`.
 
-`verifypath_session = "on"` lets the module go on. After the ready event a listing older than 30 s is read
+The module `verifypath_session` (a setting, `on` or `off`, before 2.0) lets it go on. After the ready event a listing older than 30 s is read
 again at its next use, so a file added or removed during a session counts after at most 30 s; a listing
 read during a load is fresh enough for that load. The write directory stays with the game as before, and every
 256th answer is still compared with the game's stat, which turns the module off on a difference.
@@ -1255,19 +1255,31 @@ needs Anvil 1.0 (`api = 2`, `anvil = ">=1.0.0"`, `affects_gameplay = false`).
   handler sets `sb::g_gameReady` (the hot paths read it like the old marker
   byte) and starts a thread for the profiles and the report, since the event
   runs on the game's main thread.
-- **Modules.** Since 2.0 every module but the diagnostics is an Anvil module
-  (`[[modules]]` in `plugin/plugin.toml`, Anvil ADR 0011, Anvil 1.22): `load()` asks
-  `Host::module(name)` for its handle and installs the module through it, so its
-  changes have the module as their owner and the player turns it on or off in
-  Anvil Manager (`enabled_modules` / `disabled_modules`). A module Anvil reports off
-  is not installed. `src/module_switch.hpp` combines that with the module's setting;
-  an Anvil without `module()` leaves the setting alone in charge, as before.
-- **Settings.** `plugin/settings.toml`: one enum per module (`on`/`off`, plus
-  `verify` where the module has it; for a module of `[[modules]]` the setting chooses the
-  mode, and its `off` is an alias of `disabled_modules` in 2.x) and `ram_prefetch_budget_mb` (int,
-  64–8192), all `restart = true` except `frame_pacing_interval_ms` and
-  `frame_pacing_input`, which change while the game runs (see frame_pacing). Overrides are
-  `ANVIL_BELLOWS_<NAME>`.
+- **Modules.** Since 2.0 every feature is an Anvil module (`[[modules]]` in
+  `plugin/plugin.toml`, Anvil ADR 0011 and 0013, Anvil 1.23), and its switch is the only
+  one: `load()` asks `Host::module(name)` for its handle and installs the module through
+  it, so its changes have the module as their owner and the player turns it on or off in
+  Anvil Manager or the overlay (`enabled_modules` / `disabled_modules`). A module Anvil
+  reports off is not installed. `group` orders the modules (Start-up, Loading, Simulation,
+  Saving, For testing). `verifypath_session` is a module without code of its own: it lets
+  `verifypath_listing`'s hooks go on after the ready event.
+- **Diagnostics.** One module, off by default, holds the lab's tools as its settings: the
+  seven profiles (installed through the Diagnostics handle when chosen) and, as advanced
+  settings, a `<module>_check` per feature that had a `verify` mode, which makes that module
+  run as `verify` (`src/module_switch.hpp`). With Diagnostics off, no profile or check runs,
+  whatever the settings say.
+- **Retired settings.** The mode settings of 1.x (`<module>` = on / off / verify,
+  `verifypath_session` = on / off) are `[retired.<name>]` in `plugin/settings.toml`
+  (ADR 0013, point 4): at the first start of 2.0 Anvil turns `off` into `disabled_modules`
+  and, for a module off by default, `on` / `verify` into `enabled_modules`, before it
+  resolves the modules, and removes the values from the player's file. Bellows itself writes
+  no `anvil.toml`.
+- **Settings.** `plugin/settings.toml`: every setting names its module (`module`):
+  `mimalloc_scope` (until the main menu or the whole session), `ram_prefetch_budget_mb`
+  (int, 64–8192), `frame_pacing_interval_ms`, `frame_pacing_input`, `save_compress_parallel`
+  (bool) and the Diagnostics settings. All are `restart = true` except
+  `frame_pacing_interval_ms` and `frame_pacing_input`, which change while the game runs (see
+  frame_pacing). Overrides are `ANVIL_BELLOWS_<NAME>`.
 - **No migrations from 0.7.0 and earlier.** 1.x moved `anvil/data/bellows/config.toml` to
   `settings.toml`, moved `anvil/data/eu4-startup-boost/` to `anvil/data/bellows/` and named a
   set `EU4SB_<NAME>` with its replacement; 2.0 does none of it.
