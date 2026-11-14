@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.0.0](https://github.com/happy-dwarf-team/bellows/compare/v1.8.0...v2.0.0) (2026-11-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* **settings:** a player updating straight from 0.7.0 or earlier (or from EU4 Startup Boost, 0.5.0 and earlier) chooses the settings again; the learned profiles are learned again at the first start of each mod set.
+* **plugin:** Bellows needs Anvil 1.22 (an older Anvil refuses [[modules]]). A module that is off by default (attr_cache, listing_lookup, never_throttle, checksum_defer) is turned on in Anvil Manager or with enabled_modules = ["bellows.<module>"] in anvil.toml; "on" in its setting alone no longer turns it on.
+
+### Features
+
+* **plugin:** declare Bellows' modules as Anvil modules ([[modules]], Anvil 1.22) ([#190](https://github.com/happy-dwarf-team/bellows/issues/190)) ([c9fbd75](https://github.com/happy-dwarf-team/bellows/commit/c9fbd75878ae76ec8aa8865a4dd7db5e16f7a405))
+* **settings:** drop the migrations from 0.7.0 and earlier ([#195](https://github.com/happy-dwarf-team/bellows/issues/195)) ([bf37ff9](https://github.com/happy-dwarf-team/bellows/commit/bf37ff96eb0baa9a036f4f92c22e083ade78405f))
+
+
+### Build
+
+* take the Anvil SDK from the 1.22.0 release ([#193](https://github.com/happy-dwarf-team/bellows/issues/193)) ([c397b04](https://github.com/happy-dwarf-team/bellows/commit/c397b0445e1d8c3d62c846beb0a3ae1ff7643831))
+
 ## [1.8.0](https://github.com/happy-dwarf-team/bellows/compare/v1.7.0...v1.8.0) (2026-11-12)
 
 ### Features
