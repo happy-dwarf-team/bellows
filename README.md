@@ -368,7 +368,7 @@ says in the Manager is one sentence; the details are here.
 
 | Module | What it does |
 | --- | --- |
-| **Save compression** (`save_compress`) | **On by default since 0.18.** For compressed saves (`compress_autosave = yes` and the like): compresses each member of the save with the game's own zlib, call for call as the game does, but computes its CRC-32 eight bytes at a time instead of one; the file is byte for byte the game's. `"verify"` runs the game's own compression as well, writes its result and compares the two members byte for byte. Lab, the 1719 save with `compress_autosave = yes`, 6 autosaves per setting in interleaved games: an autosave took 0.831 s (0.823–0.842) instead of 0.873 s (0.871–0.900); `"verify"` found 0 differences in 10 members. `save_compress_parallel = "on"` (off by default) compresses large members (the gamestate) in 1 MiB chunks on several threads instead: a valid archive with the same members, which the game loads and other tools read, but with other compressed bytes than the game's (`"verify"` decodes each member again before writing it). An autosave then took 0.612 s (0.575–0.637), the gamestate 80–95 ms on 7 threads instead of about 300 ms |
+| **Save compression** (`save_compress`) | **On by default since 0.18.** For compressed saves (`compress_autosave = yes` and the like): compresses each member of the save with the game's own zlib, call for call as the game does, but computes its CRC-32 eight bytes at a time instead of one; the file is byte for byte the game's. `"verify"` runs the game's own compression as well, writes its result and compares the two members byte for byte. Lab, the 1719 save with `compress_autosave = yes`, 6 autosaves per setting in interleaved games: an autosave took 0.831 s (0.823–0.842) instead of 0.873 s (0.871–0.900); `"verify"` found 0 differences in 10 members. `save_compress_threads` (off by default; `save_compress_parallel = "on"` before 2.0) compresses large members (the gamestate) in 1 MiB chunks on several threads instead: a valid archive with the same members, which the game loads and other tools read, but with other compressed bytes than the game's (`"verify"` decodes each member again before writing it). An autosave then took 0.612 s (0.575–0.637), the gamestate 80–95 ms on 7 threads instead of about 300 ms |
 | **Skip transfer compression** (`transfer_skip`) | **On by default since 1.1.** In single player, "Continue" of a text save no longer compresses the whole file at level 9 for a multiplayer transfer nobody receives; the game loads the same file as before. Hosted multiplayer is left as it is. `"verify"` keeps the game's copy and checks that it is the save, that the load does not use it and that nothing is sent. Lab, interleaved runs, 5 per setting, click on "Continue" to the game ready: the 64.5 MB save of 1821 8.95 s (8.55–9.23) instead of 10.91 s (10.78–11.06), a 40 MB vanilla save of 1450 4.47 s (4.35–4.99) instead of 5.84 s (5.70–6.14). Compressed saves have no such copy and do not change |
 
 ### For testing
@@ -468,7 +468,7 @@ change nothing.
 | `ram_prefetch` | `ram_prefetch_budget_mb` | 64–8192 (default 1024) |
 | `frame_pacing` | `frame_pacing_interval_ms` | 0–1000 (default 100); 0 keeps the game's own interval |
 | `frame_pacing` | `frame_pacing_input` | `draw` (default) or `wait`, the 0.12.0 behaviour |
-| `save_compress` | `save_compress_parallel` | `false` (default) or `true`: large members on several threads; a valid save whose compressed bytes differ from the game's |
+| `save_compress` | `save_compress_threads` | `false` (default) or `true`: large members on several threads; a valid save whose compressed bytes differ from the game's |
 | `diagnostics` | the profiles and checks | `true` or `false`, see [Diagnostics](#diagnostics) |
 
 The defaults, labels and descriptions are in
@@ -478,7 +478,7 @@ default, for example:
 
 ```toml
 ram_prefetch_budget_mb = 2048
-save_compress_parallel = true
+save_compress_threads = true
 ```
 
 **From 1.x.** 1.x had a setting of the same name as each module (`on`, `off`, `verify`). At the
@@ -487,7 +487,7 @@ off (`disabled_modules`), and for a module that is off by default (`attr_cache`,
 `never_throttle`, `checksum_defer`) `on` or `verify` turns it on (`enabled_modules`). Then it
 removes them from the file and says so in `anvil/anvil.log`. `verifypath_session = "off"` turns
 that module off the same way. Not carried over: `mimalloc = "on"` (choose `session` again) and
-`save_compress_parallel = "on"` (now `true`); `verify` is a check of the Diagnostics module now.
+`save_compress_parallel = "on"` (removed; set `save_compress_threads = true`); `verify` is a check of the Diagnostics module now.
 
 The Anvil panel and Anvil Manager show the labels and descriptions of these settings and Bellows' description in the player's
 language: French, German, Spanish, Simplified and Traditional Chinese, Japanese, Korean or
@@ -514,7 +514,7 @@ From 2.0 on, every 2.x release keeps these as they are, so a
 
 - the id of every module (`bellows.<module>` in `anvil.toml`);
 - `mimalloc_scope`, `ram_prefetch_budget_mb`, `frame_pacing_interval_ms`,
-  `frame_pacing_input` and `save_compress_parallel`, with their ranges and values;
+  `frame_pacing_input` and `save_compress_threads`, with their ranges and values;
 - the oldest Anvil Bellows needs (Anvil 1.23).
 
 A release that renames or removes one of these, gives a value another

@@ -712,7 +712,7 @@ AI) is not measured yet, so the module stays off until a SIMULATION series.
 
 ### save_compress (saving)
 
-On by default since 0.18.0 (`save_compress_parallel` stays off). With `compress_autosave = yes` (and for every other compressed
+On by default since 0.18.0 (`save_compress_threads` stays off). With `compress_autosave = yes` (and for every other compressed
 save) the game writes a ZIP archive in memory and compresses each member on the
 calling thread: `gamestate`, `meta`, `ai` and, with a random New World, its
 archive. One function does all of it, `0x153C790` (writer, input, buffer, size,
@@ -743,7 +743,7 @@ on the very state being saved, which two games cannot do (two runs of the same
 save do not reach the same state). `symbols.toml` checks the function's entry, its zlib calls, the
 CRC loop and the finish loop, so another build of the function is refused.
 
-`save_compress_parallel = "on"` (separate, off by default) compresses members of
+`save_compress_threads = true` (separate, off by default) compresses members of
 at least 4 MiB differently (`save_compress_parallel.hpp`): the member is read
 whole, cut into 1 MiB chunks, and each chunk is compressed on one of up to 8
 threads (the process's CPUs) with the zlib 1.3.1 linked into Bellows, level and
@@ -793,7 +793,7 @@ the small members with both settings on `"verify"`, 0 differences; every
 parallel member decoded to its input. Offline, the members of all 15 autosaves
 written with the module off, `"on"` and `"verify"` are byte for byte what the
 game's function gives with zlib 1.2.8. A save written with
-`save_compress_parallel` loaded in a game without Bellows (single player, the
+`save_compress_threads` loaded in a game without Bellows (single player, the
 game then ran a month); Python's `zipfile`, Windows `tar`, NanaZip and Etch's
 save reader read it with the CRCs of its headers. Starting a game from a
 plain-text save also goes through the function once, at level 9, for a copy that
@@ -825,7 +825,7 @@ handler's slot 1, as `CFileTransferManager::GetSession`) is a dummy and not a
 server, the hook calls the game's `AddFile` with `compress = false`. Nothing else
 changes: the entry has its bytes and checksum, the load gets the same bytes and
 flag. Hosted multiplayer is a server session and keeps its copy, compressed by
-the game or with `save_compress_parallel`; a client never reaches `AddFile`. If a
+the game or with `save_compress_threads`; a client never reaches `AddFile`. If a
 session did turn out to send an entry without a copy, `SendFile` sends `Data`
 with the flag off, as it does for a compressed save: a larger transfer, not a
 wrong one.
@@ -850,7 +850,7 @@ interleaved runs per arm on each save: the 1821 save (text, 64,542,833 bytes,
 Bellows with default settings otherwise; "no Bellows" is Anvil, anvil-game and
 Tongs.
 
-| Save | No Bellows | `transfer_skip` off | `save_compress_parallel` on, `transfer_skip` off | `transfer_skip` on |
+| Save | No Bellows | `transfer_skip` off | `save_compress_threads` on, `transfer_skip` off | `transfer_skip` on |
 | --- | --- | --- | --- | --- |
 | 1821 | 11.26 s (10.84–11.69) | 10.91 s (10.78–11.06) | 8.97 s (8.88–9.18) | **8.95 s** (8.55–9.23) |
 | Vanilla 1450 | 6.11 s (5.70–6.17) | 5.84 s (5.70–6.14) | not run | **4.47 s** (4.35–4.99) |
@@ -1276,8 +1276,8 @@ needs Anvil 1.0 (`api = 2`, `anvil = ">=1.0.0"`, `affects_gameplay = false`).
   no `anvil.toml`.
 - **Settings.** `plugin/settings.toml`: every setting names its module (`module`):
   `mimalloc_scope` (until the main menu or the whole session), `ram_prefetch_budget_mb`
-  (int, 64–8192), `frame_pacing_interval_ms`, `frame_pacing_input`, `save_compress_parallel`
-  (bool) and the Diagnostics settings. All are `restart = true` except
+  (int, 64–8192), `frame_pacing_interval_ms`, `frame_pacing_input`, `save_compress_threads`
+  (bool, `save_compress_parallel` of 1.x, retired) and the Diagnostics settings. All are `restart = true` except
   `frame_pacing_interval_ms` and `frame_pacing_input`, which change while the game runs (see
   frame_pacing). Overrides are `ANVIL_BELLOWS_<NAME>`.
 - **No migrations from 0.7.0 and earlier.** 1.x moved `anvil/data/bellows/config.toml` to
@@ -1378,7 +1378,7 @@ Bellows declares both builds and needs Anvil 1.7 (`anvil = ">=1.7.0"`, SDK
 
 ## 7. Open questions (Q)
 
-None at the moment. Work after 1.0 (`save_compress_parallel`
+None at the moment. Work after 1.0 (`save_compress_threads`
 on by default, the GOG build 1.37.5.0) is listed at the end of
 [#90](https://github.com/happy-dwarf-team/bellows/issues/90).
 

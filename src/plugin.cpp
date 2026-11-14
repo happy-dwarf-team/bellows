@@ -191,7 +191,7 @@ struct Bellows : anvil::Plugin {
         // A module without code of its own: verifypath_listing's hooks keep answering after the main menu.
         sb::SetVerifyPathSession(ModuleHandle(host, "verifypath_session").has_value());
         // On several threads; save_compress's check decodes each member again before writing it.
-        sb::SetSaveCompressParallel(!cfg::save_compress_parallel.get() ? 0
+        sb::SetSaveCompressParallel(!cfg::save_compress_threads.get() ? 0
                                     : diagnostics && cfg::save_compress_check.get() ? 2
                                                                                     : 1);
 

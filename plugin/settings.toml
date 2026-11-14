@@ -49,7 +49,7 @@ description = "React at once draws a frame for every input; waiting skips more f
 module = "frame_pacing"
 restart = false
 
-[setting.save_compress_parallel]
+[setting.save_compress_threads]
 type = "bool"
 default = false
 label = "Compress on several threads"
@@ -395,6 +395,10 @@ off = ["off"]
 [retired.save_compress]
 module = "save_compress"
 off = ["off"]
+
+# 1.x's mode setting, now the bool save_compress_threads: the old value is only removed.
+[retired.save_compress_parallel]
+module = "save_compress"
 
 [retired.transfer_skip]
 module = "transfer_skip"

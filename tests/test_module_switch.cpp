@@ -129,8 +129,14 @@ int main() {
         assert(r->contains("on") == !on);
         if (!on) assert(Strings((*r)["on"]).contains("on"));
     }
+    // Any other retired name is a renamed setting (save_compress_parallel): its entry names the module
+    // and only removes the old value.
     for (const auto& [key, node] : retired) {
-        assert(declared.contains(std::string(key.str())) && !settings.contains(key.str()));
+        assert(!settings.contains(key.str()));
+        if (declared.contains(std::string(key.str()))) continue;
+        const toml::table& r = *node.as_table();
+        assert(declared.contains(r["module"].value_or(std::string())));
+        assert(!r.contains("off") && !r.contains("on"));
     }
 
     std::printf("module_switch ok (%zu modules, %zu checks)\n", declared.size(), checks.size());
