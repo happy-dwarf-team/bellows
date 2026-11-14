@@ -488,6 +488,8 @@ off (`disabled_modules`), and for a module that is off by default (`attr_cache`,
 removes them from the file and says so in `anvil/anvil.log`. `verifypath_session = "off"` turns
 that module off the same way. Not carried over: `mimalloc = "on"` (choose `session` again) and
 `save_compress_parallel = "on"` (removed; set `save_compress_threads = true`); `verify` is a check of the Diagnostics module now.
+A profile you set to `on` in 1.x (`tick_profile = "on"` and the like) shows a warning at every start until you
+remove that line or set it to `true`.
 
 The Anvil panel and Anvil Manager show the labels and descriptions of these settings and Bellows' description in the player's
 language: French, German, Spanish, Simplified and Traditional Chinese, Japanese, Korean or
