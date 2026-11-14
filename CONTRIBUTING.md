@@ -36,9 +36,7 @@ settings and their values, `ram_prefetch_budget_mb`, `frame_pacing_*`,
 `army_search_profile`, `score_probe`, `monthly_probe`), log lines, counters,
 Benchmark fields and `.tsv` files are outside it: changing them is a `feat`
 or `fix` without `!`. A new default for a module is not breaking either; say
-it in the title. The migrations from 0.7.0 and earlier (`config.toml`, the
-`eu4-startup-boost` folder, `EU4SB_*` variables) stay in 1.x and go only in
-2.0.
+it in the title.
 
 Performance claims in a pull request follow the measurement rules of the lab:
 same save/mod set, interleaved runs, median and spread, and what was not

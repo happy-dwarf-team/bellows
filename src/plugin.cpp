@@ -3,7 +3,6 @@
 #include "common.hpp"
 #include "module_switch.hpp"
 #include "modules/modules.hpp"
-#include "rename.hpp"
 #include "settings.hpp"
 
 #include <anvil/anvil_game.h>
@@ -85,14 +84,6 @@ void OnGameReady() {
     }
 }
 
-// True when ANVIL_BELLOWS_<NAME> is set: Anvil applied it over the player's
-// file, so a value migrated from config.toml must not replace it.
-bool Overridden(const std::string& name) {
-    std::string variable = "ANVIL_BELLOWS_";
-    for (char c : name) variable += static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
-    return GetEnvironmentVariableA(variable.c_str(), nullptr, 0) != 0;
-}
-
 struct Module {
     const char* name;  // also the setting's name in plugin/settings.toml, and the module's id in plugin.toml
     AnvilSetting setting;
@@ -156,20 +147,6 @@ template <size_t N> void ResolveModules(anvil::Host& host, Module (&modules)[N])
 
 struct Bellows : anvil::Plugin {
     void load(anvil::Host& host) override {
-        const std::filesystem::path plugin_dir = host.plugin_dir();
-        const std::filesystem::path data_dir = host.data_dir();
-        // The old names are a note in the log: nothing here may stop the modules.
-        Guarded("former data", [&] {
-            if (sb::FormerPluginInstalled(plugin_dir)) {
-                sb::Log(ANVIL_LOG_INFO, "anvil/plugins/eu4-startup-boost (the former name of Bellows, plugin API 1) is "
-                                        "still installed; Anvil does not load it, so the folder can be deleted");
-            }
-            if (const std::string note = sb::MigrateFormerData(data_dir); !note.empty()) {
-                sb::Log(ANVIL_LOG_INFO, "%s", note.c_str());
-            }
-            for (const auto& note : sb::FormerEnvironmentNotes()) sb::Log(ANVIL_LOG_WARNING, "%s", note.c_str());
-        });
-
         Module modules[] = {
             Declared("mimalloc", cfg::mimalloc.id, sb::InstallMimalloc, kOn),  // first: before the game's runtime allocates
             Declared("open_warmup", cfg::open_warmup.id, sb::InstallOpenWarmup, kOn),  // early: its threads must run ahead of the game
@@ -217,27 +194,9 @@ struct Bellows : anvil::Plugin {
             const char* text = host.c_api().setting_string(host.self(), m.setting);
             m.mode = sb::ParseMode(text != nullptr ? text : "").value_or(sb::Mode::Off);
         }
-        std::int64_t budget = cfg::ram_prefetch_budget_mb.get();
 
-        // First start after the update from config.toml: its values apply now too.
-        Guarded("config.toml", [&] {
-            const sb::Migration migration = sb::MigrateConfigFile(data_dir, plugin_dir / "settings.toml");
-            for (const auto& note : migration.notes) sb::Log(ANVIL_LOG_WARNING, "%s", note.c_str());
-            for (const auto& value : migration.values) {
-                if (Overridden(value.name)) continue;
-                if (value.name == "ram_prefetch_budget_mb") {
-                    budget = std::stoll(value.literal);
-                    continue;
-                }
-                for (auto& m : modules) {
-                    if (value.name != m.name) continue;
-                    // The literal is a quoted option name.
-                    m.mode = sb::ParseMode(value.literal.substr(1, value.literal.size() - 2)).value_or(m.mode);
-                }
-            }
-        });
         ResolveModules(host, modules);
-        sb::SetRamPrefetchBudget(static_cast<std::uint64_t>(budget));
+        sb::SetRamPrefetchBudget(static_cast<std::uint64_t>(cfg::ram_prefetch_budget_mb.get()));
         sb::SetFramePacingInterval(cfg::frame_pacing_interval_ms.get(),
                                    cfg::frame_pacing_input.get() == cfg::frame_pacing_input.draw);
         // restart = false: a change in the overlay applies at the next check of 0x769EA0.

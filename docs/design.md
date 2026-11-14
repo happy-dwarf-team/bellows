@@ -1266,19 +1266,11 @@ needs Anvil 1.0 (`api = 2`, `anvil = ">=1.0.0"`, `affects_gameplay = false`).
   `verify` where the module has it; for a module of `[[modules]]` the setting chooses the
   mode, and its `off` is an alias of `disabled_modules` in 2.x) and `ram_prefetch_budget_mb` (int,
   64–8192), all `restart = true` except `frame_pacing_interval_ms` and
-  `frame_pacing_input`, which change while the game runs (see frame_pacing). Overrides are `ANVIL_BELLOWS_<NAME>`; a set
-  `EU4SB_<NAME>` is reported in the log with its replacement.
-- **Migration of `config.toml`.** Anvil reads the player's settings before the
-  plugin loads, so on the first start after the update the plugin itself
-  moves `anvil/data/bellows/config.toml`: values that differ from the defaults
-  go to `settings.toml` (written atomically; only when it does not exist yet),
-  old spellings (`1`, `true`, upper case) are normalized, `verify` for a module
-  without it becomes `on`, invalid entries are left out with a log line, and
-  the old file is renamed to `config.toml.migrated`. The migrated values also
-  apply to that start unless an `ANVIL_BELLOWS_<NAME>` variable overrides them.
-  Limit: a setting changed in the overlay later in that same session would
-  rewrite the player's file from what Anvil read at start-up (the overlay is
-  not in Anvil 1.0).
+  `frame_pacing_input`, which change while the game runs (see frame_pacing). Overrides are
+  `ANVIL_BELLOWS_<NAME>`.
+- **No migrations from 0.7.0 and earlier.** 1.x moved `anvil/data/bellows/config.toml` to
+  `settings.toml`, moved `anvil/data/eu4-startup-boost/` to `anvil/data/bellows/` and named a
+  set `EU4SB_<NAME>` with its replacement; 2.0 does none of it.
 - **Build.** The `AnvilPlugin` CMake package (`anvil_add_plugin`, `anvil gen`,
   the plugin folder in `build/plugin/bellows/`), from the SDK archive of a
   pinned Anvil release (`SB_ANVIL_VERSION` with its SHA-256; 1.0.0 since
