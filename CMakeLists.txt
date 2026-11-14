@@ -85,7 +85,6 @@ endif()
 set(SB_SOURCES
     src/benchmark.cpp
     src/common.cpp
-    src/rename.cpp
     src/settings.cpp
     src/modules/access_profile.cpp
     src/modules/attr_cache.cpp
@@ -149,7 +148,7 @@ endif()
 if(SB_BUILD_TESTS)
     enable_testing()
     # The sources every unit test links, compiled once rather than once per test.
-    add_library(sb_test_support OBJECT src/benchmark.cpp src/common.cpp src/settings.cpp src/rename.cpp
+    add_library(sb_test_support OBJECT src/benchmark.cpp src/common.cpp src/settings.cpp
         src/modules/access_profile.cpp src/modules/zip_reader.cpp)
     # The SDK headers and the generated symbols.gen.hpp / settings.gen.hpp of the plugin.
     target_include_directories(sb_test_support PUBLIC src $<TARGET_PROPERTY:bellows,INCLUDE_DIRECTORIES>)
@@ -162,7 +161,7 @@ if(SB_BUILD_TESTS)
         # /UNDEBUG: the tests use assert(), which Release would compile out.
         target_compile_options(sb_test_support PUBLIC /utf-8 /permissive- /EHsc /UNDEBUG)
     endif()
-    foreach(test module_switch rename trigger_intern token_dict_cache metascript_subst metascript_blocks settings access_profile path_rules zip_reader range_stats range_witness tick_profile army_search score_probe monthly_probe modifier_merge port_table province_modifier_view army_search_memo never_throttle checksum_defer frame_pacing pops_pacing history_add verifypath_listing exists_index open_warmup ram_prefetch)
+    foreach(test module_switch trigger_intern token_dict_cache metascript_subst metascript_blocks settings access_profile path_rules zip_reader range_stats range_witness tick_profile army_search score_probe monthly_probe modifier_merge port_table province_modifier_view army_search_memo never_throttle checksum_defer frame_pacing pops_pacing history_add verifypath_listing exists_index open_warmup ram_prefetch)
         add_executable(test_${test} tests/test_${test}.cpp)
         target_link_libraries(test_${test} PRIVATE sb_test_support)
         add_test(NAME ${test} COMMAND test_${test})

@@ -465,11 +465,10 @@ overrides it: `ANVIL_BELLOWS_<NAME>`, for example
 `ANVIL_BELLOWS_EXISTS_INDEX=verify`. Anvil logs each override. The plugin writes
 its counters to `anvil/anvil.log` when the game is ready.
 
-**From 0.7.0 or earlier:** on its first start Bellows moves your
-`anvil/data/bellows/config.toml` to `settings.toml` and keeps the old file as
-`config.toml.migrated`. `anvil/anvil.log` says what was moved or left out. The
-`EU4SB_<NAME>` variables are no longer read, so use `ANVIL_BELLOWS_<NAME>`. These
-migrations stay in every 1.x release.
+**From 0.7.0 or earlier:** Bellows 2.0 no longer reads
+`anvil/data/bellows/config.toml` or the `EU4SB_<NAME>` variables. Choose the
+settings again in Anvil Manager, or update through any 1.x release first, which
+moves them to `settings.toml`.
 
 ### Compatibility
 
@@ -572,13 +571,11 @@ If something does not work, see
 
 ### Updating from EU4 Startup Boost
 
-Delete `<EU4>/anvil/plugins/eu4-startup-boost/` and extract Bellows as above.
-On its first start Bellows moves your settings and learned profiles from
-`anvil/data/eu4-startup-boost/` to `anvil/data/bellows/` (and the settings
-from `config.toml` to `settings.toml`, see [Settings](#settings)). Anvil 1.0
-does not load the old plugin (plugin API 1); Bellows mentions the leftover
-folder in `anvil/anvil.log`. The exported `EU4SB_*` counters keep their
-names.
+Delete `<EU4>/anvil/plugins/eu4-startup-boost/` and `anvil/data/eu4-startup-boost/`,
+and extract Bellows as above. Anvil does not load the old plugin (plugin API 1).
+Bellows 2.0 does not move the old folder's settings and learned profiles any
+more (1.x did): it learns the profiles again at the first start of each mod set.
+The exported `EU4SB_*` counters keep their names.
 
 ## Building
 

@@ -1,7 +1,7 @@
 // bellows.dll's anvil_plugin_load against a stand-in API 2 host: the settings
 // it reads, the changes each module requests (none reaches a game: the image
 // is this test's own executable and nothing is enabled), the per-module undo
-// when Anvil refuses a change, the config.toml migration, the ready event and
+// when Anvil refuses a change, the ready event and
 // the start-up benchmark fields (a stand-in anvil.benchmark that checks every
 // call as Anvil 1.4 does; "old" is an Anvil without the service), and "modules": an Anvil with modules
 // (1.22, ADR 0011) in which the player turned exists_index off and never_throttle (off by default) is
@@ -129,6 +129,7 @@ const char* SettingString(AnvilPlugin*, AnvilSetting setting) {
     case CFG_RAM_PREFETCH: return "off";  // their threads would read the game folder
     case CFG_TOKEN_DICT_PROFILE: return "off";  // its ready report walks the (here fake) keyword tree
     case CFG_ATTR_CACHE: return "verify";
+    case CFG_METASCRIPT_SUBST: return "off";
     default: return "on";
     }
 }
@@ -320,7 +321,6 @@ int main(int argc, char** argv) {
     fs::remove_all(data);
     fs::create_directories(data);
     g_dataDir = data.wstring();
-    std::ofstream(data / "config.toml", std::ios::binary) << "[modules]\nmetascript_subst = \"off\"\n";
 
     AnvilGameInfo game{};
     game.size = sizeof(game);
@@ -370,10 +370,6 @@ int main(int argc, char** argv) {
     assert(load(&host, reinterpret_cast<AnvilPlugin*>(&host)) == ANVIL_OK);  // a failed module never fails the load
     g_loading = false;
 
-    // config.toml was migrated, and its value applies to this start too.
-    assert(fs::exists(data / "settings.toml") && fs::exists(data / "config.toml.migrated"));
-    assert(Logged("config.toml migrated to settings.toml (1 value(s)"));
-
     const std::string rest = ", metascript_subst=off, metascript_blocks=on, attr_cache=verify, zip_profile=on, token_dict_cache=on, "
                              "token_dict_profile=off, range_profile=on, range_witness=on, frame_pacing=on, pops_pacing=on, never_throttle=on, modifier_merge=on, port_table=on, province_modifier_view=on, army_search_memo=on, save_compress=on, transfer_skip=on, history_add=on, checksum_defer=on, tick_profile=on, army_search_profile=on, score_probe=on, monthly_probe=on";
     const bool modules = g_scenario == "modules";
@@ -386,7 +382,7 @@ int main(int argc, char** argv) {
         assert(!Live("swap_pointer " + std::to_string(SYM_FS_EXISTS_SLOT)));
         assert(Logged("modules off in anvil.toml: exists_index"));
         assert(Logged("settings.toml turns on never_throttle, but Anvil keeps these modules off by default now"));
-        // "off" in the settings (here open_warmup, ram_prefetch and metascript_subst, migrated from config.toml)
+        // "off" in the settings (here open_warmup, ram_prefetch and metascript_subst)
         // still turns off a module Anvil enabled, with a note.
         assert(Logged("settings.toml turns off open_warmup, ram_prefetch, metascript_subst with the module setting"));
         // Every module of [[modules]] asked once, none of the diagnostics.
@@ -448,7 +444,7 @@ int main(int argc, char** argv) {
         assert(Live("replace_block " + std::to_string(SYM_VERIFYPATH_STAT_CALL)));
     }
 
-    // metascript_subst is off (migrated), so neither of its sites was requested.
+    // metascript_subst is off, so neither of its sites was requested.
     assert(!Live("redirect_call " + std::to_string(SYM_METASCRIPT_CALL_A)));
 
     // anvil-game's ready event: the modules stop and report on a thread of their own.
