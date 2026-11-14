@@ -24,16 +24,17 @@ Every release:
    or error dialog, nothing new in `error.log` against the same session without
    Bellows, `mismatches 0` in the simulation modules' `.tsv` files, and the autosave
    loads again.
-5. **`"verify"` for what changed.** A module that is new or changed in the release, and
-   every module whose default becomes `on`, runs a `"verify"` session on the 1719 save
+5. **The check for what changed.** A module that is new or changed in the release, and
+   every module whose default becomes on, runs a session with its check (the Diagnostics
+   module on, `<module>_check = true`; `"verify"` before 2.0) on the 1719 save
    and on a late-game save (1821) with `mismatches 0`. A module that replaces a game
-   computation turns default `on` only after its `"verify"` sessions and a timed series
+   computation turns default on only after its check sessions and a timed series
    (CONTRIBUTING.md, measurement rules).
 6. **Claims.** A number the release adds to the README, the Workshop description or the
    plugin page comes from a measurement with the method written next to it.
 
 Every few releases, and before 1.0, the gate also covers what a single release does not
-touch: a big mod set (Anbennar) in `"verify"`, the repeatability pair below and the
+touch: a big mod set (Anbennar) with the checks on, the repeatability pair below and the
 multiplayer test (host with Bellows, client without).
 
 ### The repeatability pair
