@@ -6,9 +6,11 @@
 // call as Anvil 1.4 does; "old" is an Anvil without the service), and the module switches (Anvil
 // ADR 0011, 0013): in every scenario the core keeps open_warmup, ram_prefetch and metascript_subst off,
 // and turns Diagnostics on with every profile but token_dict_profile and the check of attr_cache; in
-// "modules" the player also turned exists_index and Diagnostics off and left never_throttle off; in
+// "modules" the player also turned exists_index, verifypath_session and Diagnostics off and left never_throttle
+// off; in
 // "checks0".."checks4" a different set of the features' checks is on, and each feature must run as "verify"
-// exactly when its own check is.
+// exactly when its own check is. Each change records the handle that requested it: a feature's changes belong
+// to its own module, a profile's to Diagnostics.
 //   test_plugin_load <bellows.dll> <plugin folder> ok|refuse|old|modules|checks0..checks4
 #include <anvil/anvil_benchmark.h>
 #include <anvil/anvil_game.h>
@@ -39,11 +41,13 @@ namespace {
 
 struct Change {
     std::string what;
+    std::string owner;  // the module whose handle requested it; "bellows" for the plugin's own
     bool live = true;
 };
 
 std::mutex g_mutex;
 std::vector<Change> g_changes;  // handle = index + 1
+std::map<const void*, std::string> g_owners;  // module handles (and the plugin's own) -> module id
 std::vector<std::string> g_log;
 std::string g_scenario;
 std::wstring g_pluginDir, g_dataDir;
@@ -62,10 +66,11 @@ bool Refused(const std::string& what) {
                                       what == "replace_import HeapAlloc");
 }
 
-AnvilResult Request(const std::string& what, void** next, AnvilChange** out) {
+AnvilResult Request(AnvilPlugin* self, const std::string& what, void** next, AnvilChange** out) {
     std::lock_guard lock(g_mutex);
     if (Refused(what)) return ANVIL_ERROR_CONFLICT;
-    g_changes.push_back({what});
+    const auto owner = g_owners.find(self);
+    g_changes.push_back({what, owner != g_owners.end() ? owner->second : "unknown"});
     if (next != nullptr) *next = reinterpret_cast<void*>(&NeverCalled);
     if (out != nullptr) *out = reinterpret_cast<AnvilChange*>(g_changes.size());
     return ANVIL_OK;
@@ -80,28 +85,28 @@ void Log(AnvilPlugin*, AnvilLogLevel, const char* message) {
 const wchar_t* PluginDir(AnvilPlugin*) { return g_pluginDir.c_str(); }
 const wchar_t* DataDir(AnvilPlugin*) { return g_dataDir.c_str(); }
 
-AnvilResult HookFunction(AnvilPlugin*, AnvilSymbol fn, void*, void** next, AnvilChange** out) {
-    return Request("hook_function " + std::to_string(fn), next, out);
+AnvilResult HookFunction(AnvilPlugin* self, AnvilSymbol fn, void*, void** next, AnvilChange** out) {
+    return Request(self, "hook_function " + std::to_string(fn), next, out);
 }
-AnvilResult MidHook(AnvilPlugin*, AnvilSymbol site, AnvilCpuCallback, void*, AnvilChange** out) {
-    return Request("mid_hook " + std::to_string(site), nullptr, out);
+AnvilResult MidHook(AnvilPlugin* self, AnvilSymbol site, AnvilCpuCallback, void*, AnvilChange** out) {
+    return Request(self, "mid_hook " + std::to_string(site), nullptr, out);
 }
-AnvilResult ReplaceBlock(AnvilPlugin*, AnvilSymbol block, AnvilCpuCallback, void*, AnvilChange** out) {
-    return Request("replace_block " + std::to_string(block), nullptr, out);
+AnvilResult ReplaceBlock(AnvilPlugin* self, AnvilSymbol block, AnvilCpuCallback, void*, AnvilChange** out) {
+    return Request(self, "replace_block " + std::to_string(block), nullptr, out);
 }
-AnvilResult RedirectCall(AnvilPlugin*, AnvilSymbol site, void*, void** next, AnvilChange** out) {
-    return Request("redirect_call " + std::to_string(site), next, out);
+AnvilResult RedirectCall(AnvilPlugin* self, AnvilSymbol site, void*, void** next, AnvilChange** out) {
+    return Request(self, "redirect_call " + std::to_string(site), next, out);
 }
-AnvilResult PatchBytes(AnvilPlugin*, AnvilSymbol site, const void*, size_t, AnvilChange** out) {
-    return Request("patch_bytes " + std::to_string(site), nullptr, out);
+AnvilResult PatchBytes(AnvilPlugin* self, AnvilSymbol site, const void*, size_t, AnvilChange** out) {
+    return Request(self, "patch_bytes " + std::to_string(site), nullptr, out);
 }
-AnvilResult SwapPointer(AnvilPlugin*, AnvilSymbol slot, void*, void** previous, AnvilChange** out) {
-    return Request("swap_pointer " + std::to_string(slot), previous, out);
+AnvilResult SwapPointer(AnvilPlugin* self, AnvilSymbol slot, void*, void** previous, AnvilChange** out) {
+    return Request(self, "swap_pointer " + std::to_string(slot), previous, out);
 }
-AnvilResult ReplaceImport(AnvilPlugin*, const char* module, const char* function, void*, void** next,
+AnvilResult ReplaceImport(AnvilPlugin* self, const char* module, const char* function, void*, void** next,
                           AnvilChange** out) {
     assert(std::string(module) == "KERNEL32.dll" || std::string(module) == "pops_api.dll");
-    return Request(std::string("replace_import ") + function, next, out);
+    return Request(self, std::string("replace_import ") + function, next, out);
 }
 AnvilResult Unsupported() { return ANVIL_ERROR_UNSUPPORTED; }
 AnvilResult HookFunctionAt(AnvilPlugin*, void*, const void*, size_t, void*, void**, AnvilChange**) { return Unsupported(); }
@@ -200,10 +205,12 @@ AnvilResult Module(AnvilPlugin*, const char* module, AnvilPlugin** out) {
     if (!g_manifestModules.contains(id)) return ANVIL_ERROR_NOT_DECLARED;
     // open_warmup's and ram_prefetch's threads would read the game folder.
     if (id == "open_warmup" || id == "ram_prefetch" || id == "metascript_subst") return ANVIL_ERROR_DISABLED;
-    if (g_scenario == "modules" && (id == "exists_index" || id == "never_throttle" || id == "diagnostics")) {
+    if (g_scenario == "modules" && (id == "exists_index" || id == "never_throttle" || id == "diagnostics" ||
+                                    id == "verifypath_session")) {
         return ANVIL_ERROR_DISABLED;
     }
     *out = reinterpret_cast<AnvilPlugin*>(&g_moduleHandles[g_moduleCalls.size() % sizeof(g_moduleHandles)]);
+    g_owners[*out] = id;
     return ANVIL_OK;
 }
 AnvilResult RegisterService(AnvilPlugin*, const char*, uint32_t, const void*) { return ANVIL_OK; }
@@ -371,6 +378,15 @@ bool Live(const std::string& what) {
     return false;
 }
 
+// Whether a live change `what` was requested through the handle of `module` (two modules may chain one hook).
+bool OwnedBy(const std::string& what, const std::string& module) {
+    for (const auto& c : g_changes) {
+        if (c.live && c.what == what && c.owner == module) return true;
+    }
+    std::printf("%s: no live change requested by %s\n", what.c_str(), module.c_str());
+    return false;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -428,6 +444,7 @@ int main(int argc, char** argv) {
     const auto load = reinterpret_cast<AnvilResult (*)(const AnvilHost*, AnvilPlugin*)>(
         GetProcAddress(dll, "anvil_plugin_load"));
     assert(load != nullptr);
+    g_owners[&host] = "bellows";
     g_loading = true;
     assert(load(&host, reinterpret_cast<AnvilPlugin*>(&host)) == ANVIL_OK);  // a failed module never fails the load
     g_loading = false;
@@ -492,16 +509,18 @@ int main(int argc, char** argv) {
         assert(Logged("modules: mimalloc=startup, open_warmup=off, ram_prefetch=off, verifypath_listing=on, "
                       "listing_lookup=on, exists_index=off, trigger_intern=on" + rest));
         assert(!Live("swap_pointer " + std::to_string(SYM_FS_EXISTS_SLOT)));
-        assert(Logged("modules off: open_warmup, ram_prefetch, exists_index, metascript_subst, never_throttle"));
         assert(!Logged("diagnostics on"));
+        // verifypath_session off: verifypath_listing stops answering at the ready event (no writer thread).
+        assert(Live("replace_block " + std::to_string(SYM_VERIFYPATH_STAT_CALL)));
+        assert(!Logged("verifypath_listing: also after the game is ready"));
         // The profiles' own hooks (the daily tick is also frame_pacing's and pops_pacing's).
         for (auto s : {SYM_ARMY_SEARCH, SYM_SCORE_MOVE, SYM_MONTHLY_TICK, SYM_COUNTRY_MONTH, SYM_RANGE_MIN_DISTANCE}) {
             assert(!Live("hook_function " + std::to_string(s)));
         }
         assert(!Live("swap_pointer " + std::to_string(SYM_ZIP_IO_READ_SLOT)));
     } else if (g_scenario != "refuse") {
-        assert(Logged("modules off: open_warmup, ram_prefetch, metascript_subst"));
         assert(Logged("diagnostics on"));
+        assert(Logged("verifypath_listing: also after the game is ready"));
         assert(Logged("modules: mimalloc=startup, open_warmup=off, ram_prefetch=off, verifypath_listing=on, "
                       "listing_lookup=on, exists_index=on, trigger_intern=on" + rest));
         for (const char* f : {"HeapFree", "HeapReAlloc", "HeapSize", "HeapAlloc", "GetFileAttributesExW",
@@ -536,6 +555,17 @@ int main(int argc, char** argv) {
         assert(Live("hook_function " + std::to_string(SYM_GAME_RANDOM)));
         assert(Live("hook_function " + std::to_string(SYM_COUNTRY_DAY)));
         assert(Live("hook_function " + std::to_string(SYM_COUNTRY_MODIFIERS)));
+        // A feature's changes belong to its own module's handle, a profile's to Diagnostics'.
+        assert(OwnedBy("replace_block " + std::to_string(SYM_VERIFYPATH_STAT_CALL), "verifypath_listing"));
+        assert(OwnedBy("swap_pointer " + std::to_string(SYM_FS_EXISTS_SLOT), "exists_index"));
+        assert(OwnedBy("redirect_call " + std::to_string(SYM_TRIGGER_INTERN_CALL_A), "trigger_intern"));
+        assert(OwnedBy("redirect_call " + std::to_string(SYM_METASCRIPT_BLOCKS_CALL), "metascript_blocks"));
+        assert(OwnedBy("hook_function " + std::to_string(SYM_PORT_TABLE), "port_table"));
+        assert(OwnedBy("hook_function " + std::to_string(SYM_MODIFIER_MERGE), "modifier_merge"));
+        assert(OwnedBy("swap_pointer " + std::to_string(SYM_ZIP_IO_READ_SLOT), "diagnostics"));
+        for (auto s : {SYM_ARMY_SEARCH, SYM_SCORE_MOVE, SYM_MONTHLY_TICK, SYM_COUNTRY_MONTH, SYM_RANGE_MIN_DISTANCE}) {
+            assert(OwnedBy("hook_function " + std::to_string(s), "diagnostics"));
+        }
     } else {
         // HeapAlloc refused: the three heap imports mimalloc already had are removed. The
         // second trigger_intern site refused: the first one is removed. The rest stays.
