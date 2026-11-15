@@ -28,22 +28,13 @@ Some of Bellows' tricks learn what your mod set needs during one start and pay o
 Yes. It doesn't care what your mods contain, it only helps the game read them faster. Bigger mod sets usually gain the most: on our test machine, Anbennar with Proper 2K UI Enhanced went from about 85 seconds to about 22.
 
 ### Will it break my saves or my achievements?
-It hasn't in our tests. It changes how fast the game starts and runs, not its rules. A new ironman game with Bellows still says achievements can be earned, but we haven't earned one in a full campaign yet. When the game compresses a save, Bellows writes the very same file the game would. (The optional parallel save compression packs it a little differently.)
+It shouldn't: Bellows changes how fast the game runs, not its rules, and a new ironman game with it still says achievements can be earned.
 
 ### Will the AI play differently?
-Sometimes. If you load the same save twice, the AI can make a different choice the second time, and from there the two games go their own ways. That happens without Bellows too, just less often: when the AI weighs two equally good options, a tiny difference in timing can tip it either way. The rules stay the same, and both are normal games. In multiplayer the host's AI decides for everyone, so all players get the same choices; in our tests with Bellows on the host, the game stayed in sync for about 200 game days.
-
-### Can it go faster while the game is minimized?
-Yes, with the **Full speed while minimized** module, off by default: turn it on under Bellows in Anvil Manager's **Plugins** tab. A minimized game normally waits a tenth of a second every frame; with the module on, a single-player game at speed 5 skips that wait. On our test machine a minimized year took about 60% less time without mods and about 40% less with Anbennar, and the game used more processor time meanwhile. With the window in front nothing changes, and in multiplayer the module does nothing.
-
-### Anything else that is off by default?
-**Checksum after the databases** takes about another second off the start of a big mod set such as Anbennar, and changes nothing else. Turn the module on under Bellows in Anvil Manager's **Plugins** tab and restart the game.
-
-### I turned something off in an older Bellows. Is it still off?
-Yes. Since 2.0 every feature has one switch, under Bellows in Anvil Manager's **Plugins** tab, and Anvil moves your old choice there at the first start.
+It plays by the same rules, but loading one save twice can lead the AI to a different choice, as it does without Bellows too, just less often. In multiplayer the host's AI decides for everyone, so all players see the same game.
 
 ### I play on GOG. Can I use it?
-Yes, the GOG builds 1.37.5.2 and 1.37.5.0, with the latest Anvil. GOG has no Workshop: install Bellows from the **Catalog** tab in Anvil Manager or from [GitHub](https://github.com/happy-dwarf-team/bellows/releases). Same plugin, same forge, different road.
+Yes, 1.37.5.2 and 1.37.5.0: GOG has no Workshop, so install it from the **Catalog** page of Anvil Manager. Same forge, different road.
 
 ### Something's wrong. Where do I ask?
 In **#help-and-bugs** on our [Discord server](https://discord.happydwarf.dev/) (pick the Bellows tag), or in a [GitHub issue](https://github.com/happy-dwarf-team/bellows/issues/new/choose). What we confirm on Discord goes to GitHub too.
