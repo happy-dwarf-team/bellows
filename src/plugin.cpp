@@ -160,7 +160,6 @@ struct Bellows : anvil::Plugin {
         // What the core turned on (anvil.toml, the modules' `default`), and the values Anvil validated
         // (defaults, the player's file, ANVIL_BELLOWS_* overrides).
         const std::optional<anvil::Host> diagnostics = ModuleHandle(host, "diagnostics");
-        std::string turned_off;
         for (auto& m : modules) {
             const bool chosen = m.choice != nullptr && m.choice->get();
             if (m.profile) {
@@ -172,9 +171,8 @@ struct Bellows : anvil::Plugin {
             m.mode = &m == &modules[0]
                          ? sb::MimallocMode(m.handle.has_value(), cfg::mimalloc_scope.get() == cfg::mimalloc_scope.session)
                          : sb::FeatureMode(m.handle.has_value(), diagnostics.has_value(), chosen);
-            if (!m.handle) turned_off += std::string(turned_off.empty() ? "" : ", ") + m.name;
         }
-        if (!turned_off.empty()) sb::Log(ANVIL_LOG_INFO, "modules off: %s", turned_off.c_str());
+        // The modules the core keeps off show as "=off" in the "modules:" line below.
         if (diagnostics) sb::Log(ANVIL_LOG_INFO, "diagnostics on: the checks and profiles chosen in its settings run");
         sb::SetRamPrefetchBudget(static_cast<std::uint64_t>(cfg::ram_prefetch_budget_mb.get()));
         sb::SetFramePacingInterval(cfg::frame_pacing_interval_ms.get(),
