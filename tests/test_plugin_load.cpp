@@ -3,9 +3,10 @@
 // is this test's own executable and nothing is enabled), the per-module undo
 // when Anvil refuses a change, the ready event and
 // the start-up benchmark fields (a stand-in anvil.benchmark that checks every
-// call as Anvil 1.4 does; "old" is an Anvil without the service), and "modules": an Anvil with modules
-// (1.22, ADR 0011) in which the player turned exists_index off and never_throttle (off by default) is
-// not turned on, so only its setting says "on".
+// call as Anvil 1.4 does; "old" is an Anvil without the service), and the module switches (Anvil
+// ADR 0011, 0013): in every scenario the core keeps open_warmup, ram_prefetch and metascript_subst off,
+// and turns Diagnostics on with every profile but token_dict_profile and the check of attr_cache; in
+// "modules" the player also turned exists_index and Diagnostics off and left never_throttle off.
 //   test_plugin_load <bellows.dll> <plugin folder> ok|refuse|old|modules
 #include <anvil/anvil_benchmark.h>
 #include <anvil/anvil_game.h>
@@ -119,29 +120,37 @@ AnvilResult SymbolValue(AnvilPlugin*, AnvilSymbol, const char*, uint64_t* out) {
     *out = 0x40;  // an RVA inside this executable's headers: readable
     return ANVIL_OK;
 }
-int SettingBool(AnvilPlugin*, AnvilSetting) { return 0; }
-int64_t SettingInt(AnvilPlugin*, AnvilSetting setting) { return setting == CFG_RAM_PREFETCH_BUDGET_MB ? 1024 : 0; }
-double SettingFloat(AnvilPlugin*, AnvilSetting) { return 0.0; }
-const char* SettingString(AnvilPlugin*, AnvilSetting setting) {
+int SettingBool(AnvilPlugin*, AnvilSetting setting) {
     switch (setting) {
-    case CFG_MIMALLOC: return "startup";  // a mode only mimalloc has, also as a benchmark field value
-    case CFG_OPEN_WARMUP:
-    case CFG_RAM_PREFETCH: return "off";  // their threads would read the game folder
-    case CFG_TOKEN_DICT_PROFILE: return "off";  // its ready report walks the (here fake) keyword tree
-    case CFG_ATTR_CACHE: return "verify";
-    case CFG_METASCRIPT_SUBST: return "off";
-    default: return "on";
+    // token_dict_profile stays off: its ready report walks the (here fake) keyword tree.
+    case CFG_ZIP_PROFILE:
+    case CFG_RANGE_PROFILE:
+    case CFG_TICK_PROFILE:
+    case CFG_ARMY_SEARCH_PROFILE:
+    case CFG_SCORE_PROBE:
+    case CFG_MONTHLY_PROBE:
+    case CFG_ATTR_CACHE_CHECK: return 1;
+    default: return 0;
     }
 }
+// mimalloc_scope 0 is "menu" (Mode::Startup, also a benchmark field value); frame_pacing_input 0 is "draw".
+int64_t SettingInt(AnvilPlugin*, AnvilSetting setting) { return setting == CFG_RAM_PREFETCH_BUDGET_MB ? 1024 : 0; }
+double SettingFloat(AnvilPlugin*, AnvilSetting) { return 0.0; }
+const char* SettingString(AnvilPlugin*, AnvilSetting) { return ""; }
 AnvilResult SubscribeSetting(AnvilPlugin*, AnvilSetting, AnvilSettingCallback, void*) { return ANVIL_ERROR_WRONG_KIND; }
-// --- the stand-in module() of Anvil 1.22 ("modules") -----------------------------
+// --- the stand-in module() of Anvil 1.22 and later ----------------------------
 std::vector<std::string> g_moduleCalls;
 unsigned char g_moduleHandles[64] = {};  // a distinct address per module; the stand-in calls ignore `self`
 AnvilResult Module(AnvilPlugin*, const char* module, AnvilPlugin** out) {
     std::lock_guard lock(g_mutex);
     *out = nullptr;
     g_moduleCalls.push_back(module);
-    if (std::string(module) == "exists_index" || std::string(module) == "never_throttle") return ANVIL_ERROR_DISABLED;
+    const std::string id = module;
+    // open_warmup's and ram_prefetch's threads would read the game folder.
+    if (id == "open_warmup" || id == "ram_prefetch" || id == "metascript_subst") return ANVIL_ERROR_DISABLED;
+    if (g_scenario == "modules" && (id == "exists_index" || id == "never_throttle" || id == "diagnostics")) {
+        return ANVIL_ERROR_DISABLED;
+    }
     *out = reinterpret_cast<AnvilPlugin*>(&g_moduleHandles[g_moduleCalls.size() % sizeof(g_moduleHandles)]);
     return ANVIL_OK;
 }
@@ -359,7 +368,7 @@ int main(int argc, char** argv) {
     host.get_service = GetService;
     host.subscribe = Subscribe;
     host.publish = Publish;
-    if (g_scenario == "modules") host.module = Module;  // otherwise null: an Anvil without modules
+    host.module = Module;
 
     HMODULE dll = LoadLibraryW(fs::absolute(argv[1]).wstring().c_str());
     assert(dll != nullptr);
@@ -370,33 +379,42 @@ int main(int argc, char** argv) {
     assert(load(&host, reinterpret_cast<AnvilPlugin*>(&host)) == ANVIL_OK);  // a failed module never fails the load
     g_loading = false;
 
-    const std::string rest = ", metascript_subst=off, metascript_blocks=on, attr_cache=verify, zip_profile=on, token_dict_cache=on, "
-                             "token_dict_profile=off, range_profile=on, range_witness=on, frame_pacing=on, pops_pacing=on, never_throttle=on, modifier_merge=on, port_table=on, province_modifier_view=on, army_search_memo=on, save_compress=on, transfer_skip=on, history_add=on, checksum_defer=on, tick_profile=on, army_search_profile=on, score_probe=on, monthly_probe=on";
     const bool modules = g_scenario == "modules";
-    if (modules) {
-        // exists_index turned off in anvil.toml, never_throttle not turned on there: both off, their code not run.
-        std::string after = rest;
-        after.replace(after.find("never_throttle=on"), 17, "never_throttle=off");
-        assert(Logged("modules: mimalloc=startup, open_warmup=off, ram_prefetch=off, verifypath_listing=on, "
-                      "listing_lookup=on, exists_index=off, trigger_intern=on" + after));
-        assert(!Live("swap_pointer " + std::to_string(SYM_FS_EXISTS_SLOT)));
-        assert(Logged("modules off in anvil.toml: exists_index"));
-        assert(Logged("settings.toml turns on never_throttle, but Anvil keeps these modules off by default now"));
-        // "off" in the settings (here open_warmup, ram_prefetch and metascript_subst)
-        // still turns off a module Anvil enabled, with a note.
-        assert(Logged("settings.toml turns off open_warmup, ram_prefetch, metascript_subst with the module setting"));
-        // Every module of [[modules]] asked once, none of the diagnostics.
+    // Diagnostics on: the profiles chosen in its settings run, and attr_cache's check makes it "verify".
+    const std::string diag = modules ? "off" : "on";
+    const std::string rest = ", metascript_subst=off, metascript_blocks=on, attr_cache=" + std::string(modules ? "on" : "verify") +
+                             ", zip_profile=" + diag + ", token_dict_cache=on, token_dict_profile=off, range_profile=" + diag +
+                             ", range_witness=on, frame_pacing=on, pops_pacing=on, never_throttle=" + diag +
+                             ", modifier_merge=on, port_table=on, province_modifier_view=on, army_search_memo=on, save_compress=on, "
+                             "transfer_skip=on, history_add=on, checksum_defer=on, tick_profile=" + diag + ", army_search_profile=" + diag +
+                             ", score_probe=" + diag + ", monthly_probe=" + diag;
+    {
+        // Every module of [[modules]] asked once, Diagnostics and verifypath_session included, none of the profiles.
         std::lock_guard lock(g_mutex);
-        assert(g_moduleCalls.size() == 23);
+        assert(g_moduleCalls.size() == 25);
         const std::set<std::string> asked(g_moduleCalls.begin(), g_moduleCalls.end());
-        assert(asked.size() == 23 && asked.contains("mimalloc") && asked.contains("checksum_defer"));
+        assert(asked.size() == 25 && asked.contains("mimalloc") && asked.contains("checksum_defer") &&
+               asked.contains("diagnostics") && asked.contains("verifypath_session"));
         for (const char* d : {"zip_profile", "token_dict_profile", "range_profile", "tick_profile", "army_search_profile",
                               "score_probe", "monthly_probe"}) {
             assert(!asked.contains(d));
         }
+    }
+    if (modules) {
+        // exists_index turned off, never_throttle not turned on, Diagnostics off: their code did not run.
+        assert(Logged("modules: mimalloc=startup, open_warmup=off, ram_prefetch=off, verifypath_listing=on, "
+                      "listing_lookup=on, exists_index=off, trigger_intern=on" + rest));
+        assert(!Live("swap_pointer " + std::to_string(SYM_FS_EXISTS_SLOT)));
+        assert(Logged("modules off: open_warmup, ram_prefetch, exists_index, metascript_subst, never_throttle"));
+        assert(!Logged("diagnostics on"));
+        // The profiles' own hooks (the daily tick is also frame_pacing's and pops_pacing's).
+        for (auto s : {SYM_ARMY_SEARCH, SYM_SCORE_MOVE, SYM_MONTHLY_TICK, SYM_COUNTRY_MONTH, SYM_RANGE_MIN_DISTANCE}) {
+            assert(!Live("hook_function " + std::to_string(s)));
+        }
+        assert(!Live("swap_pointer " + std::to_string(SYM_ZIP_IO_READ_SLOT)));
     } else if (g_scenario != "refuse") {
-        // No module() in the host: the settings alone decide, as on Anvil 1.21 and older.
-        assert(!Logged("modules off in anvil.toml") && !Logged("with the module setting"));
+        assert(Logged("modules off: open_warmup, ram_prefetch, metascript_subst"));
+        assert(Logged("diagnostics on"));
         assert(Logged("modules: mimalloc=startup, open_warmup=off, ram_prefetch=off, verifypath_listing=on, "
                       "listing_lookup=on, exists_index=on, trigger_intern=on" + rest));
         for (const char* f : {"HeapFree", "HeapReAlloc", "HeapSize", "HeapAlloc", "GetFileAttributesExW",
@@ -485,7 +503,7 @@ int main(int argc, char** argv) {
         std::map<std::string, std::string> modes = {
             {"mimalloc", ok ? "startup" : "failed"}, {"open_warmup", "off"}, {"ram_prefetch", "off"},
             {"verifypath_listing", "on"}, {"exists_index", "on"}, {"trigger_intern", ok ? "on" : "failed"},
-            {"metascript_subst", "off"}, {"metascript_blocks", "on"}, {"attr_cache", "verify"},
+            {"metascript_subst", "off"}, {"metascript_blocks", "on"}, {"attr_cache", modules ? "on" : "verify"},
             {"token_dict_cache", "on"},
             {"range_witness", "on"}, {"frame_pacing", "on"}, {"pops_pacing", "on"}, {"never_throttle", "on"}, {"modifier_merge", "on"}, {"port_table", "on"}, {"province_modifier_view", "on"}, {"army_search_memo", "on"}, {"save_compress", "on"}, {"transfer_skip", "on"}, {"history_add", "on"}, {"checksum_defer", "on"},
         };
@@ -495,8 +513,9 @@ int main(int argc, char** argv) {
         for (const char* field : {"exists_index.requests", "exists_index.listings", "verifypath_listing.mismatches",
                                   "attr_cache.verifications", "token_dict_cache.entries", "range_profile.checks",
                                   "range_witness.answered"}) {
-            // exists_index is off in "modules": its code did not run, so its fields stay null.
-            assert(g_values.contains(field) == !(modules && std::string(field).starts_with("exists_index.")));
+            // exists_index and Diagnostics (range_profile) are off in "modules": their fields stay null.
+            const std::string f = field;
+            assert(g_values.contains(field) == !(modules && (f.starts_with("exists_index.") || f.starts_with("range_profile."))));
         }
         // open_warmup and ram_prefetch are off: no open cost, no profile being built, their fields stay null.
         assert(!g_openCost && g_learning.empty());
