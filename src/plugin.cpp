@@ -115,6 +115,16 @@ std::optional<anvil::Host> ModuleHandle(anvil::Host& host, const char* name) {
 
 struct Bellows : anvil::Plugin {
     void load(anvil::Host& host) override {
+        // 2.0 dropped the move from 0.7.0's file (#195): a player updating straight from it learns why the
+        // settings are back to the defaults.
+        Guarded("config.toml", [&] {
+            std::error_code ec;
+            if (std::filesystem::is_regular_file(host.data_dir() / "config.toml", ec)) {
+                sb::Log(ANVIL_LOG_INFO, "anvil/data/bellows/config.toml (Bellows 0.7.0 and earlier) is no longer "
+                                        "read; choose the settings again in Anvil Manager (settings.toml) and delete "
+                                        "the old file");
+            }
+        });
         Module modules[] = {
             Feature("mimalloc", sb::InstallMimalloc),  // first: before the game's runtime allocates
             Feature("open_warmup", sb::InstallOpenWarmup),  // early: its threads must run ahead of the game

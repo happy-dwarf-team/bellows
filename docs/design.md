@@ -1296,7 +1296,8 @@ needs Anvil 1.0 (`api = 2`, `anvil = ">=1.0.0"`, `affects_gameplay = false`).
   frame_pacing). Overrides are `ANVIL_BELLOWS_<NAME>`.
 - **No migrations from 0.7.0 and earlier.** 1.x moved `anvil/data/bellows/config.toml` to
   `settings.toml`, moved `anvil/data/eu4-startup-boost/` to `anvil/data/bellows/` and named a
-  set `EU4SB_<NAME>` with its replacement; 2.0 does none of it.
+  set `EU4SB_<NAME>` with its replacement; 2.0 does none of it. A `config.toml` still in the
+  data folder gets one info line at each start (it is no longer read) and stays as it is.
 - **Build.** The `AnvilPlugin` CMake package (`anvil_add_plugin`, `anvil gen`,
   the plugin folder in `build/plugin/bellows/`), from the SDK archive of a
   pinned Anvil release (`SB_ANVIL_VERSION` with its SHA-256; 1.0.0 since
