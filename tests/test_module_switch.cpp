@@ -130,6 +130,12 @@ int main() {
         assert(r->contains("on") == !on);
         if (!on) assert(Strings((*r)["on"]).contains("on"));
     }
+    // A module off by default whose 1.x setting had a "verify" mode is turned on by it too, so a
+    // player who chose verify keeps the module; never_throttle had no verify mode.
+    for (const char* id : {"listing_lookup", "attr_cache", "checksum_defer"}) {
+        assert(Strings(retired[id]["on"]) == (std::set<std::string>{"on", "verify"}));
+    }
+    assert(Strings(retired["never_throttle"]["on"]) == std::set<std::string>{"on"});
     // Any other retired name is a renamed setting (save_compress_parallel): its entry names the module
     // and only removes the old value.
     for (const auto& [key, node] : retired) {
