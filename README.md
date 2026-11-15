@@ -331,7 +331,7 @@ says in the Manager is one sentence; the details are here.
 
 | Module | What it does |
 | --- | --- |
-| **Faster memory allocator** (`mimalloc`) | Faster memory allocator for the game's C runtime until the main menu (`startup`, the default; later allocations use the Windows heap), or for the whole session (`on`, which made the simulation about 5% slower in the lab) |
+| **Faster memory allocator** (`mimalloc`) | Faster memory allocator for the game's C runtime until the main menu (`mimalloc_scope = "menu"`, the default; later allocations use the Windows heap), or for the whole session (`session`, which made the simulation about 5% slower in the lab) |
 | **File warm-up** (`open_warmup`) | Opens the files the game will need ahead of it on parallel threads, from a profile learned per mod set (meant for the first start after a reboot, when every first open of a file is slow: 61 → 15 s in the lab's build before the plugin; the first start after a reboot with the plugin has not been measured, so Bellows makes no claim for it) |
 | **RAM prefetch** (`ram_prefetch`) | Reads and unpacks the DLC archive members the game will need into RAM on worker threads (learned per mod set; uses up to 1 GB of extra RAM during start-up and at most a quarter of the memory free at that moment, setting `ram_prefetch_budget_mb`) |
 | **Path check cache** (`verifypath_listing`) | Answers PhysFS path checks from directory listings until the main menu is up; Path checks after start-up (`verifypath_session`) keeps it on after that. Its check compares every answer, also after the main menu: 0 differences in about 650,000 answers on three saves. Lab: see [Loading a save](#loading-a-save) |
@@ -403,7 +403,7 @@ it is explained yet.
 The known cause is a tie: when the AI chooses between options with exactly the same score, for
 example two leaders with the same pips for one army, or two countries its
 diplomacy rates the same, the game breaks the tie by where the two objects lie
-in memory. `mimalloc = "startup"` (the default) and Bellows' own memory use
+in memory. The `mimalloc` module (on by default) and Bellows' own memory use
 change where the game's objects end up, so such a tie can go the other way
 than in a game without Bellows. The choice is as valid as the game's own, just
 the other of two equal options, and from then on that game takes its own
@@ -489,7 +489,8 @@ removes them from the file and says so in `anvil/anvil.log`. `verifypath_session
 that module off the same way. Not carried over: `mimalloc = "on"` (choose `session` again) and
 `save_compress_parallel = "on"` (removed; set `save_compress_threads = true`); `verify` is a check of the Diagnostics module now.
 A profile you set to `on` in 1.x (`tick_profile = "on"` and the like) shows a warning at every start until you
-remove that line or set it to `true`.
+remove that line or set it to `true`. A script that turned a feature off for one start with an environment
+variable of 1.x (`ANVIL_BELLOWS_EXISTS_INDEX=off`) does nothing now: put the module in `disabled_modules` instead.
 
 The Anvil panel and Anvil Manager show the labels and descriptions of these settings and Bellows' description in the player's
 language: French, German, Spanish, Simplified and Traditional Chinese, Japanese, Korean or

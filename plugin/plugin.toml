@@ -25,7 +25,8 @@ version = "^1"
 # overlay (enabled_modules / disabled_modules in anvil.toml) is the only one; settings.toml only refines
 # a module (`module`). `group` orders them. None changes the simulation. Diagnostics holds the lab
 # tools (profiles, the checks that were the "verify" mode of 1.x): with it off, no lab code runs.
-# tests/test_module_switch.cpp checks this list against settings.toml and src/plugin.cpp.
+# tests/test_module_switch.cpp checks this list against settings.toml, tests/test_plugin_load.cpp
+# against the ids src/plugin.cpp asks for.
 
 [[modules]]
 id = "mimalloc"
