@@ -508,7 +508,9 @@ its counters to `anvil/anvil.log` when the game is ready.
 **From 0.7.0 or earlier:** Bellows 2.0 no longer reads
 `anvil/data/bellows/config.toml` or the `EU4SB_<NAME>` variables. Choose the
 settings again in Anvil Manager, or update through any 1.x release first, which
-moves them to `settings.toml`.
+moves them to `settings.toml`. While the old file is there, `anvil/anvil.log`
+says at each start that it is no longer read; delete it once the settings are
+chosen.
 
 ### Compatibility
 

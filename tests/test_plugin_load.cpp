@@ -399,6 +399,8 @@ int main(int argc, char** argv) {
     fs::remove_all(data);
     fs::create_directories(data);
     g_dataDir = data.wstring();
+    // A 0.7.0 file left in the data folder ("ok" only): 2.0 does not read it, but says so.
+    if (g_scenario == "ok") std::ofstream(data / "config.toml", std::ios::binary) << "[modules]\nmetascript_subst = \"off\"\n";
 
     AnvilGameInfo game{};
     game.size = sizeof(game);
@@ -448,6 +450,10 @@ int main(int argc, char** argv) {
     g_loading = true;
     assert(load(&host, reinterpret_cast<AnvilPlugin*>(&host)) == ANVIL_OK);  // a failed module never fails the load
     g_loading = false;
+
+    // config.toml is named in the log only when it is there, and left as it is.
+    assert(Logged("anvil/data/bellows/config.toml (Bellows 0.7.0 and earlier) is no longer read") == (g_scenario == "ok"));
+    assert(fs::exists(data / "config.toml") == (g_scenario == "ok") && !fs::exists(data / "settings.toml"));
 
     if (const int bit = ChecksBit(); bit >= 0) {
         // With Diagnostics on, each feature runs as "verify" exactly when its own check is on.
