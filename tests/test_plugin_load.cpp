@@ -6,8 +6,10 @@
 // call as Anvil 1.4 does; "old" is an Anvil without the service), and the module switches (Anvil
 // ADR 0011, 0013): in every scenario the core keeps open_warmup, ram_prefetch and metascript_subst off,
 // and turns Diagnostics on with every profile but token_dict_profile and the check of attr_cache; in
-// "modules" the player also turned exists_index and Diagnostics off and left never_throttle off.
-//   test_plugin_load <bellows.dll> <plugin folder> ok|refuse|old|modules
+// "modules" the player also turned exists_index and Diagnostics off and left never_throttle off; in
+// "checks0".."checks4" a different set of the features' checks is on, and each feature must run as "verify"
+// exactly when its own check is.
+//   test_plugin_load <bellows.dll> <plugin folder> ok|refuse|old|modules|checks0..checks4
 #include <anvil/anvil_benchmark.h>
 #include <anvil/anvil_game.h>
 #include <anvil/anvil_plugin.h>
@@ -120,7 +122,39 @@ AnvilResult SymbolValue(AnvilPlugin*, AnvilSymbol, const char*, uint64_t* out) {
     *out = 0x40;  // an RVA inside this executable's headers: readable
     return ANVIL_OK;
 }
+// Each feature's "Check: ..." setting, as plugin/settings.toml names it. In "checks<k>" the check at index i
+// is on when bit k of i + 1 is set: over checks0..checks4 every check has its own pattern, so a Feature(...)
+// of src/plugin.cpp that reads another module's check shows that module's pattern in some scenario.
+const std::pair<const char*, AnvilSetting> kChecks[] = {
+    {"ram_prefetch", CFG_RAM_PREFETCH_CHECK},
+    {"verifypath_listing", CFG_VERIFYPATH_LISTING_CHECK},
+    {"listing_lookup", CFG_LISTING_LOOKUP_CHECK},
+    {"exists_index", CFG_EXISTS_INDEX_CHECK},
+    {"trigger_intern", CFG_TRIGGER_INTERN_CHECK},
+    {"metascript_subst", CFG_METASCRIPT_SUBST_CHECK},
+    {"metascript_blocks", CFG_METASCRIPT_BLOCKS_CHECK},
+    {"attr_cache", CFG_ATTR_CACHE_CHECK},
+    {"token_dict_cache", CFG_TOKEN_DICT_CACHE_CHECK},
+    {"range_witness", CFG_RANGE_WITNESS_CHECK},
+    {"pops_pacing", CFG_POPS_PACING_CHECK},
+    {"modifier_merge", CFG_MODIFIER_MERGE_CHECK},
+    {"port_table", CFG_PORT_TABLE_CHECK},
+    {"province_modifier_view", CFG_PROVINCE_MODIFIER_VIEW_CHECK},
+    {"army_search_memo", CFG_ARMY_SEARCH_MEMO_CHECK},
+    {"save_compress", CFG_SAVE_COMPRESS_CHECK},
+    {"transfer_skip", CFG_TRANSFER_SKIP_CHECK},
+    {"history_add", CFG_HISTORY_ADD_CHECK},
+    {"checksum_defer", CFG_CHECKSUM_DEFER_CHECK},
+};
+int ChecksBit() { return g_scenario.starts_with("checks") ? g_scenario.back() - '0' : -1; }
+bool CheckOn(std::size_t index, int bit) { return (((index + 1) >> bit) & 1) != 0; }
+
 int SettingBool(AnvilPlugin*, AnvilSetting setting) {
+    if (const int bit = ChecksBit(); bit >= 0) {
+        for (std::size_t i = 0; i < std::size(kChecks); ++i) {
+            if (kChecks[i].second == setting) return CheckOn(i, bit) ? 1 : 0;
+        }
+    }
     switch (setting) {
     // token_dict_profile stays off: its ready report walks the (here fake) keyword tree.
     case CFG_ZIP_PROFILE:
@@ -397,6 +431,39 @@ int main(int argc, char** argv) {
     g_loading = true;
     assert(load(&host, reinterpret_cast<AnvilPlugin*>(&host)) == ANVIL_OK);  // a failed module never fails the load
     g_loading = false;
+
+    if (const int bit = ChecksBit(); bit >= 0) {
+        // With Diagnostics on, each feature runs as "verify" exactly when its own check is on.
+        std::map<std::string, std::string> logged;
+        {
+            std::lock_guard lock(g_mutex);
+            for (const auto& line : g_log) {
+                if (!line.starts_with("modules: ")) continue;
+                std::size_t start = 9;
+                while (start < line.size()) {
+                    std::size_t end = line.find(", ", start);
+                    if (end == std::string::npos) end = line.size();
+                    const std::string entry = line.substr(start, end - start);
+                    const std::size_t eq = entry.find('=');
+                    assert(eq != std::string::npos);
+                    logged[entry.substr(0, eq)] = entry.substr(eq + 1);
+                    start = end + 2;
+                }
+            }
+        }
+        for (std::size_t i = 0; i < std::size(kChecks); ++i) {
+            const std::string module = kChecks[i].first;
+            // The core keeps these two off in every scenario.
+            const bool off = module == "ram_prefetch" || module == "metascript_subst";
+            const std::string expected = off ? "off" : CheckOn(i, bit) ? "verify" : "on";
+            std::printf("%s=%s (expected %s)\n", module.c_str(), logged[module].c_str(), expected.c_str());
+            assert(logged.at(module) == expected);
+        }
+        std::printf("plugin load (%s) ok\n", g_scenario.c_str());
+        std::fflush(stdout);
+        fs::remove_all(data);
+        TerminateProcess(GetCurrentProcess(), 0);
+    }
 
     const bool modules = g_scenario == "modules";
     // Diagnostics on: the profiles chosen in its settings run, and attr_cache's check makes it "verify".
