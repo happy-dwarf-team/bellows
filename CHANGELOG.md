@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.0.0](https://github.com/happy-dwarf-team/bellows/compare/v1.8.0...v2.0.0) (2026-11-15)
+
+
+### ⚠ BREAKING CHANGES
+
+* Bellows 2.0 needs Anvil 1.23.0 or newer; an older Anvil skips it and says why in `anvil.log`. Update Anvil first with `AnvilManager.exe` from its release page. ([#193](https://github.com/happy-dwarf-team/bellows/issues/193)) ([c397b04](https://github.com/happy-dwarf-team/bellows/commit/c397b0445e1d8c3d62c846beb0a3ae1ff7643831))
+* Each feature now has one switch, its module in the Plugins tab of Anvil Manager or the overlay; the on, off and verify settings are gone. A feature you turned off in 1.x stays off. Set again: the allocator for the whole session and Compress on several threads. ([#196](https://github.com/happy-dwarf-team/bellows/issues/196)) ([9c63439](https://github.com/happy-dwarf-team/bellows/commit/9c634395b506da1e60858349f95bf2fe3d62e07b))
+* Updating straight from 0.7.0 or older, or from EU4 Startup Boost, you choose the settings again, and the learned profiles are learned again at the first start of each mod set. ([#195](https://github.com/happy-dwarf-team/bellows/issues/195)) ([bf37ff9](https://github.com/happy-dwarf-team/bellows/commit/bf37ff96eb0baa9a036f4f92c22e083ade78405f))
+
+### Features
+
+* Bellows' 25 features are Anvil modules in five groups (Start-up, Loading, Simulation, Saving, For testing), each with a short name and one line on what you get. Turn one off if it causes trouble; a crash report names the module. ([#190](https://github.com/happy-dwarf-team/bellows/issues/190)) ([c9fbd75](https://github.com/happy-dwarf-team/bellows/commit/c9fbd75878ae76ec8aa8865a4dd7db5e16f7a405)) ([#196](https://github.com/happy-dwarf-team/bellows/issues/196)) ([9c63439](https://github.com/happy-dwarf-team/bellows/commit/9c634395b506da1e60858349f95bf2fe3d62e07b))
+* A new Diagnostics module, off by default, holds the timing profiles and, under Advanced, a check of each feature against the game's own code (the old "verify"). With it off, none of that code runs. ([#196](https://github.com/happy-dwarf-team/bellows/issues/196)) ([9c63439](https://github.com/happy-dwarf-team/bellows/commit/9c634395b506da1e60858349f95bf2fe3d62e07b))
+
 ## [1.8.0](https://github.com/happy-dwarf-team/bellows/compare/v1.7.0...v1.8.0) (2026-11-12)
 
 ### Features
