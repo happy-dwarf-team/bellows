@@ -591,8 +591,8 @@ includes the `anvil-game` plugin Bellows needs. Then
 [install the plugin](https://anvil.happydwarf.dev/docs/install-plugins/) one of
 these ways:
 
-- click **Install** next to Bellows on the **Catalog** tab of Anvil Manager (Anvil
-  1.9 or newer). To uninstall, click **Remove** on the **Plugins** tab.
+- click **Install** next to Bellows on the **Catalog** tab of Anvil Manager. To
+  uninstall, click **Remove** on the **Plugins** tab.
 - subscribe to the
   [Steam Workshop mod](https://steamcommunity.com/sharedfiles/filedetails/?id=3823747170)
   and approve it. To uninstall, unsubscribe.
