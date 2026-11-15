@@ -802,7 +802,12 @@ only a multiplayer client reads (64.5 MB in about 2.4 s on the game's function,
 with `-nakamamp` and no client, 15 November 2026): the host's level 9 copy of a
 40.2 MB text save went the parallel way (3.69 MB, 325 ms, 7 threads), and a save
 written in that game (`gamestate` 40.6 MB in 59 ms) passed `zipfile`'s CRC check
-and loaded again in a new hosted game. Not tested: a client receiving either,
+and loaded again in a new hosted game. With a client (2.0.0, two games on one
+computer, a GOG host with `-hardoos` and a Steam client, the same day): the
+host's level 9 copy of a 37.1 MB text save went the parallel way (3.08 MB,
+237 ms, 36 chunks, 7 threads); the client's lobby said "Savegame transfer done",
+its log "File transfer and reset in gamesetup done", and it started the game.
+Not tested: a client receiving a save written with `save_compress_threads`,
 ironman and cloud saves.
 
 ### transfer_skip (loading)
@@ -834,7 +839,10 @@ session did turn out to send an entry without a copy, `SendFile` sends `Data`
 with the flag off, as it does for a compressed save: a larger transfer, not a
 wrong one. In the game (2.0.0, 15 November 2026): a host alone in a hosted game
 started from a 40.2 MB text save logged "the game keeps its copy" with server 1
-and dummy 0 (`transfer_skip.tsv`: `kept`). No client received the copy.
+and dummy 0 (`transfer_skip.tsv`: `kept`). Later that day a client joined such a
+lobby (a 37.1 MB text save, the host's copy kept and compressed in parallel),
+received the copy and started the game; the client wrote no `transfer_skip` row,
+since it never reaches `AddFile`.
 
 `"verify"` keeps the game's copy and checks each thing `"on"` relies on: the copy
 is an archive of one member that decodes to exactly `Data` with its CRC-32, the
