@@ -798,8 +798,12 @@ game then ran a month); Python's `zipfile`, Windows `tar`, NanaZip and Etch's
 save reader read it with the CRCs of its headers. Starting a game from a
 plain-text save also goes through the function once, at level 9, for a copy that
 only a multiplayer client reads (64.5 MB in about 2.4 s on the game's function,
-0.5 s in parallel; `transfer_skip` below). Not tested: multiplayer (joining, host
-transfer) with a parallel save, ironman and cloud saves.
+0.5 s in parallel; `transfer_skip` below). On a host alone (2.0.0, a hosted game
+with `-nakamamp` and no client, 15 November 2026): the host's level 9 copy of a
+40.2 MB text save went the parallel way (3.69 MB, 325 ms, 7 threads), and a save
+written in that game (`gamestate` 40.6 MB in 59 ms) passed `zipfile`'s CRC check
+and loaded again in a new hosted game. Not tested: a client receiving either,
+ironman and cloud saves.
 
 ### transfer_skip (loading)
 
@@ -828,7 +832,9 @@ flag. Hosted multiplayer is a server session and keeps its copy, compressed by
 the game or with `save_compress_threads`; a client never reaches `AddFile`. If a
 session did turn out to send an entry without a copy, `SendFile` sends `Data`
 with the flag off, as it does for a compressed save: a larger transfer, not a
-wrong one.
+wrong one. In the game (2.0.0, 15 November 2026): a host alone in a hosted game
+started from a 40.2 MB text save logged "the game keeps its copy" with server 1
+and dummy 0 (`transfer_skip.tsv`: `kept`). No client received the copy.
 
 `"verify"` keeps the game's copy and checks each thing `"on"` relies on: the copy
 is an archive of one member that decodes to exactly `Data` with its CRC-32, the
