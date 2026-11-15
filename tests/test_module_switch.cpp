@@ -1,5 +1,6 @@
 // One switch per feature (Bellows 2.0, Anvil ADR 0013): what a module runs as, from the core's switch
-// and the Diagnostics module; and plugin.toml's [[modules]] against plugin/settings.toml: every module in
+// and the Diagnostics module; and plugin.toml's [[modules]] against plugin/settings.toml (against the
+// ids src/plugin.cpp asks for: tests/test_plugin_load.cpp): every module in
 // a group of the README's order, short names and descriptions, every setting a module's, the checks and
 // profiles in Diagnostics, and each mode setting of 1.x retired into its module.
 #include "module_switch.hpp"

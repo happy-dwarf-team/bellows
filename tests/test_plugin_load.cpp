@@ -140,12 +140,30 @@ const char* SettingString(AnvilPlugin*, AnvilSetting) { return ""; }
 AnvilResult SubscribeSetting(AnvilPlugin*, AnvilSetting, AnvilSettingCallback, void*) { return ANVIL_ERROR_WRONG_KIND; }
 // --- the stand-in module() of Anvil 1.22 and later ----------------------------
 std::vector<std::string> g_moduleCalls;
+std::set<std::string> g_manifestModules;  // the ids of plugin.toml's [[modules]], as Anvil knows them
 unsigned char g_moduleHandles[64] = {};  // a distinct address per module; the stand-in calls ignore `self`
+
+// The `id` of each [[modules]] table of the built plugin's plugin.toml.
+std::set<std::string> ManifestModules(const fs::path& manifest) {
+    std::set<std::string> out;
+    std::ifstream in(manifest);
+    bool in_module = false;
+    for (std::string line; std::getline(in, line);) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (line.starts_with("[")) in_module = line == "[[modules]]";
+        if (in_module && line.starts_with("id = \"") && line.ends_with("\"")) out.insert(line.substr(6, line.size() - 7));
+    }
+    return out;
+}
+
 AnvilResult Module(AnvilPlugin*, const char* module, AnvilPlugin** out) {
     std::lock_guard lock(g_mutex);
     *out = nullptr;
     g_moduleCalls.push_back(module);
     const std::string id = module;
+    // Anvil answers ANVIL_ERROR_NOT_DECLARED for an id plugin.toml does not declare: a typo in a
+    // Feature("...") of src/plugin.cpp would leave that feature off at every start.
+    if (!g_manifestModules.contains(id)) return ANVIL_ERROR_NOT_DECLARED;
     // open_warmup's and ram_prefetch's threads would read the game folder.
     if (id == "open_warmup" || id == "ram_prefetch" || id == "metascript_subst") return ANVIL_ERROR_DISABLED;
     if (g_scenario == "modules" && (id == "exists_index" || id == "never_throttle" || id == "diagnostics")) {
@@ -326,6 +344,7 @@ int main(int argc, char** argv) {
     assert(argc == 4);
     g_scenario = argv[3];
     g_pluginDir = fs::absolute(argv[2]).wstring();
+    g_manifestModules = ManifestModules(fs::absolute(argv[2]) / "plugin.toml");
     const fs::path data = fs::temp_directory_path() / ("sb-load-test-" + std::to_string(GetCurrentProcessId()));
     fs::remove_all(data);
     fs::create_directories(data);
@@ -391,9 +410,10 @@ int main(int argc, char** argv) {
     {
         // Every module of [[modules]] asked once, Diagnostics and verifypath_session included, none of the profiles.
         std::lock_guard lock(g_mutex);
-        assert(g_moduleCalls.size() == 25);
+        // The code asks for exactly plugin.toml's modules (25), each once.
+        assert(g_manifestModules.size() == 25 && g_moduleCalls.size() == 25);
         const std::set<std::string> asked(g_moduleCalls.begin(), g_moduleCalls.end());
-        assert(asked.size() == 25 && asked.contains("mimalloc") && asked.contains("checksum_defer") &&
+        assert(asked == g_manifestModules && asked.contains("mimalloc") && asked.contains("checksum_defer") &&
                asked.contains("diagnostics") && asked.contains("verifypath_session"));
         for (const char* d : {"zip_profile", "token_dict_profile", "range_profile", "tick_profile", "army_search_profile",
                               "score_probe", "monthly_probe"}) {
