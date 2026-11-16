@@ -175,12 +175,50 @@ void WholeSessionMode() {
     assert(EU4SB_MimallocStats.misses == misses + 1);
 }
 
+// Blocks of 1 MiB and more stay in the Windows heap in both modes (anvil#426: the game reads past
+// the end of its province array, which must not end where mimalloc's committed memory ends).
+void LargeBlocks() {
+    constexpr std::size_t kLarge = std::size_t{1} << 20;
+    sb::g_gameReady = 0;
+    sb::InitMimallocForTest(sb::Mode::Startup);
+    const LONG64 large = EU4SB_MimallocStats.duplicateKeys;
+
+    void* below = SB_HeapAlloc(kHeap, 0, kLarge - 1);
+    assert(below != nullptr && Owned(below));
+    auto* zeroed = static_cast<unsigned char*>(SB_HeapAlloc(kHeap, HEAP_ZERO_MEMORY, kLarge));
+    assert(zeroed != nullptr && !Owned(zeroed));
+    assert(All(zeroed, 0, kLarge, 0) && SB_HeapSize(kHeap, 0, zeroed) == kLarge);
+
+    // A mimalloc block grown to the limit moves out, keeping its bytes and zeroing the rest.
+    unsigned char* grown = Filled(1000, 0x77);
+    assert(Owned(grown));
+    grown = static_cast<unsigned char*>(SB_HeapReAlloc(kHeap, HEAP_ZERO_MEMORY, grown, 2 * kLarge));
+    assert(grown != nullptr && !Owned(grown) && SB_HeapSize(kHeap, 0, grown) == 2 * kLarge);
+    assert(All(grown, 0, 1000, 0x77) && All(grown, 1000, 2 * kLarge, 0));
+    // Shrunk again, it stays in the Windows heap.
+    grown = static_cast<unsigned char*>(SB_HeapReAlloc(kHeap, 0, grown, 500));
+    assert(grown != nullptr && !Owned(grown) && SB_HeapSize(kHeap, 0, grown) == 500 && All(grown, 0, 500, 0x77));
+    assert(EU4SB_MimallocStats.duplicateKeys == large + 2);
+    for (void* p : {below, static_cast<void*>(zeroed), static_cast<void*>(grown)}) assert(SB_HeapFree(kHeap, 0, p));
+
+    // The whole-session mode keeps them out as well.
+    sb::g_gameReady = 1;
+    sb::InitMimallocForTest(sb::Mode::On);
+    void* session = SB_HeapAlloc(kHeap, 0, 4 * kLarge);
+    assert(session != nullptr && !Owned(session) && SB_HeapSize(kHeap, 0, session) == 4 * kLarge);
+    assert(SB_HeapFree(kHeap, 0, session));
+    void* small = SB_HeapAlloc(kHeap, 0, 4096);
+    assert(small != nullptr && Owned(small) && SB_HeapFree(kHeap, 0, small));
+    assert(EU4SB_MimallocStats.mismatches == 0);
+}
+
 }  // namespace
 
 int main() {
     StartupModeReturnsMemory();
     StartupMode();
     WholeSessionMode();
+    LargeBlocks();
     std::puts("mimalloc_heap: ok");
     return 0;
 }

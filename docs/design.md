@@ -1432,3 +1432,17 @@ was not found. The question and the series:
   0.11; a `config.toml` of 0.7.0 that says `on` (its default then) migrates
   to the new default. The start-up gain (about 1.1 s against `off`) was
   measured on the first `startup` build, before the collects.
+- Large blocks stay in the Windows heap, in both modes (anvil#426). The game
+  reads some large tables past their end without a bounds check: `owns` with
+  a province id beyond the map reads the province array (0x2E10 bytes a
+  province) at that id. A player's mod used `owns = 5075` on the
+  4942-province map. Without Bellows the read hit other committed memory and
+  gave a wrong answer; in mimalloc the array ended in an arena whose space
+  after it was only reserved, and the game crashed at that event every time.
+  The lab reproduced both with a test event on the vanilla map (Russia 1719):
+  with `mimalloc` on, the owner field of province 5075 lay in reserved memory
+  and the event crashed at the same address; with it off, it lay in another
+  committed block and the event passed. Since then a block of 1 MiB or more,
+  or a realloc to that size, goes to the Windows heap, so such tables keep the
+  layout they have without Bellows. A read past a table can still fault there,
+  as it can without Bellows.
