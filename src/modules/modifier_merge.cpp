@@ -111,6 +111,12 @@ void* Detour(void* destPtr, void* srcPtr) {
     InterlockedIncrement64(&EU4SB_ModifierMergeStats.requests);
     auto* dest = static_cast<unsigned char*>(destPtr);
     const auto* srcBase = static_cast<const unsigned char*>(srcPtr);
+    // A null list is the caller's (anvil#426: a country's modifier source left null, likely by a mod); the
+    // game's function faults on it too, so the fault and the crash report stay the game's.
+    if (destPtr == nullptr || srcPtr == nullptr) {
+        InterlockedIncrement64(&EU4SB_ModifierMergeStats.skips);
+        return g_next(destPtr, srcPtr);
+    }
     if (destPtr == srcPtr || EU4SB_ModifierMergeStats.cacheDisabled != 0) return g_next(destPtr, srcPtr);
     const sb::ModSource src{sb::Read<std::uint8_t>(srcBase, sb::kModDense) != 0,
                             sb::Read<const std::int32_t*>(srcBase, sb::kModEntries),
