@@ -576,8 +576,9 @@ way the game does. The result is the same entries in the same order with the
 same values, count and capacity; the buffer grows at the same points with the
 game's operator new and the list's own release call. Calls outside what the
 index covers (ids outside `0..65535`, a dense list with a dynamic id in a static
-slot, the source being the destination) and small calls go to the game's
-function. `modifier_merge_core.hpp` has the game's loop written out
+slot, the source being the destination, a null list) and small calls go to the
+game's function. A null list is the caller's fault and faults in the game's
+function too, so the crash report names the game's code, not Bellows. `modifier_merge_core.hpp` has the game's loop written out
 (`MergeReference`); the test compares it with `MergeFast` on 4,000 random
 merges of every shape. `"verify"` runs the game's merge and compares a copy
 merged by `MergeFast`; `"on"` does that for every 1,024th call and goes back to
