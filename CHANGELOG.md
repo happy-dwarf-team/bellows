@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.1](https://github.com/happy-dwarf-team/bellows/compare/v2.0.0...v2.0.1) (2026-11-16)
+
+
+### Bug Fixes
+
+* **mimalloc_heap:** keep blocks of 1 MiB and more in the Windows heap ([#207](https://github.com/happy-dwarf-team/bellows/issues/207)) ([accacb4](https://github.com/happy-dwarf-team/bellows/commit/accacb47128d97a8f2fb2c081b68881e52c1a0b7))
+* **settings:** say in the log that a leftover config.toml is no longer read ([#205](https://github.com/happy-dwarf-team/bellows/issues/205)) ([2316faa](https://github.com/happy-dwarf-team/bellows/commit/2316faa44485a1d4676f3278cfe1d32e29ca0ffd))
+
 ## [2.0.0](https://github.com/happy-dwarf-team/bellows/compare/v1.8.0...v2.0.0) (2026-11-15)
 
 
