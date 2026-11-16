@@ -24,6 +24,18 @@
 // CollectMimallocIfDue at the next frame once 64 MiB of mimalloc blocks were
 // freed since the last collect (anvil-game 1.5 publishes no session event
 // for a save loaded from the in-game menu; the lab saw +0.46 GiB there).
+//
+// Large blocks (kLargeBlock and more) stay in the Windows heap in every mode,
+// and a realloc that grows a mimalloc block to that size moves it there. The
+// game reads past the end of some large tables: `owns = <id>` with a province
+// id beyond the map reads the province array at id * 0x2E10 without a bounds
+// check (anvil#426: a mod's `owns = 5075` on a 4942-province map). Without
+// Bellows the array lies in the Windows heap and such a read usually hits
+// other committed memory: a wrong answer, no crash. In mimalloc the array lay
+// in an arena whose space after it was reserved but not committed, so the
+// same read faulted (the lab reproduced both). Large blocks are few, and
+// mimalloc's gain is in the many small ones, so they keep the layout the game
+// has without Bellows.
 #include "modules.hpp"
 
 #include <mimalloc.h>
@@ -33,6 +45,8 @@ namespace {
 
 constexpr std::size_t kHeader = 16;
 constexpr std::size_t kMagic = 0x6D6C6C6F63653475ull;
+// Blocks of this size and more stay in the Windows heap (see the top of the file).
+constexpr std::size_t kLargeBlock = std::size_t{1} << 20;
 
 using HeapAllocFn = LPVOID(WINAPI*)(HANDLE, DWORD, SIZE_T);
 using HeapFreeFn = BOOL(WINAPI*)(HANDLE, DWORD, LPVOID);
@@ -80,8 +94,10 @@ inline Header* HeaderOf(const void* pointer) noexcept {
 
 extern "C" {
 // mode = 1 when the IAT slots were replaced; misses = frees/sizes/reallocs of
-// blocks mimalloc does not own (sent to kernel32); skips = calls for another
-// heap or with unsupported flags; mismatches = owned blocks with a corrupt header.
+// blocks mimalloc does not own (sent to kernel32), large blocks included;
+// skips = calls for another heap or with unsupported flags; extra = large
+// blocks allocated in or moved to the Windows heap before the switch;
+// mismatches = owned blocks with a corrupt header.
 __declspec(dllexport) sb::Stats EU4SB_MimallocStats = SB_STATS_INIT;
 }
 
@@ -89,6 +105,10 @@ extern "C" LPVOID WINAPI SB_HeapAlloc(HANDLE heap, DWORD flags, SIZE_T size) {
     if (Switched()) return g_realAlloc(heap, flags, size);
     if (heap != g_processHeap || (flags & ~static_cast<DWORD>(HEAP_ZERO_MEMORY)) != 0 || size > (SIZE_MAX - kHeader)) {
         sb::Increment(&EU4SB_MimallocStats.skips);
+        return g_realAlloc(heap, flags, size);
+    }
+    if (size >= kLargeBlock) {
+        sb::Increment(&EU4SB_MimallocStats.duplicateKeys);
         return g_realAlloc(heap, flags, size);
     }
     void* base = (flags & HEAP_ZERO_MEMORY) ? mi_zalloc(size + kHeader) : mi_malloc(size + kHeader);
@@ -121,8 +141,10 @@ extern "C" LPVOID WINAPI SB_HeapReAlloc(HANDLE heap, DWORD flags, LPVOID pointer
         Header* header = HeaderOf(pointer);
         if (header->magic == kMagic) {
             const std::size_t old = header->size;
-            if (Switched()) {
+            const bool switched = Switched();
+            if (switched || size >= kLargeBlock) {
                 // Out of mimalloc: HEAP_ZERO_MEMORY zeroes the new block, the copy keeps the old bytes.
+                if (!switched) sb::Increment(&EU4SB_MimallocStats.duplicateKeys);
                 void* moved = g_realAlloc(heap, flags, size);
                 if (moved == nullptr) {
                     SetLastError(ERROR_NOT_ENOUGH_MEMORY);
