@@ -41,7 +41,7 @@ code only.
 | `never_throttle` | Simulation, off by default: sets the application's never-throttle flag while a single-player game runs at speed 5, so a minimized game skips its 100 ms frame wait (§6a) | minimized year: vanilla 84.0 → 32.5 s, Anbennar 107.7 → 67.2 s (flag set from outside, lab) |
 | `save_compress` | Saving: the game's own zlib with a faster CRC-32 (the game's bytes); optionally in parallel (§6a) | autosave 0.873 → 0.831 s; parallel 0.612 s |
 | `transfer_skip` | Loading in single player: no level 9 copy of a text save for a transfer nobody receives (§6a) | "Continue" of a 64.5 MB save 10.91 → 8.95 s |
-| `listing_lookup` | Start-up, off by default: the stat after `verifyPath` in `getRealDir` and the opens of names that are not there answered from `verifypath_listing`'s listings; existing files opened by the game (§6a) | Anbennar 22.08 → 18.86 s to the menu; base game: in the noise |
+| `listing_lookup` | Start-up, on by default since 2.1: the stat after `verifyPath` in `getRealDir` and the opens of names that are not there answered from `verifypath_listing`'s listings; existing files opened by the game (§6a) | Anbennar 22.08 → 18.86 s to the menu; base game: in the noise |
 | `checksum_defer` | Loading, off by default: the game's checksum task waits until the databases are loaded, so the two no longer take turns on the file system locks; the same files and checksum (§6a) | Anbennar: −1.11 and −1.01 s to the menu (two series); base game: in the noise |
 
 The table's start-up modules are in the order they were ported; §6a has the
@@ -950,7 +950,7 @@ GOG: `0x217890`, `0x2085E0`, `0x2110C0` on 1.37.5.2, the same on 1.37.5.0.
 
 ### listing_lookup (start-up)
 
-Off by default; needs `verifypath_listing`. PhysFS 3.0 (the game's) asks a directory archive twice. `verifyPath`
+On by default since 2.1 (off before); needs `verifypath_listing`. PhysFS 3.0 (the game's) asks a directory archive twice. `verifyPath`
 stats every prefix of the path, and `verifypath_listing` answers those stats from listings. A missing *last*
 component still passes (a file may be opened for writing), and then:
 

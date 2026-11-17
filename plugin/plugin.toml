@@ -62,7 +62,6 @@ name = "Lookups from listings"
 description = "Answers \"is this file here?\" from folder listings, for big mod sets such as Anbennar. Needs Path check cache."
 group = "Start-up"
 affects_gameplay = false
-default = false
 
 [[modules]]
 id = "exists_index"
