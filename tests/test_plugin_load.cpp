@@ -63,7 +63,8 @@ void NeverCalled() { std::abort(); }  // what `next` and `previous` lead to: not
 
 bool Refused(const std::string& what) {
     return g_scenario == "refuse" && (what == "redirect_call " + std::to_string(SYM_TRIGGER_INTERN_CALL_B) ||
-                                      what == "replace_import HeapAlloc");
+                                      what == "replace_import HeapAlloc" ||
+                                      what == "hook_function " + std::to_string(SYM_COUNTRY_MODIFIERS));
 }
 
 AnvilResult Request(AnvilPlugin* self, const std::string& what, void** next, AnvilChange** out) {
@@ -496,7 +497,7 @@ int main(int argc, char** argv) {
                              ", range_witness=on, frame_pacing=on, pops_pacing=on, never_throttle=" + diag +
                              ", modifier_merge=on, port_table=on, province_modifier_view=on, army_search_memo=on, save_compress=on, "
                              "transfer_skip=on, history_add=on, checksum_defer=on, tick_profile=" + diag + ", army_search_profile=" + diag +
-                             ", score_probe=" + diag + ", monthly_probe=" + diag;
+                             ", score_probe=" + diag + ", monthly_probe=" + (g_scenario == "refuse" ? "FAILED" : diag);
     {
         // Every module of [[modules]] asked once, Diagnostics and verifypath_session included, none of the profiles.
         std::lock_guard lock(g_mutex);
@@ -581,6 +582,12 @@ int main(int argc, char** argv) {
             assert(!Live(std::string("replace_import ") + f));
         }
         assert(!Live("redirect_call " + std::to_string(SYM_TRIGGER_INTERN_CALL_A)));
+        // monthly_probe's last hook refused: none of its hooks stays, the random draw's included (its
+        // detour would call a null `next`).
+        for (auto s : {SYM_GAME_RANDOM, SYM_MONTHLY_TICK, SYM_COUNTRY_MONTH, SYM_PROVINCE_MONTH, SYM_UNITS_MONTH,
+                       SYM_COUNTRY_DAY, SYM_COUNTRY_DAY_ARMIES}) {
+            assert(!Live("hook_function " + std::to_string(s)));
+        }
         assert(Live("replace_import GetFileAttributesExW"));
         assert(Live("replace_block " + std::to_string(SYM_VERIFYPATH_STAT_CALL)));
     }
