@@ -212,9 +212,38 @@ void LargeBlocks() {
     assert(EU4SB_MimallocStats.mismatches == 0);
 }
 
+// HeapAlloc returns MEMORY_ALLOCATION_ALIGNMENT (16 bytes on x64) for every size, and the game's CRT
+// passes that on to malloc and operator new. mimalloc keeps it only because MI_MAX_ALIGN_SIZE (16)
+// rounds its small bins to two words (MI_ALIGN2W in page-queue.c); bins of 24, 40 or 56 bytes would
+// return 8-byte aligned blocks for requests of 1-8, 17-24 and 33-40 bytes with the 16-byte header.
+// This pins it across mimalloc updates, for allocations and reallocs.
+void Alignment() {
+    sb::g_gameReady = 0;
+    sb::InitMimallocForTest(sb::Mode::On);
+    std::vector<void*> blocks;
+    for (std::size_t size = 0; size <= 1024; ++size) {
+        for (int i = 0; i < 4; ++i) {
+            void* p = SB_HeapAlloc(kHeap, i % 2 ? HEAP_ZERO_MEMORY : 0, size);
+            assert(p != nullptr && Owned(p));
+            assert(reinterpret_cast<std::uintptr_t>(p) % MEMORY_ALLOCATION_ALIGNMENT == 0);
+            assert(SB_HeapSize(kHeap, 0, p) == size);
+            blocks.push_back(p);
+        }
+    }
+    for (std::size_t i = 0; i < blocks.size(); ++i) {
+        void* p = SB_HeapReAlloc(kHeap, 0, blocks[i], (i * 7) % 300);
+        assert(p != nullptr && Owned(p));
+        assert(reinterpret_cast<std::uintptr_t>(p) % MEMORY_ALLOCATION_ALIGNMENT == 0);
+        assert(SB_HeapSize(kHeap, 0, p) == (i * 7) % 300);
+        assert(SB_HeapFree(kHeap, 0, p));
+    }
+    assert(EU4SB_MimallocStats.mismatches == 0);
+}
+
 }  // namespace
 
 int main() {
+    Alignment();
     StartupModeReturnsMemory();
     StartupMode();
     WholeSessionMode();
