@@ -50,6 +50,9 @@ constexpr std::size_t kSetNodeValue = 0x10;  // unique_ptr<key> in a set node
 constexpr std::size_t kRegistrySizes[2] = {0x10, 0x50};
 constexpr std::uint64_t kMaxPresize = 1ULL << 26;
 constexpr std::size_t kDefaultPresize = 1u << 16;
+// The presize allocates its slots at once and zero-filled; past this the memo grows as it fills (a misread
+// registry size must not ask for gigabytes at start-up).
+constexpr std::size_t kMaxPresizeBytes = std::size_t{256} << 20;
 
 constexpr std::uint32_t kForeign = 0xFFFFFFFFu;  // not a key structure
 constexpr std::uint32_t kEmpty = 0xFFFFFFFEu;    // free slot in the structure table
@@ -141,7 +144,7 @@ struct Memo {
         return static_cast<std::size_t>(x);
     }
     void Init(std::size_t expected) {
-        slots.assign(Capacity(expected), Slot{nullptr, 0});
+        slots.assign(std::min(Capacity(expected), kMaxPresizeBytes / sizeof(Slot)), Slot{nullptr, 0});
         mask = slots.size() - 1;
         used = 0;
     }

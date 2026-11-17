@@ -289,11 +289,21 @@ BufferPtr Take(const std::string& archiveKey, const char* member) {
     return nullptr;
 }
 
+// Whether every worker had exited when StopBackend returned (then nothing reads the archives' handles but
+// FinishRamPrefetch's own profile check).
+bool g_workersExited = false;
+
 void StopBackend() {
     Backend* b = g_backend.load();
     if (b == nullptr || !prefetch::Stop(*b)) return;
-    if (!b->threads.empty()) {
-        WaitForMultipleObjects(static_cast<DWORD>(b->threads.size()), b->threads.data(), TRUE, 10000);
+    if (b->threads.empty()) {
+        g_workersExited = true;
+    } else {
+        // At most MAXIMUM_WAIT_OBJECTS handles: WorkersFor keeps the count small.
+        g_workersExited = WaitForMultipleObjects(static_cast<DWORD>(b->threads.size()), b->threads.data(), TRUE,
+                                                 10000) == WAIT_OBJECT_0;
+        for (HANDLE thread : b->threads) CloseHandle(thread);  // a worker still running goes on without it
+        b->threads.clear();
     }
     std::lock_guard<std::mutex> lock(b->mutex);
     g_committedPeak = b->committedPeak;
@@ -612,6 +622,25 @@ bool InstallRamPrefetch(anvil::Host& host, Mode mode) {
     return true;
 }
 
+namespace {
+
+// The ZIP archives stay open until here: LineGone may still scan one. Once every worker has exited nothing
+// else reads them (after ready no lookup reaches the backend), so their handles are closed and the archives
+// are no longer held open for the rest of the process. With a worker still running they stay open.
+void CloseArchives() {
+    Backend* b = g_backend.load();
+    if (b == nullptr || !g_workersExited) return;
+    for (auto& a : b->archives) {
+        if (a->file == INVALID_HANDLE_VALUE) continue;
+        CloseHandle(a->file);
+        a->file = INVALID_HANDLE_VALUE;
+    }
+}
+
+void SaveProfile();
+
+}  // namespace
+
 // Called after the game-ready event: stop the workers, free unused buffers, save the profile.
 void FinishRamPrefetch() {
     if (g_learned == nullptr) return;
@@ -619,6 +648,13 @@ void FinishRamPrefetch() {
     InterlockedExchange(&EU4SB_RamPrefetchStats.readyDisabled, 1);
     StopBackend();
     g_learnStopped.store(true);
+    SaveProfile();
+    CloseArchives();
+}
+
+namespace {
+
+void SaveProfile() {
     if (g_profileTarget == nullptr) return;
     try {
         std::vector<std::wstring> learned;
@@ -636,6 +672,8 @@ void FinishRamPrefetch() {
         Log(ANVIL_LOG_WARNING, "ram_prefetch: profile NOT saved");
     }
 }
+
+}  // namespace
 
 void ReportRamPrefetch() {
     if (g_learned == nullptr) return;

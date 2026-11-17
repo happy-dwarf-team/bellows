@@ -333,7 +333,26 @@ void RandomDagScenario(std::uint32_t seed, volatile std::uintptr_t& registrySlot
 
 }  // namespace
 
+// A registry size the module trusts too far (2^26 nodes would be 2^27 slots, 2 GiB) presizes at most
+// kMaxPresizeBytes; the memo still takes more nodes than that and grows.
+void PresizeCap() {
+    Memo memo;
+    memo.Init(std::size_t{1} << 26);
+    assert(memo.slots.size() == kMaxPresizeBytes / sizeof(Memo::Slot));
+    assert(memo.mask == memo.slots.size() - 1 && (memo.slots.size() & memo.mask) == 0);
+    memo.Init(1000);
+    assert(memo.slots.size() == Capacity(1000));
+    std::vector<int> nodes(5000);
+    for (std::size_t i = 0; i < nodes.size(); ++i) memo.Put(&nodes[i], static_cast<std::uint32_t>(i));
+    for (std::size_t i = 0; i < nodes.size(); ++i) {
+        std::uint32_t id = 0;
+        assert(memo.Get(&nodes[i], id) && id == i);
+    }
+    assert(memo.slots.size() >= Capacity(nodes.size()));
+}
+
 int main() {
+    PresizeCap();
     std::mt19937 rng(1234);
     std::vector<Node*> registry;
     for (int i = 0; i < 400; ++i) {
