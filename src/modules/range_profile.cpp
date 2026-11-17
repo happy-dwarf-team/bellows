@@ -12,12 +12,15 @@
 // The game is usually closed without a clean exit, so a background thread writes
 // the counters every 5 s to range_profile*.tsv in the data directory.
 #include "modules.hpp"
+#include "../file_write.hpp"
 #include "range_stats.hpp"
 
 #include <intrin.h>
 
-#include <fstream>
+#include <sstream>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace {
 
@@ -91,17 +94,14 @@ void* DistanceDetour(void* out, void* a2, void* a3, void* a4, std::uintptr_t a5,
 
 void WriteFiles() {
     const double msPerTick = sb::TicksToMs(1);
+    // Formatted under the lock, written after it: a hooked call waits for the formatting, not for the disk.
+    std::vector<std::pair<const wchar_t*, std::string>> files;
     AcquireSRWLockShared(&g_lock);
     try {
-        const std::wstring& dir = *g_dir;
         auto write = [&](const wchar_t* name, auto&& body) {
-            const std::wstring path = dir + L"\\" + name;
-            const std::wstring temp = path + L".tmp";
-            {
-                std::ofstream out(temp, std::ios::binary | std::ios::trunc);
-                body(out);
-            }
-            MoveFileExW(temp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING);
+            std::ostringstream out;
+            body(out);
+            files.emplace_back(name, out.str());
         };
         write(L"range_profile.tsv", [&](std::ostream& out) {
             g_stats->WriteSummary(out, msPerTick);
@@ -113,6 +113,7 @@ void WriteFiles() {
     } catch (...) {
     }
     ReleaseSRWLockShared(&g_lock);
+    for (const auto& [name, text] : files) sb::ReplaceFileWith(*g_dir + L"\\" + name, text);
 }
 
 DWORD WINAPI WriterThread(void*) {
