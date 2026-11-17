@@ -319,7 +319,6 @@ off = ["off"]
 [retired.listing_lookup]
 module = "listing_lookup"
 off = ["off"]
-on = ["on", "verify"]
 
 [retired.exists_index]
 module = "exists_index"

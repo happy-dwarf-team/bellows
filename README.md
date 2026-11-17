@@ -216,7 +216,7 @@ and multiplayer with the module on.
 
 ### PhysFS lookups from listings
 
-`listing_lookup` off (the default) and `"on"`, warm starts to the main menu
+`listing_lookup` off (the default before 2.1) and `"on"`, warm starts to the main menu
 (`Running application` in `system.log`), EU4 1.37.5 (Steam), original `eu4.exe`
 started from a copy of the game folder on processors 1–7, Anvil 1.13.0 and
 anvil-game, Bellows defaults otherwise and the profiles it learned on a warm-up
@@ -335,7 +335,7 @@ says in the Manager is one sentence; the details are here.
 | **File warm-up** (`open_warmup`) | Opens the files the game will need ahead of it on parallel threads, from a profile learned per mod set (meant for the first start after a reboot, when every first open of a file is slow: 61 → 15 s in the lab's build before the plugin; the first start after a reboot with the plugin has not been measured, so Bellows makes no claim for it) |
 | **RAM prefetch** (`ram_prefetch`) | Reads and unpacks the DLC archive members the game will need into RAM on worker threads (learned per mod set; uses up to 1 GB of extra RAM during start-up and at most a quarter of the memory free at that moment, setting `ram_prefetch_budget_mb`) |
 | **Path check cache** (`verifypath_listing`) | Answers PhysFS path checks from directory listings until the main menu is up; Path checks after start-up (`verifypath_session`) keeps it on after that. Its check compares every answer, also after the main menu: 0 differences in about 650,000 answers on three saves. Lab: see [Loading a save](#loading-a-save) |
-| **Lookups from listings** (`listing_lookup`) | **Off by default.** Once a file path passed PhysFS's checks, the game asks each mod folder once more whether the file is there, and tries to open it in every folder that has its parent folder, also where the file is not. With the module on (and `verifypath_listing` on) both answers for files that are not there come from the directory listings Bellows already reads; every existing file is still opened by the game. Matters for big mod sets that replace folders: lab, about 3.2 s less to the main menu on Anbennar, nothing measurable on the base game; the game's logs and the checksum on the menu were the same in every start. Every 256th answer is also asked of the game, and a difference turns the module off; its check asks every time. See [PhysFS lookups from listings](#physfs-lookups-from-listings) |
+| **Lookups from listings** (`listing_lookup`) | **On by default since 2.1.** Once a file path passed PhysFS's checks, the game asks each mod folder once more whether the file is there, and tries to open it in every folder that has its parent folder, also where the file is not. With the module on (and `verifypath_listing` on) both answers for files that are not there come from the directory listings Bellows already reads; every existing file is still opened by the game. Matters for big mod sets that replace folders: lab, about 3.2 s less to the main menu on Anbennar, nothing measurable on the base game; the game's logs and the checksum on the menu were the same in every start. Every 256th answer is also asked of the game, and a difference turns the module off; its check asks every time. See [PhysFS lookups from listings](#physfs-lookups-from-listings) |
 | **File existence index** (`exists_index`) | Answers "does this file exist" for the modifier icon check |
 | **Trigger profile lookup** (`trigger_intern`) | Faster lookup of each trigger in the game's trigger profile at the end of loading (~0.4 s instead of ~0.6 s for the game's own code with the shipped trigger profile; a `config.toml` written by 0.3.0 or earlier turned it off, and that choice is kept: turn it on in Anvil Manager) |
 | **Parameter substitution** (`metascript_subst`) | Single-pass `$parameter$` substitution in scripted effects |
@@ -483,7 +483,7 @@ save_compress_threads = true
 
 **From 1.x.** 1.x had a setting of the same name as each module (`on`, `off`, `verify`). At the
 first start of 2.0, Anvil 1.23 reads them from your `settings.toml` once: `off` turns the module
-off (`disabled_modules`), and for a module that is off by default (`attr_cache`, `listing_lookup`,
+off (`disabled_modules`), and for a module that is off by default (`attr_cache`,
 `never_throttle`, `checksum_defer`) `on` or `verify` turns it on (`enabled_modules`). Then it
 removes them from the file and says so in `anvil/anvil.log`. `verifypath_session = "off"` turns
 that module off the same way. Not carried over: `mimalloc = "on"` (choose `session` again) and
