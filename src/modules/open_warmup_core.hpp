@@ -63,8 +63,9 @@ inline std::vector<std::wstring> RecordedPaths(const LearnRecord* rows, LONG cla
 
 // Opens one listed file as the game will and closes it at once: nothing is read or changed.
 inline bool OpenAhead(const std::wstring& path) noexcept {
-    HANDLE file = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING,
-                              FILE_ATTRIBUTE_NORMAL, nullptr);
+    // FILE_SHARE_DELETE too: for the moment it is open, another program may still rename or delete it.
+    HANDLE file = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                              nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (file == INVALID_HANDLE_VALUE) return false;
     CloseHandle(file);
     return true;
