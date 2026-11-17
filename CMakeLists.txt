@@ -202,7 +202,7 @@ if(SB_BUILD_TESTS)
     if(MSVC)
         target_compile_options(test_plugin_load PRIVATE /utf-8 /permissive- /EHsc /UNDEBUG)
     endif()
-    foreach(scenario ok refuse old modules checks0 checks1 checks2 checks3 checks4)
+    foreach(scenario ok refuse old modules nolisting checks0 checks1 checks2 checks3 checks4)
         add_test(NAME plugin_load_${scenario}
             COMMAND test_plugin_load $<TARGET_FILE:bellows> ${CMAKE_BINARY_DIR}/plugin/bellows ${scenario})
     endforeach()

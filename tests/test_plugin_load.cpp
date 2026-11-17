@@ -7,11 +7,11 @@
 // ADR 0011, 0013): in every scenario the core keeps open_warmup, ram_prefetch and metascript_subst off,
 // and turns Diagnostics on with every profile but token_dict_profile and the check of attr_cache; in
 // "modules" the player also turned exists_index, verifypath_session and Diagnostics off and left never_throttle
-// off; in
+// off; in "nolisting" verifypath_listing is off, so listing_lookup is off too (not failed); in
 // "checks0".."checks4" a different set of the features' checks is on, and each feature must run as "verify"
 // exactly when its own check is. Each change records the handle that requested it: a feature's changes belong
 // to its own module, a profile's to Diagnostics.
-//   test_plugin_load <bellows.dll> <plugin folder> ok|refuse|old|modules|checks0..checks4
+//   test_plugin_load <bellows.dll> <plugin folder> ok|refuse|old|modules|nolisting|checks0..checks4
 #include <anvil/anvil_benchmark.h>
 #include <anvil/anvil_game.h>
 #include <anvil/anvil_plugin.h>
@@ -210,6 +210,7 @@ AnvilResult Module(AnvilPlugin*, const char* module, AnvilPlugin** out) {
                                     id == "verifypath_session")) {
         return ANVIL_ERROR_DISABLED;
     }
+    if (g_scenario == "nolisting" && id == "verifypath_listing") return ANVIL_ERROR_DISABLED;
     *out = reinterpret_cast<AnvilPlugin*>(&g_moduleHandles[g_moduleCalls.size() % sizeof(g_moduleHandles)]);
     g_owners[*out] = id;
     return ANVIL_OK;
@@ -456,6 +457,24 @@ int main(int argc, char** argv) {
     assert(Logged("anvil/data/bellows/config.toml (Bellows 0.7.0 and earlier) is no longer read") == (g_scenario == "ok"));
     assert(fs::exists(data / "config.toml") == (g_scenario == "ok") && !fs::exists(data / "settings.toml"));
 
+    if (g_scenario == "nolisting") {
+        // listing_lookup depends on verifypath_listing: with that module off it is off as well, not "FAILED",
+        // in the log and in the benchmark's mode field, and its code did not run.
+        assert(Logged("listing_lookup: needs verifypath_listing, which is off; module off"));
+        assert(Logged("modules: mimalloc=startup, open_warmup=off, ram_prefetch=off, verifypath_listing=off, "
+                      "listing_lookup=off, exists_index=on"));
+        assert(Logged(", verifypath_session=on"));
+        assert(!Live("replace_block " + std::to_string(SYM_VERIFYPATH_STAT_CALL)));
+        {
+            std::lock_guard lock(g_mutex);
+            assert(g_values.at("listing_lookup.mode") == "off" && g_values.at("verifypath_listing.mode") == "off");
+        }
+        std::printf("plugin load (%s) ok\n", g_scenario.c_str());
+        std::fflush(stdout);
+        fs::remove_all(data);
+        TerminateProcess(GetCurrentProcess(), 0);
+    }
+
     if (const int bit = ChecksBit(); bit >= 0) {
         // With Diagnostics on, each feature runs as "verify" exactly when its own check is on.
         std::map<std::string, std::string> logged;
@@ -497,7 +516,8 @@ int main(int argc, char** argv) {
                              ", range_witness=on, frame_pacing=on, pops_pacing=on, never_throttle=" + diag +
                              ", modifier_merge=on, port_table=on, province_modifier_view=on, army_search_memo=on, save_compress=on, "
                              "transfer_skip=on, history_add=on, checksum_defer=on, tick_profile=" + diag + ", army_search_profile=" + diag +
-                             ", score_probe=" + diag + ", monthly_probe=" + (g_scenario == "refuse" ? "FAILED" : diag);
+                             ", score_probe=" + diag + ", monthly_probe=" + (g_scenario == "refuse" ? "FAILED" : diag) +
+                             ", verifypath_session=" + (modules ? "off" : "on");
     {
         // Every module of [[modules]] asked once, Diagnostics and verifypath_session included, none of the profiles.
         std::lock_guard lock(g_mutex);
