@@ -9,10 +9,13 @@
 
 #include "settings.gen.hpp"  // cfg::<name>, written by anvil gen from plugin/settings.toml
 
+#include <algorithm>
 #include <cctype>
 #include <filesystem>
+#include <iterator>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace {
@@ -182,6 +185,16 @@ struct Bellows : anvil::Plugin {
                          ? sb::MimallocMode(m.handle.has_value(), cfg::mimalloc_scope.get() == cfg::mimalloc_scope.session)
                          : sb::FeatureMode(m.handle.has_value(), diagnostics.has_value(), chosen);
         }
+        // listing_lookup answers from verifypath_listing's listings. With that module turned off it is off
+        // too, not failed; a verifypath_listing that fails to install still leaves it "FAILED".
+        const auto named = [&](std::string_view name) -> Module& {
+            return *std::find_if(std::begin(modules), std::end(modules), [&](const Module& m) { return m.name == name; });
+        };
+        if (Module& lookup = named("listing_lookup");
+            lookup.mode != sb::Mode::Off && named("verifypath_listing").mode == sb::Mode::Off) {
+            sb::Log(ANVIL_LOG_INFO, "listing_lookup: needs verifypath_listing, which is off; module off");
+            lookup.mode = sb::Mode::Off;
+        }
         // The modules the core keeps off show as "=off" in the "modules:" line below.
         if (diagnostics) sb::Log(ANVIL_LOG_INFO, "diagnostics on: the checks and profiles chosen in its settings run");
         sb::SetRamPrefetchBudget(static_cast<std::uint64_t>(cfg::ram_prefetch_budget_mb.get()));
@@ -197,7 +210,8 @@ struct Bellows : anvil::Plugin {
             host.subscribe_setting(cfg::frame_pacing_input, apply);
         });
         // A module without code of its own: verifypath_listing's hooks keep answering after the main menu.
-        sb::SetVerifyPathSession(ModuleHandle(host, "verifypath_session").has_value());
+        const bool verifyPathSession = ModuleHandle(host, "verifypath_session").has_value();
+        sb::SetVerifyPathSession(verifyPathSession);
         // On several threads; save_compress's check decodes each member again before writing it.
         sb::SetSaveCompressParallel(!cfg::save_compress_threads.get() ? 0
                                     : diagnostics && cfg::save_compress_check.get() ? 2
@@ -218,6 +232,8 @@ struct Bellows : anvil::Plugin {
             summary += std::string(summary.empty() ? "" : ", ") + m.name + "=" + (mode == "failed" ? "FAILED" : mode);
             sb::bench::SetMode(m.name, mode.c_str());
         }
+        // A module without code of its own, so not in the table; it has no benchmark field (the report is full).
+        summary += std::string(", verifypath_session=") + (verifyPathSession ? "on" : "off");
         sb::Log(ANVIL_LOG_INFO, "modules: %s", summary.c_str());
 
         // The plugin.toml dependency makes anvil-game load first (both are early).

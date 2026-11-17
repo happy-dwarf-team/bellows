@@ -538,7 +538,9 @@ release.
 - **Was Bellows loaded?** `anvil/anvil.log` has one line per start with every
   module and its mode, e.g. `modules: mimalloc=startup, open_warmup=on, …`. A
   module shown as `FAILED` turned itself off (the line above it says why) and
-  the game went on without it. When Anvil skips the whole plugin (another game
+  the game went on without it. `listing_lookup` shows `off` while Path check
+  cache (`verifypath_listing`) is off, and the line ends with
+  `verifypath_session`. When Anvil skips the whole plugin (another game
   build, an unapproved Workshop version), the log and the overlay (Ctrl+Shift+F12) say
   so, and the game starts as without Bellows.
 - **Turn one module off** to see whether it causes a problem: in Anvil Manager or the
