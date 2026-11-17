@@ -12,9 +12,12 @@
 // 5 s to army_search*.tsv in the data directory.
 #include "army_search_core.hpp"
 #include "modules.hpp"
+#include "../file_write.hpp"
 
-#include <fstream>
+#include <sstream>
 #include <string>
+#include <utility>
+#include <vector>
 
 extern "C" {
 // requests = searches, mode = 1 on.
@@ -82,23 +85,21 @@ std::uint64_t SearchDetour(void* scorer, int mode, void* army, std::uint64_t arg
 void WriteFiles() {
     const double msPerTick = sb::TicksToMs(1);
     const std::int64_t provinces = Provinces();
+    // Formatted under the lock, written after it: a hooked call waits for the formatting, not for the disk.
+    std::vector<std::pair<const wchar_t*, std::string>> files;
     AcquireSRWLockShared(&g_lock);
     try {
-        const std::wstring& dir = *g_dir;
         auto write = [&](const wchar_t* name, auto&& body) {
-            const std::wstring path = dir + L"\\" + name;
-            const std::wstring temp = path + L".tmp";
-            {
-                std::ofstream out(temp, std::ios::binary | std::ios::trunc);
-                body(out);
-            }
-            MoveFileExW(temp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING);
+            std::ostringstream out;
+            body(out);
+            files.emplace_back(name, out.str());
         };
         write(L"army_search.tsv", [&](std::ostream& out) { g_stats->WriteSummary(out, msPerTick, provinces); });
         write(L"army_search_days.tsv", [&](std::ostream& out) { g_stats->WriteDays(out, msPerTick); });
     } catch (...) {
     }
     ReleaseSRWLockShared(&g_lock);
+    for (const auto& [name, text] : files) sb::ReplaceFileWith(*g_dir + L"\\" + name, text);
 }
 
 DWORD WINAPI WriterThread(void*) {

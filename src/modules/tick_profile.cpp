@@ -15,12 +15,15 @@
 // The game is usually closed without a clean exit, so a background thread writes the counters
 // every 5 s to tick_profile*.tsv in the data directory.
 #include "modules.hpp"
+#include "../file_write.hpp"
 #include "tick_profile_core.hpp"
 
 #include <intrin.h>
 
-#include <fstream>
+#include <sstream>
 #include <string>
+#include <utility>
+#include <vector>
 
 extern "C" {
 // requests = game days, hits = checkpoints (0x769EA0 calls), mode = 1 on.
@@ -185,17 +188,14 @@ void CountryDetour(void* ai) {
 
 void WriteFiles() {
     const double msPerTick = sb::TicksToMs(1);
+    // Formatted under the lock, written after it: a hooked call waits for the formatting, not for the disk.
+    std::vector<std::pair<const wchar_t*, std::string>> files;
     AcquireSRWLockShared(&g_lock);
     try {
-        const std::wstring& dir = *g_dir;
         auto write = [&](const wchar_t* name, auto&& body) {
-            const std::wstring path = dir + L"\\" + name;
-            const std::wstring temp = path + L".tmp";
-            {
-                std::ofstream out(temp, std::ios::binary | std::ios::trunc);
-                body(out);
-            }
-            MoveFileExW(temp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING);
+            std::ostringstream out;
+            body(out);
+            files.emplace_back(name, out.str());
         };
         write(L"tick_profile_segments.tsv", [&](std::ostream& out) { g_profile->WriteSegments(out, msPerTick); });
         write(L"tick_profile_segments_first.tsv", [&](std::ostream& out) { g_profile->WriteSegments(out, msPerTick, true); });
@@ -213,6 +213,7 @@ void WriteFiles() {
     } catch (...) {
     }
     ReleaseSRWLockShared(&g_lock);
+    for (const auto& [name, text] : files) sb::ReplaceFileWith(*g_dir + L"\\" + name, text);
 }
 
 DWORD WINAPI WriterThread(void*) {
