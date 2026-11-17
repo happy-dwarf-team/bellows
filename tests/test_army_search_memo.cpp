@@ -25,8 +25,27 @@ void SpeedMemo() {
     assert(sb::LookupSpeed(memo, &a) == sb::MemoAnswer::Outside);
 }
 
+// A search left by an exception (the game's search throwing through the detour) still ends its scope.
+void ScopeOnException() {
+    sb::SearchMemo memo;
+    int a = 0;
+    {
+        const sb::SearchScope outer(memo);
+        sb::Store(memo, &a, 1);
+        try {
+            const sb::SearchScope inner(memo);
+            assert(memo.depth == 2);
+            throw 1;
+        } catch (int) {
+        }
+        assert(memo.depth == 1 && sb::Lookup(memo, &a) == sb::MemoAnswer::Hit);
+    }
+    assert(memo.depth == 0 && sb::Lookup(memo, &a) == sb::MemoAnswer::Outside);
+}
+
 int main() {
     SpeedMemo();
+    ScopeOnException();
     int armyA = 0, armyB = 0;
     sb::SearchMemo memo;
 
