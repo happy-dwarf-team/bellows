@@ -243,7 +243,30 @@ int main() {
     }
     g.lieAbout = -1;
 
-    std::printf("ok: %lld checks, %lld answered, %lld originals\n", static_cast<long long>(e.stats.calls),
+    // A save from an earlier date is loaded (an in-game load publishes no session event): the witnesses and
+    // their retry days belong to the old game and are forgotten, so the lookup runs again at once.
+    {
+        sb::WitnessEngine<FakeGame> v;
+        Country lone{{6}, {}, 11};
+        g.eligible[6] = true;
+        g.values[{6, 900}] = threshold;  // in range, but nothing below the threshold: no witness
+        g.day = 2000;
+        v.Check(g, &lone, &out, &siberia, nullptr, &threshold, false);
+        assert(v.stats.not_acquired == 1 && v.size() == 1);
+        v.Check(g, &lone, &out, &siberia, nullptr, &threshold, false);
+        assert(v.stats.lookups_skipped == 1);  // retry day 2030
+        g.day = 1000;
+        g.evaluations = 0;
+        v.Check(g, &lone, &out, &siberia, nullptr, &threshold, false);
+        assert(v.stats.resets == 1 && v.stats.lookups_skipped == 1 && v.stats.not_acquired == 2 && g.evaluations > 0);
+        // The date moving on, or staying, keeps them.
+        g.day = 1031;
+        v.Check(g, &lone, &out, &siberia, nullptr, &threshold, false);
+        v.Check(g, &lone, &out, &siberia, nullptr, &threshold, false);
+        assert(v.stats.resets == 1 && v.size() == 1);
+    }
+
+    std::printf("ok:%lld checks, %lld answered, %lld originals\n", static_cast<long long>(e.stats.calls),
                 static_cast<long long>(e.stats.answered), static_cast<long long>(e.stats.originals));
     return 0;
 }

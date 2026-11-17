@@ -16,6 +16,8 @@
 #include "modules.hpp"
 #include "range_witness_core.hpp"
 
+#include <xmmintrin.h>
+
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -133,13 +135,13 @@ bool ValueUnguarded(void* country, bool related, std::int32_t province, void* ta
         const std::uint8_t integer = sb::Read<std::uint8_t>(map, kMapIntegerFlag);
         const int squared = g_line(&a, &b, sb::Read<int>(map, kMapWidth), sb::Read<int>(map, kMapHeight), integer);
         if (integer != 0) {
-            line = squared * 1000;
+            line = static_cast<int>(static_cast<std::uint32_t>(squared) * 1000u);  // imul: wraps as the game's
         } else {
             if (squared < 0) return false;  // the game takes another path for negative input
             const float root2 = static_cast<float>(std::sqrt(static_cast<double>(squared)));
             float scaled = root2 * g_scale;
             scaled = scaled + g_offset;
-            line = static_cast<int>(scaled);  // cvttss2si
+            line = _mm_cvtt_ss2si(_mm_set_ss(scaled));  // cvttss2si: 0x80000000 out of range, as the game's
         }
     }
     const int nearest = byPath < line ? byPath : line;
@@ -267,6 +269,7 @@ void WriteFile() {
                 << "acquired\t" << s.acquired << "\n"
                 << "not_acquired\t" << s.not_acquired << "\n"
                 << "out_of_range\t" << s.out_of_range << "\n"
+                << "resets\t" << s.resets << "\n"
                 << "verify_agree\t" << s.verify_agree << "\n"
                 << "verify_disagree\t" << s.verify_disagree << "\n"
                 << "verify_value_same\t" << s.verify_value_same << "\n"
