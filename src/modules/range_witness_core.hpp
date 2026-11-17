@@ -63,6 +63,8 @@ struct WitnessStats {
     std::int64_t verify_disagree = 0;     // verify: valid witness but original out of range
     std::int64_t verify_value_same = 0;   // verify: original stopped at the witness, same value
     std::int64_t verify_value_differs = 0;
+    std::int64_t sampled = 0;             // on: answers checked against the original (one in sampleEvery)
+    std::int64_t sampled_disagree = 0;    // on: ... where the original said out of range (the module then stops)
 };
 
 // One verify mismatch, copied when it is detected and written out later by the module.
@@ -99,6 +101,11 @@ public:
     static constexpr std::size_t kMismatchesPerKind = 32;  // kept per kind; later ones are only counted
 
     WitnessStats stats;
+    // "on" checks one answer in this many against the original; a disagreement turns the engine off for good.
+    std::uint32_t sampleEvery = 1024;
+
+    // True once a sampled check disagreed: every later call goes to the original.
+    bool off() const { return off_; }
 
     // verify = always run the original and compare; otherwise answer from a valid witness.
     int* Check(Game& g, void* country, int* out, void* target, void* arg4, int* threshold, bool verify) {
@@ -111,7 +118,7 @@ public:
             ++stats.resets;
         }
         lastDay_ = day;
-        if (country == nullptr || target == nullptr || out == nullptr || threshold == nullptr) {
+        if (off_ || country == nullptr || target == nullptr || out == nullptr || threshold == nullptr) {
             ++stats.originals;
             return g.Original(country, out, target, arg4, threshold);
         }
@@ -126,6 +133,20 @@ public:
         if (have && known.found()) {
             valid = Qualifies(g, country, known, target, limit, &witnessValue);
             ++(valid ? stats.witness_valid : stats.witness_lost);
+        }
+        if (valid && !verify && sampleEvery != 0 && ++sinceSample_ >= sampleEvery) {
+            // The witness would answer: this time the original answers, and the two are compared. Its result
+            // is what the game gets either way.
+            sinceSample_ = 0;
+            ++stats.sampled;
+            ++stats.originals;
+            int* result = g.Original(country, out, target, arg4, threshold);
+            if (result == nullptr || *result > limit) {
+                ++stats.sampled_disagree;
+                off_ = true;
+                witnesses_.clear();
+            }
+            return result;
         }
         if (valid && !verify) {
             ++stats.answered;
@@ -254,6 +275,8 @@ private:
 
     std::unordered_map<WitnessKey, Witness, WitnessKeyHash> witnesses_;
     std::int32_t lastDay_ = INT32_MIN;
+    std::uint32_t sinceSample_ = 0;
+    bool off_ = false;
     Mismatch mismatches_[2 * kMismatchesPerKind];
     std::size_t mismatchCount_ = 0;
     std::size_t kept_[2] = {};

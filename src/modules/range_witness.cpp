@@ -194,6 +194,7 @@ struct Game {
 Game g_game;
 sb::WitnessEngine<Game>* g_engine = nullptr;
 SRWLOCK g_lock = SRWLOCK_INIT;
+bool g_offLogged = false;  // the sampled check disagreed and that was logged (under g_lock)
 volatile LONG64 g_ticks = 0;
 volatile LONG g_dirty = 0;
 std::wstring* g_dir = nullptr;
@@ -274,6 +275,8 @@ void WriteFile() {
                 << "verify_disagree\t" << s.verify_disagree << "\n"
                 << "verify_value_same\t" << s.verify_value_same << "\n"
                 << "verify_value_differs\t" << s.verify_value_differs << "\n"
+                << "sampled\t" << s.sampled << "\n"
+                << "sampled_disagree\t" << s.sampled_disagree << "\n"
                 << "witnesses\t" << size << "\n"
                 << "ms_in_checks\t" << sb::TicksToMs(g_ticks) << "\n";
         }
@@ -298,6 +301,11 @@ int* SB_RangeWitness(void* country, int* out, void* target, void* arg4, int* thr
     int* result = nullptr;
     try {
         result = g_engine->Check(g_game, country, out, target, arg4, threshold, g_mode == sb::Mode::Verify);
+        if (g_engine->off() && !g_offLogged) {
+            g_offLogged = true;
+            sb::Log(ANVIL_LOG_WARNING, "range_witness: a sampled check disagreed with the game; module off for this "
+                                       "process (range_witness.tsv)");
+        }
     } catch (...) {
         // Allocation failure in the witness map: answer like the game.
         ReleaseSRWLockExclusive(&g_lock);
@@ -361,6 +369,10 @@ void ReportRangeWitness() {
     InterlockedExchange64(&EU4SB_RangeWitnessStats.requests, s.calls);
     InterlockedExchange64(&EU4SB_RangeWitnessStats.hits, s.answered);
     InterlockedExchange64(&EU4SB_RangeWitnessStats.skips, s.originals);
+    InterlockedExchange64(&EU4SB_RangeWitnessStats.verifications, s.sampled + s.verify_agree + s.verify_disagree);
+    InterlockedExchange64(&EU4SB_RangeWitnessStats.mismatches,
+                          s.sampled_disagree + s.verify_disagree + s.verify_value_differs);
+    if (s.sampled_disagree != 0) InterlockedExchange(&EU4SB_RangeWitnessStats.cacheDisabled, 1);
     bench::Get().set("range_witness.checks", s.calls);
     bench::Get().set("range_witness.answered", s.answered);
     bench::Get().set("range_witness.originals", s.originals);
