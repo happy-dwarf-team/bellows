@@ -266,6 +266,47 @@ int main() {
         assert(v.stats.resets == 1 && v.size() == 1);
     }
 
+    // "on" runs the original for one answer in sampleEvery and compares; when the original says out of range
+    // for a witness the engine called valid, the engine turns off and every later call goes to the original.
+    {
+        FakeGame g;
+        Country c{{11, 12}, {}, 21};
+        Target t{901};
+        g.eligible[11] = g.eligible[12] = true;
+        g.values[{11, 901}] = 900'000;
+        g.values[{12, 901}] = 150'000;
+        int threshold = 200'000;
+        int out = 0;
+        sb::WitnessEngine<FakeGame> v;
+        v.sampleEvery = 3;
+        v.Check(g, &c, &out, &t, nullptr, &threshold, false);  // acquires province 12
+        v.Check(g, &c, &out, &t, nullptr, &threshold, false);
+        v.Check(g, &c, &out, &t, nullptr, &threshold, false);
+        assert(v.stats.acquired == 1 && v.stats.answered == 2 && g.originals == 1);
+        int* r = v.Check(g, &c, &out, &t, nullptr, &threshold, false);  // the third answer: sampled, agrees
+        assert(r == &out && out == 150'000 && v.stats.sampled == 1 && v.stats.sampled_disagree == 0 && !v.off());
+        assert(g.originals == 2 && v.size() == 1);
+        // The witness is wrongly valid (Value() lies about province 12; the game's walk sees 900 000).
+        g.values[{12, 901}] = 900'000;
+        g.lieAbout = 12;
+        v.Check(g, &c, &out, &t, nullptr, &threshold, false);
+        v.Check(g, &c, &out, &t, nullptr, &threshold, false);
+        assert(v.stats.answered == 4 && g.originals == 2);  // the silent wrong answers a sample exists to catch
+        r = v.Check(g, &c, &out, &t, nullptr, &threshold, false);
+        assert(*r > threshold && v.stats.sampled == 2 && v.stats.sampled_disagree == 1 && v.off() && v.size() == 0);
+        // Off for good: the original answers, no witness is looked up or kept.
+        g.evaluations = 0;
+        g.lieAbout = -1;
+        g.values[{12, 901}] = 150'000;
+        r = v.Check(g, &c, &out, &t, nullptr, &threshold, false);
+        assert(out == 150'000 && g.originals == 4 && g.evaluations == 0 && v.size() == 0 && v.stats.answered == 4);
+        // sampleEvery = 0 never samples.
+        sb::WitnessEngine<FakeGame> n;
+        n.sampleEvery = 0;
+        for (int i = 0; i < 10; ++i) n.Check(g, &c, &out, &t, nullptr, &threshold, false);
+        assert(n.stats.sampled == 0 && n.stats.answered == 9);
+    }
+
     std::printf("ok:%lld checks, %lld answered, %lld originals\n", static_cast<long long>(e.stats.calls),
                 static_cast<long long>(e.stats.answered), static_cast<long long>(e.stats.originals));
     return 0;
