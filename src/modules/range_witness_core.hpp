@@ -13,6 +13,7 @@
 // witness is looked up again; when none exists, the lookup is retried only after a while.
 // Verify also keeps the first mismatches of each kind (Mismatch) for the module to write out.
 
+#include <climits>
 #include <cstdint>
 #include <unordered_map>
 
@@ -57,6 +58,7 @@ struct WitnessStats {
     std::int64_t not_acquired = 0;        // in range, but no province below the threshold found
     std::int64_t lookups_skipped = 0;     // no witness known, lookup not due yet
     std::int64_t out_of_range = 0;        // original said out of range
+    std::int64_t resets = 0;              // witnesses forgotten because the date went back (a save loaded)
     std::int64_t verify_agree = 0;        // verify: valid witness and original in range
     std::int64_t verify_disagree = 0;     // verify: valid witness but original out of range
     std::int64_t verify_value_same = 0;   // verify: original stopped at the witness, same value
@@ -101,6 +103,14 @@ public:
     // verify = always run the original and compare; otherwise answer from a valid witness.
     int* Check(Game& g, void* country, int* out, void* target, void* arg4, int* threshold, bool verify) {
         ++stats.calls;
+        // A date before the last one: another save was loaded (an in-game load publishes no session event). The
+        // witnesses belong to the old game's countries, and their retry days lie in its future.
+        const std::int32_t day = g.Day();
+        if (day < lastDay_) {
+            witnesses_.clear();
+            ++stats.resets;
+        }
+        lastDay_ = day;
         if (country == nullptr || target == nullptr || out == nullptr || threshold == nullptr) {
             ++stats.originals;
             return g.Original(country, out, target, arg4, threshold);
@@ -153,7 +163,7 @@ public:
             return result;
         }
         if (valid) return result;
-        if (have && !known.found() && g.Day() < known.retry_day) {
+        if (have && !known.found() && day < known.retry_day) {
             ++stats.lookups_skipped;
             return result;
         }
@@ -162,7 +172,7 @@ public:
             ++stats.acquired;
         } else {
             ++stats.not_acquired;
-            found.retry_day = g.Day() + kRetryDays;
+            found.retry_day = day + kRetryDays;
         }
         witnesses_[key] = found;
         return result;
@@ -243,6 +253,7 @@ private:
     }
 
     std::unordered_map<WitnessKey, Witness, WitnessKeyHash> witnesses_;
+    std::int32_t lastDay_ = INT32_MIN;
     Mismatch mismatches_[2 * kMismatchesPerKind];
     std::size_t mismatchCount_ = 0;
     std::size_t kept_[2] = {};
