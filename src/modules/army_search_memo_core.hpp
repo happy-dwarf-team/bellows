@@ -33,6 +33,21 @@ inline SearchMemo EnterSearch(SearchMemo& memo) {
 
 inline void LeaveSearch(SearchMemo& memo, const SearchMemo& saved) { memo = saved; }
 
+// One search's memo for the lifetime of a detour's frame. The destructor also runs when a C++ exception
+// unwinds through the frame: a search left without LeaveSearch would keep depth above 0 on that thread for
+// good, and every later call of 0xD45250 there, inside a search or not, would be answered from the memo.
+class SearchScope {
+public:
+    explicit SearchScope(SearchMemo& memo) : memo_(memo), saved_(EnterSearch(memo)) {}
+    ~SearchScope() { LeaveSearch(memo_, saved_); }
+    SearchScope(const SearchScope&) = delete;
+    SearchScope& operator=(const SearchScope&) = delete;
+
+private:
+    SearchMemo& memo_;
+    const SearchMemo saved_;
+};
+
 enum class MemoAnswer { Outside, Hit, Miss };
 
 inline MemoAnswer Lookup(const SearchMemo& memo, const void* army) {

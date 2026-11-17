@@ -56,23 +56,18 @@ std::uint64_t SearchDetour(void* scorer, int mode, void* army, std::uint64_t arg
                            std::uint8_t* a7, std::uint8_t* a8, std::uint8_t* a9, std::uint8_t a10, std::uint8_t a11,
                            void* path) {
     InterlockedIncrement64(&EU4SB_ArmySearchMemoStats.duplicateKeys);
-    const sb::SearchMemo saved = sb::EnterSearch(t_memo);
-    const std::uint64_t result = g_search(scorer, mode, army, arg, score, a6, a7, a8, a9, a10, a11, path);
-    sb::LeaveSearch(t_memo, saved);
-    return result;
+    const sb::SearchScope scope(t_memo);
+    return g_search(scorer, mode, army, arg, score, a6, a7, a8, a9, a10, a11, path);
 }
 
 std::uint8_t PathDetour(void* a1, void* a2, void* a3, void* a4, void* a5, void* a6, void* a7, void* a8) {
-    const sb::SearchMemo saved = sb::EnterSearch(t_memo);
-    const std::uint8_t result = g_path(a1, a2, a3, a4, a5, a6, a7, a8);
-    sb::LeaveSearch(t_memo, saved);
-    return result;
+    const sb::SearchScope scope(t_memo);
+    return g_path(a1, a2, a3, a4, a5, a6, a7, a8);
 }
 
 void MovesDetour(void* a1, void* unit, int province, std::uint8_t a4, void* a5, void* a6) {
-    const sb::SearchMemo saved = sb::EnterSearch(t_memo);
+    const sb::SearchScope scope(t_memo);
     g_moves(a1, unit, province, a4, a5, a6);
-    sb::LeaveSearch(t_memo, saved);
 }
 
 std::uint8_t TimedFlag(void* army, std::uint32_t modifier, std::uint8_t viaLocation, std::int64_t arg) {
