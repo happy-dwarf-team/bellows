@@ -516,6 +516,7 @@ bool InstallMonthlyProbe(anvil::Host& host, Mode mode) {
     host.hook(g_mergeHook, sym::modifier_merge, &MergeDetour);
     undo.add(g_mergeHook);
     host.hook(g_randomHook, sym::game_random, &RandomDetour);
+    undo.add(g_randomHook);  // a later refusal must not leave it live with g_random still null
     host.hook(g_dayHook, sym::daily_tick, &DayDetour);
     undo.add(g_dayHook);
     g_dayNext = g_dayHook.next_pointer();
@@ -534,7 +535,6 @@ bool InstallMonthlyProbe(anvil::Host& host, Mode mode) {
     SB_HOOK_PART(p3288b0, country_day_3288b0)
     SB_HOOK_PART(modifiers, country_modifiers)
 #undef SB_HOOK_PART
-    undo.add(g_randomHook);
     g_monthly = g_monthlyHook.next_pointer();
     g_country = g_countryHook.next_pointer();
     g_province = g_provinceHook.next_pointer();
