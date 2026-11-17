@@ -461,9 +461,19 @@ int main(int argc, char** argv) {
         // listing_lookup depends on verifypath_listing: with that module off it is off as well, not "FAILED",
         // in the log and in the benchmark's mode field, and its code did not run.
         assert(Logged("listing_lookup: needs verifypath_listing, which is off; module off"));
-        assert(Logged("modules: mimalloc=startup, open_warmup=off, ram_prefetch=off, verifypath_listing=off, "
-                      "listing_lookup=off, exists_index=on"));
-        assert(Logged(", verifypath_session=on"));
+        std::string line;
+        {
+            std::lock_guard lock(g_mutex);
+            for (const auto& l : g_log) {
+                if (l.starts_with("modules: ")) line = l;
+            }
+        }
+        assert(line.starts_with("modules: mimalloc=startup, open_warmup=off, ram_prefetch=off, verifypath_listing=off, "
+                                "listing_lookup=off, exists_index=on"));
+        assert(line.ends_with(", verifypath_session=on"));
+        // listing_lookup's own blocks (realDir's stat, the directory archiver's openRead) were never requested.
+        assert(!Live("replace_block " + std::to_string(SYM_REALDIR_STAT_CALL)));
+        assert(!Live("replace_block " + std::to_string(SYM_DIR_OPENREAD_CALL)));
         assert(!Live("replace_block " + std::to_string(SYM_VERIFYPATH_STAT_CALL)));
         {
             std::lock_guard lock(g_mutex);
