@@ -42,6 +42,19 @@ struct Root {
     }
 };
 
+// Turns the case-sensitive flag on for an empty folder, as WSL does for folders it creates. False where the
+// system cannot (the flag needs the Windows Subsystem for Linux feature): the test then skips that part.
+bool MakeCaseSensitive(const fs::path& folder) {
+    HANDLE handle = CreateFileW(folder.wstring().c_str(), FILE_WRITE_ATTRIBUTES,
+                                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING,
+                                FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+    if (handle == INVALID_HANDLE_VALUE) return false;
+    FILE_CASE_SENSITIVE_INFO info{FILE_CS_FLAG_CASE_SENSITIVE_DIR};
+    const BOOL ok = SetFileInformationByHandle(handle, FileCaseSensitiveInfo, &info, sizeof(info));
+    CloseHandle(handle);
+    return ok != FALSE;
+}
+
 }  // namespace
 
 int main() {
@@ -91,6 +104,24 @@ int main() {
     assert(!root.Exists("gfx/b.txt"));
     Root later{base.wstring()};
     assert(later.Exists("gfx/b.txt"));
+
+    // A case-sensitive folder: its listing is not used, so nothing in it is answered "exists" (the game's own
+    // check decides), whatever the spelling.
+    const fs::path sensitive = base / "sensitive";
+    fs::create_directories(sensitive);
+    if (MakeCaseSensitive(sensitive)) {
+        fs::create_directories(sensitive / "gfx");
+        std::ofstream(sensitive / "gfx" / "x.dds") << "x";
+        std::ofstream(sensitive / "a.txt") << "a";
+        Root cs{sensitive.wstring()};
+        for (const char* name : {"gfx/x.dds", "GFX/X.DDS", "gfx", "a.txt", "A.TXT"}) assert(!cs.Exists(name));
+        assert(!cs.cache.begin()->second->usable);
+        Root above{base.wstring()};
+        assert(above.Exists("sensitive"));
+        assert(!above.Exists("sensitive/gfx/x.dds"));
+    } else {
+        std::puts("exists_index: skipped the case-sensitive folder (the system cannot set the flag)");
+    }
 
     fs::remove_all(base);
     std::puts("exists_index: ok");

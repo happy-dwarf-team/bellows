@@ -4,6 +4,8 @@
 // PhysFS side.
 #include <windows.h>
 
+#include "listing_case.hpp"
+
 #include <cstdint>
 #include <cstring>
 #include <memory>
@@ -70,7 +72,8 @@ inline std::shared_ptr<const Listing> ReadListing(const std::wstring& directory)
         }
     }
     FindClose(find);
-    listing->usable = complete;
+    // A case-sensitive folder (listing_case.hpp): its names go to the game's own call.
+    listing->usable = complete && sb::listing_case::UsableCase(directory);
     return listing;
 }
 

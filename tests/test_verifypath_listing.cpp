@@ -28,6 +28,19 @@ vp::Answer Ask(Lister& lister, const std::string& root, const char* name, vp::Ki
     return vp::DecideInRoot(root.c_str(), name, kind, lister);
 }
 
+// Turns the case-sensitive flag on for an empty folder, as WSL does for folders it creates. False where the
+// system cannot (the flag needs the Windows Subsystem for Linux feature): the test then skips that part.
+bool MakeCaseSensitive(const fs::path& folder) {
+    HANDLE handle = CreateFileW(folder.wstring().c_str(), FILE_WRITE_ATTRIBUTES,
+                                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING,
+                                FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+    if (handle == INVALID_HANDLE_VALUE) return false;
+    FILE_CASE_SENSITIVE_INFO info{FILE_CS_FLAG_CASE_SENSITIVE_DIR};
+    const BOOL ok = SetFileInformationByHandle(handle, FileCaseSensitiveInfo, &info, sizeof(info));
+    CloseHandle(handle);
+    return ok != FALSE;
+}
+
 }  // namespace
 
 int main() {
@@ -84,6 +97,30 @@ int main() {
     assert(Ask(lister, root, "common/b.txt", kind) == vp::Answer::NotFound);
     Lister later;
     assert(Ask(later, root, "common/b.txt", kind) == vp::Answer::Exists);
+
+    // A case-sensitive folder (WSL, fsutil file setCaseSensitiveInfo): "common" and "COMMON" are different
+    // names there, so its listing is not used and every name in it goes to the original stat.
+    assert(sb::listing_case::CaseOf(base.wstring()) == sb::listing_case::Folder::CaseInsensitive);
+    const fs::path sensitive = base / "sensitive";
+    fs::create_directories(sensitive);
+    if (MakeCaseSensitive(sensitive)) {
+        assert(sb::listing_case::CaseOf(sensitive.wstring()) == sb::listing_case::Folder::CaseSensitive);
+        fs::create_directories(sensitive / "common");
+        fs::create_directories(sensitive / "Gfx");
+        std::ofstream(sensitive / "common" / "x.txt") << "x";
+        Lister cs;
+        const std::string csRoot = sensitive.string() + "\\";
+        // Upper-cased, these were "missing" (the game finds the file) and "exists" (the game does not).
+        for (const char* name : {"common/x.txt", "common", "gfx", "Gfx", "COMMON/x.txt", "missing"}) {
+            assert(Ask(cs, csRoot, name, kind) == vp::Answer::Original);
+        }
+        // From an ordinary folder above it, the case-sensitive folder itself is still answered; what is in it is not.
+        assert(Ask(cs, root, "sensitive", kind) == vp::Answer::Exists && kind == vp::Kind::Directory);
+        assert(Ask(cs, root, "SENSITIVE/common/x.txt", kind) == vp::Answer::Original);
+        assert(Ask(cs, root, "sensitive/missing", kind) == vp::Answer::Original);
+    } else {
+        std::puts("verifypath_listing: skipped the case-sensitive folder (the system cannot set the flag)");
+    }
 
     // The write directory and folders inside it go to the original stat.
     assert(vp::IsWriteRoot("C:\\Users\\u\\EU4\\", "C:\\Users\\u\\EU4"));
