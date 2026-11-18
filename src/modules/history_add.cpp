@@ -9,9 +9,10 @@
 // the answers; "on" does that for every 1024th entry and goes back to the game's walk for good after a mismatch.
 // A background thread writes the counters every 5 s to history_add.tsv in the data directory.
 #include "history_add_core.hpp"
+#include "../file_write.hpp"
 #include "modules.hpp"
 
-#include <fstream>
+#include <sstream>
 #include <string>
 
 extern "C" {
@@ -63,14 +64,13 @@ void WriteFile() {
     const sb::Stats& s = EU4SB_HistoryAddStats;
     try {
         const std::wstring path = *g_dir + L"\\history_add.tsv";
-        const std::wstring temp = path + L".tmp";
         {
-            std::ofstream out(temp, std::ios::binary | std::ios::trunc);
+            std::ostringstream out;
             out << "mode\tadds\tskipped\tcompared\tmismatches\tnodes_walked\tdisabled\n"
                 << (g_verifyOnly ? "verify" : "on") << "\t" << s.requests << "\t" << s.hits << "\t" << s.verifications
                 << "\t" << s.mismatches << "\t" << s.duplicateKeys << "\t" << s.cacheDisabled << "\n";
+            sb::ReplaceFileWith(path, out.str());
         }
-        MoveFileExW(temp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING);
     } catch (...) {
     }
 }

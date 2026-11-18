@@ -6,11 +6,12 @@
 // good after a mismatch. A background thread writes the counters every 5 s to port_table.tsv in the data
 // directory, because the game is usually closed without a clean exit.
 #include "modules.hpp"
+#include "../file_write.hpp"
 #include "port_table_core.hpp"
 
 #include <algorithm>
 #include <cstring>
-#include <fstream>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -127,9 +128,8 @@ void WriteFile() {
     const sb::Stats& s = EU4SB_PortTableStats;
     try {
         const std::wstring path = *g_dir + L"\\port_table.tsv";
-        const std::wstring temp = path + L".tmp";
         {
-            std::ofstream out(temp, std::ios::binary | std::ios::trunc);
+            std::ostringstream out;
             const double ms = sb::TicksToMs(1);
             out << "mode\trequests\thits\tskips\tverifications\tmismatches\tdisabled\tgame_calls\tgame_ms\tfast_ms\t"
                    "collect_ms\tports\tunchanged\tunchanged_game_ms\n"
@@ -137,8 +137,8 @@ void WriteFile() {
                 << s.verifications << "\t" << s.mismatches << "\t" << s.cacheDisabled << "\t" << g_gameCalls << "\t"
                 << g_gameTicks * ms << "\t" << g_fastTicks * ms << "\t" << g_collectTicks * ms << "\t" << g_ports << "\t"
                 << g_unchanged << "\t" << g_unchangedTicks * ms << "\n";
+            sb::ReplaceFileWith(path, out.str());
         }
-        MoveFileExW(temp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING);
     } catch (...) {
     }
 }

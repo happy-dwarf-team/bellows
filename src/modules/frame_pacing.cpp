@@ -20,11 +20,12 @@
 // (GetQueueStatus; SDL reads it only when a frame pumps events) or in SDL's own queue (SDL_PeepEvents
 // with no buffer counts the events; another plugin's SDL_PushEvent puts them there).
 #include "../settings.hpp"
+#include "../file_write.hpp"
 #include "frame_pacing_core.hpp"
 #include "modules.hpp"
 
 #include <atomic>
-#include <fstream>
+#include <sstream>
 #include <string>
 
 namespace {
@@ -85,9 +86,8 @@ sb::Waiting ProbeInput(double now) noexcept {
 void WriteFile() {
     try {
         const std::wstring path = *g_dir + L"\\frame_pacing.tsv";
-        const std::wstring temp = path + L".tmp";
         {
-            std::ofstream out(temp, std::ios::binary | std::ios::trunc);
+            std::ostringstream out;
             out << "key\tvalue\n"
                 << "interval_ms\t" << g_intervalMs.load() << "\n"
                 << "draw_on_input\t" << (g_drawOnInput.load() ? 1 : 0) << "\n"
@@ -100,8 +100,8 @@ void WriteFile() {
                 out << "calls_" << i << "\t" << g_calls[i] << "\n"
                     << "frames_" << i << "\t" << g_frames[i] << "\n";
             }
+            sb::ReplaceFileWith(path, out.str());
         }
-        MoveFileExW(temp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING);
     } catch (...) {
     }
 }

@@ -12,9 +12,10 @@
 // back to the game's function for good after a mismatch. A background thread writes the counters every 5 s
 // to province_modifier_view.tsv in the data directory.
 #include "modules.hpp"
+#include "../file_write.hpp"
 #include "province_modifier_view_core.hpp"
 
-#include <fstream>
+#include <sstream>
 #include <string>
 
 extern "C" {
@@ -87,16 +88,15 @@ void WriteFile() {
     const sb::Stats& s = EU4SB_ProvinceModifierViewStats;
     try {
         const std::wstring path = *g_dir + L"\\province_modifier_view.tsv";
-        const std::wstring temp = path + L".tmp";
         {
-            std::ofstream out(temp, std::ios::binary | std::ios::trunc);
+            std::ostringstream out;
             const double ms = sb::TicksToMs(1);
             out << "mode\trequests\thits\tskips\tvalue_objects_set\tverifications\tmismatches\tdisabled\tgame_ms\tview_ms\n"
                 << (g_verifyOnly ? "verify" : "on") << "\t" << s.requests << "\t" << s.hits << "\t" << s.skips << "\t"
                 << s.misses << "\t" << s.verifications << "\t" << s.mismatches << "\t" << s.cacheDisabled << "\t"
                 << g_gameTicks * ms << "\t" << g_fastTicks * ms << "\n";
+            sb::ReplaceFileWith(path, out.str());
         }
-        MoveFileExW(temp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING);
     } catch (...) {
     }
 }
