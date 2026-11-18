@@ -3,5 +3,5 @@ tags={
 	"Utilities"
 }
 name="Bellows - Faster Start, Faster Game"
-supported_version="1.37.*"
+supported_version="v1.37.*.*"
 remote_file_id="3823747170"
