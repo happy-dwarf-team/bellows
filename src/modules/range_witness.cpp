@@ -247,6 +247,8 @@ void AppendMismatches() {
     }
 }
 
+void PublishStats(const sb::WitnessStats& s);
+
 void WriteFile() {
     sb::WitnessStats s;
     std::size_t size = 0;
@@ -254,6 +256,7 @@ void WriteFile() {
     s = g_engine->stats;
     size = g_engine->size();
     ReleaseSRWLockShared(&g_lock);
+    PublishStats(s);
     if (g_mode == sb::Mode::Verify) AppendMismatches();
     try {
         const std::wstring path = *g_dir + L"\\range_witness.tsv";
@@ -317,9 +320,24 @@ int* SB_RangeWitness(void* country, int* out, void* target, void* arg4, int* thr
     InterlockedExchange(&g_dirty, 1);
     return result;
 }
-// requests = checks, hits = answered from the witness, skips = originals, mode = 1 on / 2 verify.
+// requests = checks, hits = answered from the witness, skips = originals, mode = 1 on / 2 verify. Copied from
+// the engine's counters every 5 s while checks run (with range_witness.tsv) and at the ready report.
 __declspec(dllexport) sb::Stats EU4SB_RangeWitnessStats = SB_STATS_INIT;
 }
+
+namespace {
+
+void PublishStats(const sb::WitnessStats& s) {
+    InterlockedExchange64(&EU4SB_RangeWitnessStats.requests, s.calls);
+    InterlockedExchange64(&EU4SB_RangeWitnessStats.hits, s.answered);
+    InterlockedExchange64(&EU4SB_RangeWitnessStats.skips, s.originals);
+    InterlockedExchange64(&EU4SB_RangeWitnessStats.verifications, s.sampled + s.verify_agree + s.verify_disagree);
+    InterlockedExchange64(&EU4SB_RangeWitnessStats.mismatches,
+                          s.sampled_disagree + s.verify_disagree + s.verify_value_differs);
+    if (s.sampled_disagree != 0) InterlockedExchange(&EU4SB_RangeWitnessStats.cacheDisabled, 1);
+}
+
+}  // namespace
 
 namespace sb {
 
@@ -367,13 +385,7 @@ void ReportRangeWitness() {
     AcquireSRWLockShared(&g_lock);
     const WitnessStats s = g_engine->stats;
     ReleaseSRWLockShared(&g_lock);
-    InterlockedExchange64(&EU4SB_RangeWitnessStats.requests, s.calls);
-    InterlockedExchange64(&EU4SB_RangeWitnessStats.hits, s.answered);
-    InterlockedExchange64(&EU4SB_RangeWitnessStats.skips, s.originals);
-    InterlockedExchange64(&EU4SB_RangeWitnessStats.verifications, s.sampled + s.verify_agree + s.verify_disagree);
-    InterlockedExchange64(&EU4SB_RangeWitnessStats.mismatches,
-                          s.sampled_disagree + s.verify_disagree + s.verify_value_differs);
-    if (s.sampled_disagree != 0) InterlockedExchange(&EU4SB_RangeWitnessStats.cacheDisabled, 1);
+    PublishStats(s);
     bench::Get().set("range_witness.checks", s.calls);
     bench::Get().set("range_witness.answered", s.answered);
     bench::Get().set("range_witness.originals", s.originals);
