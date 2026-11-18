@@ -284,7 +284,9 @@ bool InstallAttrCache(anvil::Host& host, Mode mode) {
         return false;
     }
     g_verifyOnly = mode == Mode::Verify;
+    Undo undo;  // anything but a refused A import below removes the W hook again
     host.replace_import(g_exWHook, "KERNEL32.dll", "GetFileAttributesExW", &SB_GetFileAttributesExW);
+    undo.add(g_exWHook);
     g_realExW = g_exWHook.next_pointer();
     try {
         host.replace_import(g_aHook, "KERNEL32.dll", "GetFileAttributesA", &SB_GetFileAttributesA);
@@ -292,6 +294,7 @@ bool InstallAttrCache(anvil::Host& host, Mode mode) {
     } catch (const anvil::Error& e) {
         Log(ANVIL_LOG_WARNING, "attr_cache: only the W import cached (%s)", e.what());
     }
+    undo.keep();
     InterlockedExchange(&EU4SB_AttrCacheStats.mode, g_verifyOnly ? 2 : 1);
     InterlockedExchange(&EU4SB_AttrCacheStats.initialized, 1);
     Log(ANVIL_LOG_INFO, "attr_cache: %zu roots (game folder + enabled mods)", g_roots->size());
