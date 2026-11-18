@@ -99,7 +99,11 @@ void WriteFiles() {
     } catch (...) {
     }
     ReleaseSRWLockShared(&g_lock);
-    for (const auto& [name, text] : files) sb::ReplaceFileWith(*g_dir + L"\\" + name, text);
+    // Building a path can throw bad_alloc, which out of the writer thread would end the game.
+    try {
+        for (const auto& [name, text] : files) sb::ReplaceFileWith(*g_dir + L"\\" + name, text);
+    } catch (...) {
+    }
 }
 
 DWORD WINAPI WriterThread(void*) {
