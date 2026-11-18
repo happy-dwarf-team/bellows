@@ -337,7 +337,7 @@ says in the Manager is one sentence; the details are here.
 | **Path check cache** (`verifypath_listing`) | Answers PhysFS path checks from directory listings until the main menu is up; Path checks after start-up (`verifypath_session`) keeps it on after that. Its check compares every answer, also after the main menu: 0 differences in about 650,000 answers on three saves. Lab: see [Loading a save](#loading-a-save) |
 | **Lookups from listings** (`listing_lookup`) | **On by default since 2.1.** Once a file path passed PhysFS's checks, the game asks each mod folder once more whether the file is there, and tries to open it in every folder that has its parent folder, also where the file is not. With the module on (and `verifypath_listing` on) both answers for files that are not there come from the directory listings Bellows already reads; every existing file is still opened by the game. Matters for big mod sets that replace folders: lab, about 3.2 s less to the main menu on Anbennar, nothing measurable on the base game; the game's logs and the checksum on the menu were the same in every start. Every 256th answer is also asked of the game, and a difference turns the module off; its check asks every time. See [PhysFS lookups from listings](#physfs-lookups-from-listings) |
 | **File existence index** (`exists_index`) | Answers "does this file exist" for the modifier icon check |
-| **Trigger profile lookup** (`trigger_intern`) | Faster lookup of each trigger in the game's trigger profile at the end of loading (~0.4 s instead of ~0.6 s for the game's own code with the shipped trigger profile; a `config.toml` written by 0.3.0 or earlier turned it off, and that choice is kept: turn it on in Anvil Manager) |
+| **Trigger profile lookup** (`trigger_intern`) | Faster lookup of each trigger in the game's trigger profile at the end of loading (~0.4 s instead of ~0.6 s for the game's own code with the shipped trigger profile; a `config.toml` written by 0.3.0 or earlier turned it off; 1.x carried that choice into `settings.toml`, and 2.x keeps it from there, so turn it on in Anvil Manager. 2.x no longer reads `config.toml`) |
 | **Parameter substitution** (`metascript_subst`) | Single-pass `$parameter$` substitution in scripted effects |
 | **Conditional blocks** (`metascript_blocks`) | Single-pass resolution of the `[[parameter] ...]` blocks of scripted effects and triggers (matters for mods with large scripted effects, e.g. Anbennar) |
 | **Missing-file cache** (`attr_cache`) | Remembers "file not found" answers for game and mod files during start-up (off by default: ~0.1 s left next to the other modules) |
@@ -375,7 +375,7 @@ says in the Manager is one sentence; the details are here.
 
 | Module | What it does |
 | --- | --- |
-| **Diagnostics** (`diagnostics`) | Off by default. The lab's tools, as settings of this module: seven timing profiles and a "Check: ..." per feature (see [Diagnostics](#diagnostics)). With it off, none of their code runs |
+| **Diagnostics** (`diagnostics`) | Off by default. The lab's tools, as settings of this module: seven timing profiles and a "Check: ..." for each feature that has one (see [Diagnostics](#diagnostics)). With it off, none of their code runs |
 
 ### Diagnostics
 
@@ -387,8 +387,9 @@ choose it:
   time and repeated answers of the AI army search), `score_probe` (how often the inputs of the AI
   search's scoring functions repeat within a game day), `monthly_probe` (time of the monthly tick's
   loops, modifier merges and random draws per context);
-- under Advanced, a check per feature, `<module>_check` ("Check: <name>"), which was the `verify`
-  mode of 1.x: the module runs the game's own code as well and counts differences. A check runs
+- under Advanced, a check for each feature that had a `verify` mode in 1.x, `<module>_check`
+  ("Check: <name>"): the module runs the game's own code as well and counts differences.
+  `mimalloc`, `open_warmup`, `verifypath_session`, `frame_pacing` and `never_throttle` have none. A check runs
   while Diagnostics and its module are on. It makes the module slower.
 
 They are tools for the lab: their names, counters and output files may change in any release
