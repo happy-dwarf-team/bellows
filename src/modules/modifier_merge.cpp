@@ -21,8 +21,9 @@
 #include <string>
 
 extern "C" {
-// requests = calls, hits = calls merged by MergeFast, skips = calls below the threshold or not covered,
-// verifications = calls compared with the game's function, mismatches = comparisons that differed,
+// requests = calls, hits = calls merged by MergeFast, skips = calls below the threshold or with a null list,
+// misses = calls MergeFastApplies does not cover (not_covered in the file; a list merged into itself and calls
+// after the module turned itself off are in requests only), verifications = calls compared with the game's function, mismatches = comparisons that differed,
 // cacheDisabled = 1 after a mismatch in "on", mode = 1 on / 2 verify.
 __declspec(dllexport) sb::Stats EU4SB_ModifierMergeStats = SB_STATS_INIT;
 }
