@@ -466,7 +466,7 @@ change nothing.
 | --- | --- | --- |
 | `mimalloc` | `mimalloc_scope` | `menu` (default: until the main menu, then the Windows heap) or `session` (the whole session, which made the simulation about 5% slower in the lab) |
 | `ram_prefetch` | `ram_prefetch_budget_mb` | 64–8192 (default 1024) |
-| `frame_pacing` | `frame_pacing_interval_ms` | 0–1000 (default 100); 0 keeps the game's own interval |
+| `frame_pacing` | `frame_pacing_interval_ms` | 0–1000 (default 100); 0 keeps the game's own interval, and so does any value up to the game's 50 ms |
 | `frame_pacing` | `frame_pacing_input` | `draw` (default) or `wait`, the 0.12.0 behaviour |
 | `save_compress` | `save_compress_threads` | `false` (default) or `true`: large members on several threads; a valid save whose compressed bytes differ from the game's |
 | `diagnostics` | the profiles and checks | `true` or `false`, see [Diagnostics](#diagnostics) |
