@@ -101,8 +101,10 @@ template <class L> void MergeReference(L& dest, const ModSource& src) {
 }
 
 // Whether MergeFast covers this call: every source id in [0, kModMaxId) (a dense destination then
-// never gets an in-place write at a negative slot), and in a dense destination no slot below 0x286
-// holding an id the scans could look for (above 0x286; 0x286 itself is never looked for). Reads only.
+// never gets an in-place write at a negative slot), and a dense destination with at least 0x286
+// entries and no slot below 0x286 holding an id the scans could look for (above 0x286; 0x286 itself
+// is never looked for). With fewer entries an appended id lands in a static id's slot, where that
+// id's in-place write would replace it behind the index's back. Reads only.
 template <class L> bool MergeFastApplies(const L& dest, const ModSource& src) {
     if (src.entries == nullptr || src.count <= 0) return false;
     for (std::int32_t i = 0; i < src.count; ++i) {
@@ -110,9 +112,9 @@ template <class L> bool MergeFastApplies(const L& dest, const ModSource& src) {
         if (id < 0 || id >= kModMaxId) return false;
     }
     if (dest.dense()) {
+        if (dest.count() < kModStaticEnd) return false;
         const std::int32_t* e = dest.entries();
-        const std::int32_t end = dest.count() < kModStaticEnd ? dest.count() : kModStaticEnd;
-        for (std::int32_t j = 0; j < end; ++j) {
+        for (std::int32_t j = 0; j < kModStaticEnd; ++j) {
             if (e[2 * static_cast<std::int64_t>(j)] > kModStaticEnd) return false;
         }
     }
@@ -142,6 +144,7 @@ template <class L> bool FirstDynamicStaticSlot(const L& dest, std::int32_t* id) 
 // which grows by at most one per scanned entry): the caller compares it with a threshold, below which
 // the game's own loop is as fast.
 template <class L> std::int64_t ScanWork(const L& dest, const ModSource& src) {
+    if (src.entries == nullptr) return 0;  // the game's function reads it, not Bellows
     std::int64_t scanned = 0;
     for (std::int32_t i = 0; i < src.count; ++i) {
         const std::int32_t id = src.entries[2 * static_cast<std::int64_t>(i)];
