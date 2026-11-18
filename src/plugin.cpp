@@ -227,6 +227,9 @@ struct Bellows : anvil::Plugin {
                 // Mostly anvil::Error: Anvil refused a change (and logged why). The module's
                 // sb::Undo removed its other changes; the other modules stay.
                 sb::Log(ANVIL_LOG_WARNING, "%s: %s; module off", m.name, e.what());
+            } catch (...) {
+                // Anything else would leave load() and skip every later module.
+                sb::Log(ANVIL_LOG_WARNING, "%s: failed; module off", m.name);
             }
             const std::string mode = active ? sb::ModeName(m.mode) : (m.mode == sb::Mode::Off ? "off" : "failed");
             summary += std::string(summary.empty() ? "" : ", ") + m.name + "=" + (mode == "failed" ? "FAILED" : mode);
