@@ -39,6 +39,7 @@ constexpr std::uint32_t kMouseMotion = 0x400;  // SDL_MOUSEMOTION
 constexpr std::uint32_t kFirstButton = 0x401;  // SDL_MOUSEBUTTONDOWN, SDL_MOUSEBUTTONUP, SDL_MOUSEWHEEL
 constexpr std::uint32_t kLastButton = 0x403;
 constexpr double kProbeGap = 0.002;            // seconds: the queues are probed at most this often
+constexpr std::int64_t kGameIntervalMs = 50;   // the game's threshold at index 4 with its default base 1.0
 
 std::atomic<std::int64_t> g_intervalMs{100};  // 0: keep the game's threshold, count only
 std::atomic<float> g_interval{0.1f};          // seconds, the unit of the game's clock in 0x769EA0
@@ -135,6 +136,7 @@ void ChangeFramePacing(std::int64_t milliseconds, bool draw_on_input) {
     Log(ANVIL_LOG_INFO, "frame_pacing: changed while the game runs: interval %lld ms%s",
         static_cast<long long>(milliseconds),
         milliseconds <= 0 ? " (the game's own, counting only)"
+        : milliseconds <= kGameIntervalMs ? " (no longer than the game's own, 50 ms by default, which stays)"
                           : (draw_on_input ? ", the game's interval while input waits" : ", also while input waits"));
 }
 
@@ -186,7 +188,10 @@ bool InstallFramePacing(anvil::Host& host, Mode mode) {
     InterlockedExchange(&EU4SB_FramePacingStats.mode, 1);
     InterlockedExchange(&EU4SB_FramePacingStats.initialized, 1);
     if (g_intervalMs.load() > 0) {
-        Log(ANVIL_LOG_INFO, "frame_pacing: frames inside the daily tick at most every %lld ms at the fastest speed%s; "
+        // PacedThreshold keeps the game's threshold whenever it is not shorter, so 10-50 ms act like 0 at the
+        // game's default 50 ms.
+        Log(ANVIL_LOG_INFO, "frame_pacing: frames inside the daily tick at most every %lld ms at the fastest speed, "
+                            "or the game's own interval where that is longer (50 ms by default)%s; "
                             "counters in frame_pacing.tsv every 5 s",
             static_cast<long long>(g_intervalMs.load()),
             g_drawOnInput.load() ? ", at the game's interval while input waits" : "");
