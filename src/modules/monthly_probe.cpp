@@ -337,6 +337,9 @@ MergeCell* SiteCell(std::uint32_t rva) noexcept {
 }
 
 void* MergeDetour(void* dest, void* src) {
+    // A null list (anvil#426, as in modifier_merge): the game's function faults on it, so the fault and the
+    // crash report stay the game's, not this probe's reads.
+    if (dest == nullptr || src == nullptr) return g_merge(dest, src);
     const auto site = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(_ReturnAddress()) - g_imageBase);
     const auto* entries = sb::Read<const std::int32_t*>(src, sb::kModEntries);
     const auto count = sb::Read<std::int32_t>(src, sb::kModCount);
