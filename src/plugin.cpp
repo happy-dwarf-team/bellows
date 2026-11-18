@@ -210,7 +210,12 @@ struct Bellows : anvil::Plugin {
             host.subscribe_setting(cfg::frame_pacing_input, apply);
         });
         // A module without code of its own: verifypath_listing's hooks keep answering after the main menu.
-        const bool verifyPathSession = ModuleHandle(host, "verifypath_session").has_value();
+        // With verifypath_listing off it has nothing to keep answering, so it shows off, as listing_lookup does.
+        bool verifyPathSession = ModuleHandle(host, "verifypath_session").has_value();
+        if (verifyPathSession && named("verifypath_listing").mode == sb::Mode::Off) {
+            sb::Log(ANVIL_LOG_INFO, "verifypath_session: needs verifypath_listing, which is off; module off");
+            verifyPathSession = false;
+        }
         sb::SetVerifyPathSession(verifyPathSession);
         // On several threads; save_compress's check decodes each member again before writing it.
         sb::SetSaveCompressParallel(!cfg::save_compress_threads.get() ? 0

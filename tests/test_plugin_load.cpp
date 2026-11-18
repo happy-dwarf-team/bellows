@@ -470,7 +470,9 @@ int main(int argc, char** argv) {
         }
         assert(line.starts_with("modules: mimalloc=startup, open_warmup=off, ram_prefetch=off, verifypath_listing=off, "
                                 "listing_lookup=off, exists_index=on"));
-        assert(line.ends_with(", verifypath_session=on"));
+        // verifypath_session has nothing to keep answering without verifypath_listing, so it shows off too.
+        assert(Logged("verifypath_session: needs verifypath_listing, which is off; module off"));
+        assert(line.ends_with(", verifypath_session=off"));
         // listing_lookup's own blocks (realDir's stat, the directory archiver's openRead) were never requested.
         assert(!Live("replace_block " + std::to_string(SYM_REALDIR_STAT_CALL)));
         assert(!Live("replace_block " + std::to_string(SYM_DIR_OPENREAD_CALL)));
