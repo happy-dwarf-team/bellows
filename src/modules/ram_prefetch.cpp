@@ -293,7 +293,13 @@ BufferPtr Take(const std::string& archiveKey, const char* member) {
 // FinishRamPrefetch's own profile check).
 bool g_workersExited = false;
 
+// Held by the starter from its last Active() check until the backend is published and every worker is in
+// `threads`, and by StopBackend: a stop at ready either comes first (the starter then sees g_off and
+// publishes nothing) or finds the backend with all its workers.
+std::mutex g_startMutex;
+
 void StopBackend() {
+    std::lock_guard<std::mutex> start(g_startMutex);
     Backend* b = g_backend.load();
     if (b == nullptr || !prefetch::Stop(*b)) return;
     if (b->threads.empty()) {
@@ -552,7 +558,9 @@ DWORD WINAPI Starter(LPVOID) {
         }
         InterlockedExchange(&g_profileEntries, static_cast<LONG>(backend->members.size()));
         InterlockedExchange(&g_profileArchives, static_cast<LONG>(backend->archives.size()));
-        if (backend->members.empty() || !Active()) return 0;
+        if (backend->members.empty()) return 0;
+        std::lock_guard<std::mutex> start(g_startMutex);
+        if (!Active()) return 0;
         Backend* published = backend.release();
         g_backend.store(published);
         g_startTicks = sb::Ticks();
