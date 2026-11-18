@@ -106,6 +106,22 @@ int main() {
         const std::int32_t one[] = {1, 1};
         assert(!sb::MergeFastApplies(dense, {false, one, 1}));
     }
+    // A dense destination with fewer than 0x286 entries: an appended dynamic id sits in a static id's slot,
+    // which the in-place write of that static id then overwrites. The game scans again and appends the
+    // dynamic id once more; an index would still point at the overwritten slot. Such a call goes to the game.
+    {
+        sb::VectorModList d;
+        d.is_dense = true;
+        d.data.assign(2 * static_cast<std::size_t>(sb::kModStaticEnd + 8), 0);
+        d.n = 3;
+        for (int j = 0; j < 3; ++j) d.data[2 * j] = j;
+        const std::int32_t e[] = {1000, 1, 3, 10, 1000, 100};
+        const sb::ModSource src{false, e, 3};
+        assert(!sb::MergeFastApplies(d, src));
+        sb::VectorModList ref = d;
+        sb::MergeReference(ref, src);
+        assert(ref.n == 5 && ref.data[2 * 3] == 3 && ref.data[2 * 4] == 1000 && ref.data[2 * 4 + 1] == 100);
+    }
     // ScanWork counts the scans of the entries appended during the call: 700 new ids into an empty list.
     {
         sb::VectorModList d;
@@ -115,6 +131,8 @@ int main() {
         std::int32_t id = 0;
         const std::int32_t bad[] = {5, 1, -9, 1};
         assert(sb::FirstUncoveredId({false, bad, 2}, &id) && id == -9);
+        // A source without entries is left to the game's function, which reads it; Bellows does not.
+        assert(sb::ScanWork(d, {false, nullptr, 700}) == 0);
     }
     // The index survives generation wrap-around.
     {
