@@ -27,7 +27,7 @@ code only.
 | `attr_cache` | Negative cache of `GetFileAttributesExW`/`A` for not-found paths during start-up (existing files always hit the real API) | part of the above |
 | `exists_index` | Answers the modifier-picture verifier's "file exists" queries from directory listings | 24.6 → 19.6 s |
 | `verifypath_listing` | Answers PhysFS `verifyPath` stats from directory listings | → 13.3 s |
-| `mimalloc` | Replaces the game's CRT heap with mimalloc for the whole process (`on`) or until the game-ready event (`startup`) | 13.8 → 11.8 s |
+| `mimalloc` | Replaces the game's CRT heap with mimalloc until the main menu or for the whole session (`mimalloc_scope = "menu"` or `"session"`; the log calls them `startup` and `on`) | 13.8 → 11.8 s |
 | `trigger_intern` | Looks each trigger up in the game's trigger profile at the end of loading: at once for an empty profile map, through a linear index otherwise | tail −0.8 s |
 | `metascript_subst` | Single-pass `$param$` substitution in scripted effects/triggers | −0.75 s |
 | `metascript_blocks` | Single-pass resolution of the `[[param] ...]` blocks of scripted effects/triggers | Anbennar: 34.4 → 24.0 s; lab playset: no change |
@@ -110,7 +110,8 @@ format change.
   (compute both, keep the game's result, count mismatches) and on (sampled
   comparison every 256th call, disable on mismatch).
 - Startup caches answer only what is provably identical and fall back to the
-  original otherwise; all switch off when the game is ready (`anvil-game.ready`).
+  original otherwise; all switch off when the game is ready (`anvil-game.ready`),
+  except `verifypath_listing` while `verifypath_session` is on (its default).
 - Counters per module are written to the plugin's section of `anvil.log` once
   the game is ready (requests, hits, fallbacks, mismatches).
 - Same answers do not mean the same heap. Two AI decisions of EU4 1.37.5 sort
@@ -399,8 +400,8 @@ The interval and `frame_pacing_input` are `restart = false`: a change in the
 overlay reaches the module through `Host::subscribe_setting`, on the thread
 that made it, which stores them in atomics the hook reads at every check; the
 next check uses them. The log says so, and `frame_pacing.tsv` counts the
-changes (`changes`). `frame_pacing` itself stays `restart = true`, so
-`off` still means no hooks at all; an interval of 0 turns the effect off until
+changes (`changes`). The module `frame_pacing` itself applies at the next
+start, so `off` still means no hooks at all; an interval of 0 turns the effect off until
 another value is set, since the hook reads the interval at every check.
 
 With `frame_pacing_input = "draw"` (the default since 0.13) frames are skipped
@@ -480,7 +481,8 @@ this module, year 1720 at speed 5 through Tongs; lab `docs/bellows-frame-pacing.
   22.53-23.94): -11.6%, p = 0.024, no overlap; main-thread CPU -10.3%. Hence
   the default of 100 ms: the gain of 250 ms with the shortest latency tail.
 - Not measured: time until the reaction is on screen, other saves and dates.
-  Experimental and off by default, since the median latency cost stays.
+  This series is from 0.12–0.14, when the module was off by default for that
+  median cost; it is on by default since 0.15 (see above).
 
 ### pops_pacing (simulation)
 
