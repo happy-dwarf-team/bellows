@@ -14,7 +14,8 @@
 //     in chunks on several threads (save_compress_parallel.hpp, Bellows' zlib): a valid ZIP member with the
 //     same name, method, CRC and sizes, but other DEFLATE bytes than the game's. "verify" also decodes the
 //     result and compares it with the input before it is written. When anything fails before the first byte
-//     is written, the member goes the "on" way.
+//     is written, the member goes the "on" way; an exception from the game's writer after that goes on to
+//     the game, as from the game's own loop.
 // The callers write the local header, the sizes and the CRC as before. Every call appends a row to
 // save_compress.tsv in the data directory.
 #include "modules.hpp"
@@ -76,6 +77,7 @@ struct Row {
     std::int64_t totalTicks = 0, crcTicks = 0, gameCrcTicks = 0, checkTicks = 0;
     bool mismatch = false;
     bool tried = false;  // the parallel way took the member (a "fallback" row when it then went the game's way)
+    bool wrote = false;  // the parallel way handed a piece to the game's writer: no fallback after that
 };
 
 void AppendRow(const Row& row) {
@@ -198,6 +200,7 @@ bool CompressInParallel(const sb::savez::EntryIo& io, std::uint32_t* crc, int le
             return false;
         }
     }
+    row.wrote = true;
     for (const auto& piece : result.pieces) io.write(io.writer, piece.bytes.get(), static_cast<std::int64_t>(piece.size));
     *crc = result.crc;
     written = static_cast<int>(result.compressedSize);
@@ -222,6 +225,9 @@ int Detour(void* writer, void* input, std::uint8_t* buffer, std::uint64_t size, 
         try {
             done = CompressInParallel(io, crc, level, row, written);
         } catch (...) {
+            // Pieces already in the archive: writing the member again after them would leave a corrupt
+            // member, so the writer's exception goes on to the game, as it would from the game's own loop.
+            if (row.wrote) throw;
             done = false;
         }
         if (done) {
