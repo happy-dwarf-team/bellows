@@ -29,9 +29,10 @@
 // game or mod folder during a session counts after at most 30 s. The counters
 // after the ready event go to verifypath_listing.tsv every 5 s.
 #include "modules.hpp"
+#include "../file_write.hpp"
 #include "verifypath_listing_core.hpp"
 
-#include <fstream>
+#include <sstream>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -137,14 +138,13 @@ void WriteFile() {
     const sb::Stats& s = EU4SB_VerifyPathStats;
     try {
         const std::wstring path = *g_dir + L"\\verifypath_listing.tsv";
-        const std::wstring temp = path + L".tmp";
         {
-            std::ofstream out(temp, std::ios::binary | std::ios::trunc);
+            std::ostringstream out;
             out << "requests\texists\tnot_found\tto_game\tlistings\tverifications\tmismatches\tdisabled\n"
                 << s.requests << "\t" << s.hits << "\t" << s.misses << "\t" << s.skips << "\t" << s.duplicateKeys << "\t"
                 << s.verifications << "\t" << s.mismatches << "\t" << s.cacheDisabled << "\n";
+            sb::ReplaceFileWith(path, out.str());
         }
-        MoveFileExW(temp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING);
     } catch (...) {
     }
 }

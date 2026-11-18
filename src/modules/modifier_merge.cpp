@@ -13,10 +13,11 @@
 // a mismatch. A background thread writes the counters every 5 s to modifier_merge.tsv in the data
 // directory, because the game is usually closed without a clean exit.
 #include "modules.hpp"
+#include "../file_write.hpp"
 #include "modifier_merge_core.hpp"
 
 #include <cstring>
-#include <fstream>
+#include <sstream>
 #include <string>
 
 extern "C" {
@@ -179,9 +180,8 @@ void WriteFile() {
     const sb::Stats& s = EU4SB_ModifierMergeStats;
     try {
         const std::wstring path = *g_dir + L"\\modifier_merge.tsv";
-        const std::wstring temp = path + L".tmp";
         {
-            std::ofstream out(temp, std::ios::binary | std::ios::trunc);
+            std::ostringstream out;
             const double ms = sb::TicksToMs(1);
             out << "mode\trequests\thits\tskips\tverifications\tmismatches\tdisabled\tgame_ms\tfast_ms\tnot_covered"
                    "\trefused_source\trefused_dense\trefused_empty\tfirst_source_id\tfirst_slot_id\n"
@@ -189,8 +189,8 @@ void WriteFile() {
                 << s.verifications << "\t" << s.mismatches << "\t" << s.cacheDisabled << "\t" << g_gameTicks * ms << "\t"
                 << g_fastTicks * ms << "\t" << s.misses << "\t" << g_refusedSource << "\t" << g_refusedDense << "\t"
                 << g_refusedEmpty << "\t" << g_firstSourceId << "\t" << g_firstSlotId << "\n";
+            sb::ReplaceFileWith(path, out.str());
         }
-        MoveFileExW(temp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING);
     } catch (...) {
     }
 }

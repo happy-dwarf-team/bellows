@@ -13,6 +13,7 @@
 // witness is looked up). Mode verify always runs the original and compares the answers; the
 // first mismatches of each kind go to range_witness_mismatches.tsv with the counters.
 #include "../settings.hpp"
+#include "../file_write.hpp"
 #include "modules.hpp"
 #include "range_witness_core.hpp"
 
@@ -23,6 +24,7 @@
 #include <cstring>
 #include <fstream>
 #include <string>
+#include <sstream>
 
 namespace {
 
@@ -255,9 +257,8 @@ void WriteFile() {
     if (g_mode == sb::Mode::Verify) AppendMismatches();
     try {
         const std::wstring path = *g_dir + L"\\range_witness.tsv";
-        const std::wstring temp = path + L".tmp";
         {
-            std::ofstream out(temp, std::ios::binary | std::ios::trunc);
+            std::ostringstream out;
             out << "key\tvalue\n"
                 << "mode\t" << sb::ModeName(g_mode) << "\n"
                 << "calls\t" << s.calls << "\n"
@@ -279,8 +280,8 @@ void WriteFile() {
                 << "sampled_disagree\t" << s.sampled_disagree << "\n"
                 << "witnesses\t" << size << "\n"
                 << "ms_in_checks\t" << sb::TicksToMs(g_ticks) << "\n";
+            sb::ReplaceFileWith(path, out.str());
         }
-        MoveFileExW(temp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING);
     } catch (...) {
     }
 }

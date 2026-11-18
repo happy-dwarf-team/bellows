@@ -11,9 +11,10 @@
 // The game is usually closed without a clean exit, so a background thread writes the counters every
 // 5 s to score_probe.tsv in the data directory.
 #include "modules.hpp"
+#include "../file_write.hpp"
 #include "score_probe_core.hpp"
 
-#include <fstream>
+#include <sstream>
 #include <string>
 
 extern "C" {
@@ -118,16 +119,15 @@ void WriteFile() {
     const double msPerTick = sb::TicksToMs(1);
     try {
         const std::wstring path = *g_dir + L"\\score_probe.tsv";
-        const std::wstring temp = path + L".tmp";
         {
-            std::ofstream out(temp, std::ios::binary | std::ios::trunc);
+            std::ostringstream out;
             out << "function\tcalls\ttotal_ms\tfull_repeats\tfull_same\tpartial_repeats\tpartial_same\n";
             for (const Probe* p : {&g_move, &g_strength, &g_table}) {
                 out << p->name << "\t" << p->calls << "\t" << p->ticks * msPerTick << "\t" << p->full_repeats << "\t"
                     << p->full_same << "\t" << p->partial_repeats << "\t" << p->partial_same << "\n";
             }
+            sb::ReplaceFileWith(path, out.str());
         }
-        MoveFileExW(temp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING);
     } catch (...) {
     }
 }

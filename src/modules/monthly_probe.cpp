@@ -23,11 +23,12 @@
 // writes the counters every 5 s to monthly_probe*.tsv in the data directory (monthly_probe_days.tsv:
 // the daily country parts per day class).
 #include "modules.hpp"
+#include "../file_write.hpp"
 #include "monthly_probe_core.hpp"
 
 #include <intrin.h>
 
-#include <fstream>
+#include <sstream>
 #include <string>
 
 extern "C" {
@@ -390,12 +391,11 @@ void WriteMerge(std::ostream& out, const std::string& key, const MergeCell& m, d
 
 void Replace(const std::wstring& name, void (*write)(std::ostream&, double)) {
     const std::wstring path = *g_dir + L"\\" + name;
-    const std::wstring temp = path + L".tmp";
     {
-        std::ofstream out(temp, std::ios::binary | std::ios::trunc);
+        std::ostringstream out;
         write(out, sb::TicksToMs(1));
+        sb::ReplaceFileWith(path, out.str());
     }
-    MoveFileExW(temp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING);
 }
 
 void WriteFiles() {

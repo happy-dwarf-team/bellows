@@ -8,11 +8,12 @@
 // written apart from that one byte. A background thread writes the counters every 5 s to never_throttle.tsv in
 // the data directory.
 #include "never_throttle_core.hpp"
+#include "../file_write.hpp"
 #include "modules.hpp"
 
 #include <anvil/anvil_game.h>
 
-#include <fstream>
+#include <sstream>
 #include <string>
 
 extern "C" {
@@ -68,14 +69,13 @@ void WriteFile() {
     const sb::Stats& s = EU4SB_NeverThrottleStats;
     try {
         const std::wstring path = *g_dir + L"\\never_throttle.tsv";
-        const std::wstring temp = path + L".tmp";
         {
-            std::ofstream out(temp, std::ios::binary | std::ios::trunc);
+            std::ostringstream out;
             out << "mode\tframes\tframes_set\tsets\tclears\tset_ms\n"
                 << "on\t" << s.requests << "\t" << s.hits << "\t" << s.misses << "\t" << s.skips << "\t"
                 << sb::TicksToMs(g_setTicks) << "\n";
+            sb::ReplaceFileWith(path, out.str());
         }
-        MoveFileExW(temp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING);
     } catch (...) {
     }
 }
