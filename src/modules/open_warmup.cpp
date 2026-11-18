@@ -202,17 +202,22 @@ bool InstallOpenWarmup(anvil::Host& host, Mode mode) {
 
 // Called after the game-ready event: stop learning and save the merged profile.
 void FinishOpenWarmup() {
-    if (g_learn == nullptr || EU4SB_OpenWarmupLearn.mode == 0 || g_profileTarget == nullptr) return;
+    if (g_learn == nullptr || EU4SB_OpenWarmupLearn.mode == 0) return;
+    // Learning ends at ready also when there is no profile to save it to (no dlc_load.json, or the starter
+    // is still building its list): otherwise every later open of the session would claim a row.
     InterlockedExchange(&g_learnStopped, 1);
+    const auto* target = static_cast<const std::wstring*>(
+        InterlockedCompareExchangePointer(reinterpret_cast<void* volatile*>(&g_profileTarget), nullptr, nullptr));
+    if (target == nullptr) return;
     Sleep(200);  // let calls that claimed a row finish writing it
     const LONG claimed = InterlockedCompareExchange(&g_learnNext, 0, 0);
     try {
         const auto paths = warmup::RecordedPaths(g_learn, claimed, kLearnCapacity);
         std::string previousText;
         std::vector<std::wstring> previous;
-        if (profile::ReadWhole(*g_profileTarget, previousText)) previous = profile::ParseList(previousText);
+        if (profile::ReadWhole(*target, previousText)) previous = profile::ParseList(previousText);
         const auto merged = profile::UniqueStored(paths, *g_gameDir, previous);
-        if (!merged.empty() && profile::WriteList(*g_profileTarget, merged)) {
+        if (!merged.empty() && profile::WriteList(*target, merged)) {
             InterlockedExchange64(&EU4SB_OpenWarmupLearn.hits, static_cast<LONG64>(merged.size()));
             InterlockedExchange(&EU4SB_OpenWarmupLearn.initialized, 1);
         } else {
