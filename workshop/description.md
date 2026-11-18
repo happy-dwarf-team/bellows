@@ -37,7 +37,7 @@ It plays by the same rules, but loading one save twice can lead the AI to a diff
 Yes, 1.37.5.2 and 1.37.5.0: GOG has no Workshop, so install it from the **Catalog** page of Anvil Manager. Same forge, different road.
 
 ### I play on Linux. Can I use it?
-Yes, through Proton: our team runs Bellows on desktop Linux, the Steam Deck is not tested yet. Force Proton for EU4, install Anvil from its zip and add the launch option `WINEDLLOVERRIDES="version=n,b" %command%` ([the steps](https://anvil.happydwarf.dev/docs/install/#on-linux-with-proton)). Approving a Workshop plugin there has not been tried yet; if it fails, install the plugin's zip by hand. A penguin can pump the bellows too.
+Yes, through Proton: our team runs Bellows on desktop Linux, the Steam Deck is not tested yet. Force Proton for EU4, install Anvil from its zip and add the launch option `WINEDLLOVERRIDES="version=n,b" %command%` ([the steps](https://anvil.happydwarf.dev/docs/install/#on-linux-with-proton)). Plugins from the Workshop work there too: approve them in the Anvil panel. A penguin can pump the bellows too.
 
 ### Something's wrong. Where do I ask?
 In **#help-and-bugs** on our [Discord server](https://discord.happydwarf.dev/) (pick the Bellows tag), or in a [GitHub issue](https://github.com/happy-dwarf-team/bellows/issues/new/choose). What we confirm on Discord goes to GitHub too.
