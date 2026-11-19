@@ -91,6 +91,9 @@ int main() {
     assert(sb::listing_case::IsDeviceName("COM0") && sb::listing_case::IsDeviceName("CONOUT$.TXT"));
     assert(!sb::listing_case::IsDeviceName("COM") && !sb::listing_case::IsDeviceName("") &&
            !sb::listing_case::IsDeviceName(".NUL"));
+    // Longer than a string's inline buffer, with and without a device base name.
+    assert(sb::listing_case::IsDeviceName("NUL.INTERFACE_TEXTURES.DDS") &&
+           !sb::listing_case::IsDeviceName("INTERFACE_TEXTURES_OF_A_MOD.DDS"));
 
     // A root the directory archiver would not give: too short, or without the trailing separator.
     assert(Ask(lister, "C:\\", "gfx", kind) == vp::Answer::Original);
