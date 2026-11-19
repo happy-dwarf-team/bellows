@@ -82,6 +82,10 @@ anvil::PointerSwap<void*(Io*, const char*, int, int*)> g_openArchiveSlot;
 anvil::PointerSwap<Io*(void*, const char*)> g_openReadSlot;
 anvil::PointerSwap<void(void*)> g_closeArchiveSlot;
 TinflFn g_tinfl = nullptr;
+// The ZIP Io template's read slot. The archiver's openRead makes each Io as a copy of the template, so its read
+// is the slot's value (zip_profile's, when that profile is on). An Io with another read came from another plugin
+// further down the openRead chain: its opaque is not the archiver's file info, so it is never read.
+void* const* g_zipIoRead = nullptr;
 // The game's ZIP entry (eu4.exe 1.37.5, lab): method, CRC-32, compressed and uncompressed size.
 constexpr std::size_t g_offMethod = 0x46, g_offCrc = 0x48, g_offCompressed = 0x50, g_offUncompressed = 0x58;
 bool g_verify = false;
@@ -155,7 +159,7 @@ thread_local std::uint8_t* t_tinflState = nullptr;
 extern "C" {
 // requests = game opens of archive members while active, hits = served from
 // RAM, misses = not ready yet (read by the game itself), skips = not in the
-// profile, duplicateKeys = members prefetched, verifications / mismatches =
+// profile, or an Io that is not the ZIP archiver's (another plugin's), duplicateKeys = members prefetched, verifications / mismatches =
 // byte or metadata comparisons with the game, mode = 1 on / 2 verify,
 // cacheDisabled = off after a mismatch, readyDisabled = stopped at ready.
 __declspec(dllexport) sb::Stats EU4SB_RamPrefetchStats = SB_STATS_INIT;
@@ -467,6 +471,11 @@ extern "C" Io* SB_ZipOpenRead(void* archive, const char* name) {
     const DWORD error = GetLastError();
     if (io != nullptr && Active()) {
         try {
+            if (reinterpret_cast<void*>(io->read) != *static_cast<void* const volatile*>(g_zipIoRead)) {
+                sb::Increment(&EU4SB_RamPrefetchStats.skips);
+                SetLastError(error);
+                return io;
+            }
             OpenedArchive opened;
             AcquireSRWLockShared(&g_archiveLock);
             const auto found = g_opened->find(archive);
@@ -609,6 +618,7 @@ bool InstallRamPrefetch(anvil::Host& host, Mode mode) {
         g_learned = new std::vector<std::wstring>();
         g_learnedSet = new std::unordered_set<std::wstring>();
         g_learned->reserve(4096);
+        g_zipIoRead = static_cast<void* const*>(host.address(sym::zip_io_read_slot));
     } catch (...) {
         return false;
     }
