@@ -62,6 +62,15 @@ public:
 
     std::int64_t calls() const { return calls_; }
 
+    // A save loaded or left: the old game's armies are gone and their addresses can be reused by the new one's, so
+    // the per-army keys are forgotten (a reused address then counts as a first call, not as a repeat). The counts of
+    // calls, time and answers so far stay.
+    void ForgetArmies() noexcept {
+        last_.clear();
+        armies_.clear();
+        ++session_events_;
+    }
+
     void WriteSummary(std::ostream& out, double ms_per_tick, std::int64_t provinces) const {
         out << "key\tvalue\n"
             << "calls\t" << calls_ << "\n"
@@ -69,6 +78,7 @@ public:
             << "mean_us\t" << (calls_ > 0 ? ticks_ * ms_per_tick * 1000.0 / static_cast<double>(calls_) : 0.0) << "\n"
             << "max_ms\t" << max_ticks_ * ms_per_tick << "\n"
             << "with_path\t" << with_path_ << "\n"
+            << "session_events\t" << session_events_ << "\n"
             << "armies\t" << armies_.size() << "\n"
             << "keys\t" << last_.size() << "\n"
             << "first\t" << first_ << "\n"
@@ -96,6 +106,7 @@ private:
     std::int64_t calls_ = 0, ticks_ = 0, max_ticks_ = 0, with_path_ = 0;
     std::int64_t first_ = 0, same_ = 0, same_day_repeats_ = 0, ticks_same_ = 0;
     std::int64_t same_result_other_score_ = 0, different_ = 0;
+    std::int64_t session_events_ = 0;  // session events seen (ForgetArmies): a load gives two, end and start
     std::map<std::tuple<std::uintptr_t, std::int32_t, std::uint64_t>, Last> last_;
     std::map<std::uintptr_t, std::int64_t> armies_;
     std::map<std::int32_t, std::pair<std::int64_t, std::int64_t>> days_;  // calls, ticks

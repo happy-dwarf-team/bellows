@@ -1041,7 +1041,12 @@ over the province graph with a scoring functor (`param_1`, vtable
 (`*param_5`), fills a path (`param_12`) and clears two arrays sized by the
 province count on every call. The module hooks it only to observe and writes
 `army_search.tsv` (calls, time, armies, keys, and per key whether the result
-and score equal the previous call's) and `army_search_days.tsv`.
+and score equal the previous call's) and `army_search_days.tsv`. At
+anvil-game's session event (a save loaded or left) it forgets the per-army
+keys, because the new game's armies can reuse the old ones' addresses:
+`session_events` counts those events (a load gives two: the old game ending and
+the new one starting), `armies` and `keys` describe the current game,
+and the other counts run over the whole process.
 
 Lab (Russia 1719 to 1725, defaults plus this module; lab
 `docs/simulation-profile.md`, "Wyszukiwanie armii AI"): one search per AI army

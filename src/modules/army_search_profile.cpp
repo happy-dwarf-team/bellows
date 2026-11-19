@@ -6,7 +6,8 @@
 // sized by the province count on every call. The function is hooked (inline, through Anvil) only to
 // observe: every call is recorded with its army, arguments, result, score, time and game day, and the
 // counters tell how often the same army asked the same thing got the same answer. Nothing the game
-// computes is changed.
+// computes is changed. The per-army keys are forgotten at anvil-game's session event (a save loaded or
+// left), since the new game's armies can reuse the old ones' addresses.
 //
 // The game is usually closed without a clean exit, so a background thread writes the counters every
 // 5 s to army_search*.tsv in the data directory.
@@ -116,6 +117,14 @@ DWORD WINAPI WriterThread(void*) {
 }  // namespace
 
 namespace sb {
+
+void NoteArmySearchProfileSession() noexcept {
+    if (g_stats == nullptr) return;
+    AcquireSRWLockExclusive(&g_lock);
+    g_stats->ForgetArmies();
+    ReleaseSRWLockExclusive(&g_lock);
+    InterlockedExchange(&g_dirty, 1);
+}
 
 bool InstallArmySearchProfile(anvil::Host& host, Mode mode) {
     if (mode == Mode::Off) return false;

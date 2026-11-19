@@ -247,7 +247,7 @@ struct Bellows : anvil::Plugin {
         // The plugin.toml dependency makes anvil-game load first (both are early).
         host.subscribe(ANVIL_GAME_EVENT_READY, [] { OnGameReady(); });
         // A save loaded or left frees most of what mimalloc still holds in "startup" mode, and ends what
-        // range_witness knows about the old game's countries.
+        // range_witness knows about the old game's countries and army_search_profile about its armies.
         host.subscribe(ANVIL_GAME_EVENT_SESSION, [](const void* payload) {
             const auto* session = static_cast<const AnvilGameSession*>(payload);
             const bool ended = session != nullptr && session->change == ANVIL_GAME_SESSION_ENDED;
@@ -255,6 +255,7 @@ struct Bellows : anvil::Plugin {
             sb::NotePopsSession(session != nullptr && !ended && session->multiplayer != 0);
             sb::NoteNeverThrottleSession(session != nullptr && !ended && session->multiplayer != 0);
             sb::NoteRangeWitnessSession();
+            sb::NoteArmySearchProfileSession();
         });
         // A frame also collects once enough was freed (a counter read otherwise), for a load without a session
         // event: anvil-game published none for a save loaded from the in-game menu before Anvil 1.5.2.
