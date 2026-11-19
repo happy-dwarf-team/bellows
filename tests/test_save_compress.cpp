@@ -230,9 +230,22 @@ void TestParallel() {
     assert(ratio < 1.01);
 }
 
+// The row path of a member the parallel way did not write (#244, #248).
+void TestRowPath() {
+    using sb::savez::RowPath;
+    const auto is = [](const char* a, const char* b) { return std::strcmp(a, b) == 0; };
+    assert(is(RowPath(false, false, false), "game"));
+    assert(is(RowPath(false, false, true), "verify"));
+    assert(is(RowPath(false, true, true), "uncompared"));
+    assert(is(RowPath(true, false, false), "fallback"));
+    assert(is(RowPath(true, false, true), "fallback"));
+    assert(is(RowPath(true, true, true), "uncompared"));  // given back, then not compared
+}
+
 }  // namespace
 
 int main() {
+    TestRowPath();
     TestCrc();
     TestCompressEntry();
     TestParallel();

@@ -153,4 +153,12 @@ inline int CompressEntry(const Deflater& z, const EntryIo& io, std::uint8_t* buf
     return written;
 }
 
+// The path a member's row in save_compress.tsv names when the parallel way did not write it: `tried` = the
+// parallel way took the member and gave it back, `uncompared` = "verify" could not compare it, `verify` = the
+// check is on. "uncompared" comes first: such a member went out without either check, which is what the row must
+// show (the fallback is counted in misses).
+constexpr const char* RowPath(bool tried, bool uncompared, bool verify) noexcept {
+    return uncompared ? "uncompared" : tried ? "fallback" : verify ? "verify" : "game";
+}
+
 }  // namespace sb::savez
