@@ -1144,7 +1144,9 @@ read and decode members into buffers; OpenRead wraps the game's Io and serves
 the buffer. Same safeguards as the lab: the local header is cross-checked with
 the central directory; CRC-32 is computed over the whole output; at open the
 game's own entry (method, CRC, sizes) must match; anything else goes to the
-original Io. Differences from the lab:
+original Io. An Io that is not the archiver's own (its read is not the ZIP Io
+template's, so another plugin in the openRead chain made it) is left as it came
+and counted in `skips`. Differences from the lab:
 
 - Prefetch starts at plugin load, in first-use order, instead of when the game
   mounts an archive.
