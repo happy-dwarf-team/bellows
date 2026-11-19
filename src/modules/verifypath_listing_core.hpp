@@ -129,7 +129,7 @@ Answer DecideInRoot(const char* root, const char* name, Kind& kind, GetListing&&
             continue;
         }
         if (component.empty() || component == "." || component == ".." || component.back() == '.' ||
-            component.back() == ' ') {
+            component.back() == ' ' || sb::listing_case::IsDeviceName(component)) {
             return Answer::Original;
         }
         const std::shared_ptr<const Listing> listing = get_listing(directory);

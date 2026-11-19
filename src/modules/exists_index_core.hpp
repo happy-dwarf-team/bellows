@@ -31,14 +31,17 @@ bool SplitVirtualPath(const char* text, std::size_t length, std::vector<std::str
             return false;
         }
         if (value == '/') {
-            if (current.empty() || current == "." || current == "..") return false;
+            if (current.empty() || current == "." || current == ".." || sb::listing_case::IsDeviceName(current)) {
+                return false;
+            }
             parts.push_back(std::move(current));
             current.clear();
             continue;
         }
         current.push_back(static_cast<char>(value >= 'a' && value <= 'z' ? value - ('a' - 'A') : value));
     }
-    if (current.empty() || current == "." || current == ".." || current.back() == '.' || current.back() == ' ') {
+    if (current.empty() || current == "." || current == ".." || current.back() == '.' || current.back() == ' ' ||
+        sb::listing_case::IsDeviceName(current)) {
         return false;
     }
     parts.push_back(std::move(current));

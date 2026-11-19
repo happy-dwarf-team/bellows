@@ -61,8 +61,10 @@ int main() {
     // Only plain relative paths of printable ASCII, upper-cased per component.
     assert((Split("gfx/interface/x.dds") == std::vector<std::string>{"GFX", "INTERFACE", "X.DDS"}));
     assert(Split("a").size() == 1);
+    assert(Split("gfx/null.dds").size() == 2 && Split("console.txt").size() == 1 && Split("com10").size() == 1);
     for (const char* bad : {"", "/gfx", "gfx/", "gfx//x", "gfx/./x", "gfx/../x", ".", "..", "x.", "x ", "gfx\\x",
-                            "c:x", "x*", "x?", "x~1", "\"x\"", "x<", "x>", "x|", "\xC3\xA9", "a\tb"}) {
+                            "c:x", "x*", "x?", "x~1", "\"x\"", "x<", "x>", "x|", "\xC3\xA9", "a\tb",
+                            "nul", "gfx/NUL", "con.txt", "gfx/aux.tga", "com1/x", "gfx/lpt0.dds", "gfx/prn .txt"}) {
         std::vector<std::string> parts;
         assert(!ex::SplitVirtualPath(bad, std::strlen(bad), parts));
     }
