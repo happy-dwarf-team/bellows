@@ -22,8 +22,9 @@
 // delayed purge: CollectMimalloc returns the freed pages at the ready and
 // session events (the lab saw +0.37 GiB per save load without it), and
 // CollectMimallocIfDue at the next frame once 64 MiB of mimalloc blocks were
-// freed since the last collect (anvil-game 1.5 publishes no session event
-// for a save loaded from the in-game menu; the lab saw +0.46 GiB there).
+// freed since the last collect (anvil-game before Anvil 1.5.2 published no
+// session event for a save loaded from the in-game menu, and the lab saw
+// +0.46 GiB there; the frame check stays for any load without one).
 //
 // Large blocks (kLargeBlock and more) stay in the Windows heap in every mode,
 // and a realloc that grows a mimalloc block to that size moves it there. The

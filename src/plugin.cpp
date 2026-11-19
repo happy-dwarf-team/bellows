@@ -256,8 +256,8 @@ struct Bellows : anvil::Plugin {
             sb::NoteNeverThrottleSession(session != nullptr && !ended && session->multiplayer != 0);
             sb::NoteRangeWitnessSession();
         });
-        // ... and so does a save loaded from the in-game menu, which publishes no session event in
-        // anvil-game 1.5: a frame collects once enough was freed (a counter read otherwise).
+        // A frame also collects once enough was freed (a counter read otherwise), for a load without a session
+        // event: anvil-game published none for a save loaded from the in-game menu before Anvil 1.5.2.
         if (modules[0].mode == sb::Mode::Startup) {
             host.subscribe(ANVIL_GAME_EVENT_FRAME, [] { sb::CollectMimallocIfDue(); });
         }
