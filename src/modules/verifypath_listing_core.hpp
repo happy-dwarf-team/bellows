@@ -5,6 +5,7 @@
 #include <windows.h>
 
 #include "listing_case.hpp"
+#include "write_root.hpp"
 
 #include <cstdint>
 #include <cstring>
@@ -82,15 +83,11 @@ enum class Answer { Original, Exists, NotFound };
 // True when `root` is PhysFS's write directory (or inside it): the game creates,
 // renames and deletes files there while it starts (logs, settings), so a listing
 // read earlier can be stale (seen in the plugin's verify run: logs/error.log
-// renamed during start-up). Such roots always go to the original stat.
+// renamed during start-up). Such roots always go to the original stat, whichever
+// separators either string uses (write_root.hpp).
 inline bool IsWriteRoot(const char* root, const char* write) {
-    if (write == nullptr || *write == '\0') return false;
-    std::size_t wl = std::strlen(write);
-    while (wl > 0 && (write[wl - 1] == '\\' || write[wl - 1] == '/')) --wl;
-    std::size_t rl = std::strlen(root);
-    while (rl > 0 && (root[rl - 1] == '\\' || root[rl - 1] == '/')) --rl;
-    if (rl < wl || _strnicmp(root, write, wl) != 0) return false;
-    return rl == wl || root[wl] == '\\' || root[wl] == '/';
+    if (root == nullptr || write == nullptr) return false;
+    return sb::write_root::IsInside(root, std::strlen(root), write, std::strlen(write));
 }
 
 // RFLAGS after `test eax,eax` for this eax: CF and OF cleared, ZF, SF and PF from the value; the other

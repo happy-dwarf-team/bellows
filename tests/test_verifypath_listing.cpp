@@ -6,11 +6,16 @@
 #include <filesystem>
 #include <fstream>
 #include <map>
+#include <string_view>
 
 namespace {
 
 namespace fs = std::filesystem;
 namespace vp = sb::verifypath;
+
+constexpr bool InsideWide(std::wstring_view path, std::wstring_view folder) {
+    return sb::write_root::IsInside(path.data(), path.size(), folder.data(), folder.size());
+}
 
 struct Lister {
     std::map<std::wstring, std::shared_ptr<const vp::Listing>> cache;
@@ -130,6 +135,22 @@ int main() {
     assert(!vp::IsWriteRoot("C:\\Users\\u\\", "C:\\Users\\u\\EU4"));
     assert(!vp::IsWriteRoot("C:\\Games\\EU4\\", nullptr));
     assert(!vp::IsWriteRoot("C:\\Games\\EU4\\", ""));
+    // The same folder in another spelling of its separators is still the write directory (before 19.11.2026 these
+    // went to the listing: a "-userdir=C:/eu4user/" write directory against a root mounted as "C:\eu4user\").
+    assert(vp::IsWriteRoot("C:\\eu4user\\", "C:/eu4user/"));
+    assert(vp::IsWriteRoot("C:\\eu4user\\logs\\", "C:/eu4user"));
+    assert(vp::IsWriteRoot("C:/eu4user/gfx/flags/", "c:\\EU4USER\\"));
+    assert(vp::IsWriteRoot("C:\\eu4user\\\\logs\\", "C:\\eu4user\\"));
+    assert(vp::IsWriteRoot("C:\\eu4user\\logs\\", "C:\\\\eu4user\\\\"));
+    assert(!vp::IsWriteRoot("C:\\eu4userx\\", "C:/eu4user/"));
+    assert(!vp::IsWriteRoot("C:\\eu4\\", "C:/eu4user/"));
+    assert(!vp::IsWriteRoot("C:\\Games\\EU4\\", "\\\\"));
+    assert(!vp::IsWriteRoot(nullptr, "C:\\eu4user"));
+    // exists_index compares the wide strings the same way.
+    static_assert(InsideWide(L"C:\\eu4user\\mod", L"C:/eu4user/"));
+    static_assert(!InsideWide(L"C:\\eu4users", L"C:/eu4user/"));
+    static_assert(InsideWide(L"c:\\EU4USER", L"C:/eu4user/"));
+    static_assert(!InsideWide(L"C:\\eu4user", L""));
 
     fs::remove_all(base);
     // A listing is good for 30 s after it was read (verifypath_session).
