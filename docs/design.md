@@ -1044,7 +1044,8 @@ province count on every call. The module hooks it only to observe and writes
 and score equal the previous call's) and `army_search_days.tsv`. At
 anvil-game's session event (a save loaded or left) it forgets the per-army
 keys, because the new game's armies can reuse the old ones' addresses:
-`sessions` counts those events, `armies` and `keys` describe the current game,
+`session_events` counts those events (a load gives two: the old game ending and
+the new one starting), `armies` and `keys` describe the current game,
 and the other counts run over the whole process.
 
 Lab (Russia 1719 to 1725, defaults plus this module; lab

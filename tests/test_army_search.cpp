@@ -53,7 +53,7 @@ int main() {
     assert(Has(t, "different\t1"));
     assert(Has(t, "provinces\t4941"));
     assert(Has(d, "4\t3\t30"));
-    assert(Has(t, "sessions\t0"));
+    assert(Has(t, "session_events\t0"));
 
     // A load: the same address in the new game is a first call, not a repeat; the totals stay.
     s.ForgetArmies();
@@ -62,7 +62,7 @@ int main() {
     s.WriteSummary(after, 1.0, 4941);
     const std::string a = after.str();
     assert(Has(a, "calls\t8"));
-    assert(Has(a, "sessions\t1"));
+    assert(Has(a, "session_events\t1"));
     assert(Has(a, "armies\t1"));
     assert(Has(a, "keys\t1"));
     assert(Has(a, "first\t4"));
