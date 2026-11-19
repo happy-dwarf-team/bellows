@@ -199,6 +199,7 @@ SRWLOCK g_lock = SRWLOCK_INIT;
 bool g_offLogged = false;  // the sampled check disagreed and that was logged (under g_lock)
 volatile LONG64 g_ticks = 0;
 volatile LONG g_dirty = 0;
+volatile LONG g_sessionChanged = 0;  // set by anvil-game's session event; the next check forgets the witnesses
 std::wstring* g_dir = nullptr;
 std::size_t g_mismatchesWritten = 0;  // writer thread only
 
@@ -304,6 +305,7 @@ int* SB_RangeWitness(void* country, int* out, void* target, void* arg4, int* thr
     AcquireSRWLockExclusive(&g_lock);
     int* result = nullptr;
     try {
+        if (InterlockedExchange(&g_sessionChanged, 0) != 0) g_engine->Forget();
         result = g_engine->Check(g_game, country, out, target, arg4, threshold, g_mode == sb::Mode::Verify);
         if (g_engine->off() && !g_offLogged) {
             g_offLogged = true;
@@ -379,6 +381,8 @@ bool InstallRangeWitness(anvil::Host& host, Mode mode) {
         mode == Mode::Verify ? ", first mismatches in range_witness_mismatches.tsv" : "");
     return true;
 }
+
+void NoteRangeWitnessSession() noexcept { InterlockedExchange(&g_sessionChanged, 1); }
 
 void ReportRangeWitness() {
     if (g_engine == nullptr) return;

@@ -58,7 +58,7 @@ struct WitnessStats {
     std::int64_t not_acquired = 0;        // in range, but no province below the threshold found
     std::int64_t lookups_skipped = 0;     // no witness known, lookup not due yet
     std::int64_t out_of_range = 0;        // original said out of range
-    std::int64_t resets = 0;              // witnesses forgotten because the date went back (a save loaded)
+    std::int64_t resets = 0;              // witnesses forgotten: a session started or ended, or the date went back
     std::int64_t verify_agree = 0;        // verify: valid witness and original in range
     std::int64_t verify_disagree = 0;     // verify: valid witness but original out of range
     std::int64_t verify_value_same = 0;   // verify: original stopped at the witness, same value
@@ -107,16 +107,23 @@ public:
     // True once a sampled check disagreed: every later call goes to the original.
     bool off() const { return off_; }
 
+    // A session started or ended (a save loaded, or the game left): the witnesses belong to the old game's
+    // countries, whose addresses the next game can reuse, and their retry days to its calendar. Forgetting them
+    // changes no answer (a witness only counts after Qualifies checked it on the live game); it keeps a later
+    // game from waiting out an old "not found" and the map from keeping keys of countries that are gone.
+    void Forget() {
+        witnesses_.clear();
+        lastDay_ = INT32_MIN;
+        ++stats.resets;
+    }
+
     // verify = always run the original and compare; otherwise answer from a valid witness.
     int* Check(Game& g, void* country, int* out, void* target, void* arg4, int* threshold, bool verify) {
         ++stats.calls;
-        // A date before the last one: another save was loaded (an in-game load publishes no session event). The
-        // witnesses belong to the old game's countries, and their retry days lie in its future.
+        // A date before the last one: another save was loaded. The module also calls Forget() on Anvil's session
+        // event, but anvil-game 1.5 publishes none for an in-game load, so the date is checked too.
         const std::int32_t day = g.Day();
-        if (day < lastDay_) {
-            witnesses_.clear();
-            ++stats.resets;
-        }
+        if (day < lastDay_) Forget();
         lastDay_ = day;
         if (off_ || country == nullptr || target == nullptr || out == nullptr || threshold == nullptr) {
             ++stats.originals;
@@ -195,7 +202,11 @@ public:
             ++stats.not_acquired;
             found.retry_day = day + kRetryDays;
         }
-        witnesses_[key] = found;
+        try {
+            witnesses_[key] = found;
+        } catch (...) {
+            // No memory for the entry: the game's answer is already in hand; the next call looks again.
+        }
         return result;
     }
 
