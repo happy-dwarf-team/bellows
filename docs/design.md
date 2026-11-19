@@ -770,7 +770,7 @@ sizes, chunks, threads, total and CRC time) to `save_compress.tsv`. The path is
 `game`, `parallel`, `fallback` or, with Diagnostics' `save_compress_check`,
 `verify`; `uncompared` marks a member the check could not compare (no memory
 for a capture, or the game's function called its writer through a slot other
-than write), and the first of each cause is logged.
+than write), also after a fallback, and the first of each cause is logged.
 
 Offline (lab, without the game; `tools/save_compress_offline.cpp`, built with
 `-DSB_BUILD_SAVE_TOOLS=ON`): on three compressed saves written by the game
