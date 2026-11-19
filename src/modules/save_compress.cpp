@@ -268,7 +268,9 @@ int Detour(void* writer, void* input, std::uint8_t* buffer, std::uint64_t size, 
         sb::savez::EntryTimes times;
         written = g_verifyCrc ? VerifyEntry(io, input, buffer, size, crc, level, row, times)
                               : sb::savez::CompressEntry(g_game, io, buffer, size, crc, level, false, &times, &Now);
-        row.path = row.tried ? "fallback" : row.uncompared ? "uncompared" : g_verifyCrc ? "verify" : "game";
+        // "uncompared" first: a member the parallel way gave back and the check then could not compare was written
+        // without either check, which is what the row must show (the fallback is counted in misses).
+        row.path = row.uncompared ? "uncompared" : row.tried ? "fallback" : g_verifyCrc ? "verify" : "game";
         row.crcTicks = times.crcTicks;
         row.gameCrcTicks = times.referenceCrcTicks;
         row.input = times.inputSize;
