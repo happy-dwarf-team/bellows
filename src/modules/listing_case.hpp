@@ -13,6 +13,7 @@
 #include <windows.h>
 
 #include <string>
+#include <string_view>
 
 namespace sb::listing_case {
 
@@ -40,17 +41,18 @@ inline bool UsableCase(const std::wstring& directory) noexcept {
 // A path component Windows may take for a device instead of a file (CON, PRN, AUX, NUL, COM0-9, LPT0-9, CONIN$,
 // CONOUT$, CLOCK$), with any extension and spaces before the dot: no listing holds it, yet the file API can find
 // it (Windows 11 answers attributes for "<folder>\NUL"; Windows 10 also for "NUL.txt", "CON.txt" and the like).
-// Such a name goes to the game's own call. `upper` is the component upper-cased in ASCII.
-inline bool IsDeviceName(const std::string& upper) noexcept {
+// Such a name goes to the game's own call. `upper` is the component upper-cased in ASCII. It runs for every
+// component of every lookup, so it only looks at the characters (no copy, nothing to allocate).
+inline bool IsDeviceName(std::string_view upper) noexcept {
     std::size_t base = upper.find('.');
-    if (base == std::string::npos) base = upper.size();
+    if (base == std::string_view::npos) base = upper.size();
     while (base > 0 && upper[base - 1] == ' ') --base;
-    const std::string name = upper.substr(0, base);
+    const std::string_view name = upper.substr(0, base);
     if (name == "CON" || name == "PRN" || name == "AUX" || name == "NUL" || name == "CONIN$" || name == "CONOUT$" ||
         name == "CLOCK$") {
         return true;
     }
-    return name.size() == 4 && (name.compare(0, 3, "COM") == 0 || name.compare(0, 3, "LPT") == 0) && name[3] >= '0' &&
+    return name.size() == 4 && (name.substr(0, 3) == "COM" || name.substr(0, 3) == "LPT") && name[3] >= '0' &&
            name[3] <= '9';
 }
 
