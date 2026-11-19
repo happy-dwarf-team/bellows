@@ -121,7 +121,8 @@ public:
     int* Check(Game& g, void* country, int* out, void* target, void* arg4, int* threshold, bool verify) {
         ++stats.calls;
         // A date before the last one: another save was loaded. The module also calls Forget() on Anvil's session
-        // event, but anvil-game 1.5 publishes none for an in-game load, so the date is checked too.
+        // event (published for an in-game load too since Anvil 1.5.2); the date is checked as well, for any load
+        // without one.
         const std::int32_t day = g.Day();
         if (day < lastDay_) Forget();
         lastDay_ = day;

@@ -327,8 +327,8 @@ stopping there. Otherwise the original walk runs and a new witness is looked
 up; when none exists (the answer came from a value exactly at the threshold),
 the lookup waits 30 game days. Nothing is kept across loads beyond what the
 session builds: the witnesses are forgotten on anvil-game's session event (a
-save loaded or left) and when the date goes back (anvil-game 1.5 publishes no
-event for an in-game load); `resets` in `range_witness.tsv` counts both.
+save loaded, also from the in-game menu, or left) and when the date goes back
+(for a load without the event); `resets` in `range_witness.tsv` counts both.
 `verify` always runs the original and compares.
 
 Counters go to `range_witness.tsv` in the data folder every 5 s. In `verify`
@@ -1435,7 +1435,8 @@ was not found. The question and the series:
   261 → 20 MiB for blocks of live threads freed on another thread). With it
   the year was no longer slower than with `off` (21.23 against 21.69 s), but
   the first save loaded from the in-game menu still added 0.46 GiB:
-  anvil-game 1.5 publishes no session event there. So the frees of
+  anvil-game 1.5 published no session event there (Anvil 1.5.2 and later
+  do, and Bellows needs 1.23). So the frees of
   mimalloc blocks after the switch are counted as well, and the next frame
   collects once 64 MiB were freed since the last collect. With that, commit
   stayed within 0.08 GiB of `on` through four in-game loads to 1740. A third
