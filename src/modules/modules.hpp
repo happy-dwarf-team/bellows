@@ -30,6 +30,7 @@ bool InstallTokenDictCache(anvil::Host& host, Mode mode);
 bool InstallRangeProfile(anvil::Host& host, Mode mode);  // diagnostic
 bool InstallRangeWitness(anvil::Host& host, Mode mode);
 void NoteRangeWitnessSession() noexcept;  // from anvil-game's session event (a save loaded or left)
+void NoteArmySearchProfileSession() noexcept;  // the same; forgets the per-army keys (no-op when off)
 bool InstallFramePacing(anvil::Host& host, Mode mode);
 bool InstallModifierMerge(anvil::Host& host, Mode mode);
 bool InstallPortTable(anvil::Host& host, Mode mode);
