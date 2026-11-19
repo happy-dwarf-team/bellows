@@ -323,7 +323,10 @@ bonus) < threshold`. Then it writes the value the original would write when
 stopping there. Otherwise the original walk runs and a new witness is looked
 up; when none exists (the answer came from a value exactly at the threshold),
 the lookup waits 30 game days. Nothing is kept across loads beyond what the
-session builds. `verify` always runs the original and compares.
+session builds: the witnesses are forgotten on anvil-game's session event (a
+save loaded or left) and when the date goes back (anvil-game 1.5 publishes no
+event for an in-game load); `resets` in `range_witness.tsv` counts both.
+`verify` always runs the original and compares.
 
 Counters go to `range_witness.tsv` in the data folder every 5 s. In `verify`
 the first 32 cases of each kind of mismatch (`verify_disagree`: a valid witness

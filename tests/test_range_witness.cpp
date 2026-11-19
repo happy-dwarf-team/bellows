@@ -266,6 +266,42 @@ int main() {
         assert(v.stats.resets == 1 && v.size() == 1);
     }
 
+    // A session event (Forget): a save of the same or a later date, whose countries can sit at the old
+    // addresses. The old "not found" would make the new game wait out its retry day; after Forget the lookup
+    // runs at once and the map holds only what the new game built. A witness found again answers as before.
+    {
+        sb::WitnessEngine<FakeGame> v;
+        Country lone{{6}, {}, 11};
+        g.eligible[6] = true;
+        g.values[{6, 900}] = threshold;  // in range, nothing below the threshold: no witness
+        g.day = 2000;
+        v.Check(g, &lone, &out, &siberia, nullptr, &threshold, false);
+        v.Check(g, &lone, &out, &siberia, nullptr, &threshold, false);
+        assert(v.stats.not_acquired == 1 && v.stats.lookups_skipped == 1 && v.size() == 1);
+        v.Forget();  // the same date in the next game, the same country address
+        assert(v.size() == 0 && v.stats.resets == 1);
+        g.values[{6, 900}] = 150'000;  // in the new game the province is below the threshold
+        const int originals = g.originals;
+        int* r = v.Check(g, &lone, &out, &siberia, nullptr, &threshold, false);
+        assert(r == &out && out == 150'000 && v.stats.acquired == 1 && v.stats.lookups_skipped == 1);
+        assert(g.originals == originals + 1 && v.size() == 1 && v.stats.resets == 1);
+        r = v.Check(g, &lone, &out, &siberia, nullptr, &threshold, false);
+        assert(r == &out && out == 150'000 && v.stats.answered == 1 && g.originals == originals + 1);
+        // Without Forget the same sequence keeps the old "not found" until its retry day.
+        sb::WitnessEngine<FakeGame> keep;
+        g.values[{6, 900}] = threshold;
+        keep.Check(g, &lone, &out, &siberia, nullptr, &threshold, false);
+        g.values[{6, 900}] = 150'000;
+        keep.Check(g, &lone, &out, &siberia, nullptr, &threshold, false);
+        assert(keep.stats.lookups_skipped == 1 && keep.stats.acquired == 0);
+        // Forget also lets a later date start from scratch: no reset is counted twice.
+        v.Forget();
+        g.day = 1500;  // earlier than the last check, but Forget already cleared the last day
+        v.Check(g, &lone, &out, &siberia, nullptr, &threshold, false);
+        assert(v.stats.resets == 2 && v.stats.acquired == 2);
+    }
+    g.day = 100;
+
     // "on" runs the original for one answer in sampleEvery and compares; when the original says out of range
     // for a witness the engine called valid, the engine turns off and every later call goes to the original.
     {
