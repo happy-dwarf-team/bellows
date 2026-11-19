@@ -979,7 +979,8 @@ and about 20,700 for the checksum task, whose 9,372 flattened paths fail in two 
 game without mods nothing reaches these calls.
 
 The module replaces both blocks and decides with `verifypath_listing`'s listings and rules (only the DIR archiver,
-never the write directory, unusual names to the game). The stat gives rc 1 for an existing name and rc 0 with
+never the write directory, unusual names to the game, and so are device names such as `NUL` or `CON.txt`, which no
+listing holds but the file API can find). The stat gives rc 1 for an existing name and rc 0 with
 `NOT_FOUND` otherwise, and sets the flags the game's `test eax,eax` would (the next instruction is a `jne`).
 `openRead` answers only "not found" (null and `NOT_FOUND`, the code the game's failed `CreateFileW` gives for
 `ERROR_FILE_NOT_FOUND` and `ERROR_PATH_NOT_FOUND`); an existing name always goes to the game, which opens it

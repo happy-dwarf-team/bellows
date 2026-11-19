@@ -78,6 +78,20 @@ int main() {
                              "gfx\\interface", "gfx/inter~1", "gfx/a:b", "gfx/a*", "gfx/\xC3\xA9.dds"}) {
         assert(Ask(lister, root, name, kind) == vp::Answer::Original);
     }
+    // Device names (listing_case.hpp): no listing holds them, but the file API can find them (Windows 11 answers
+    // attributes for "<folder>\NUL"). Before 19.11.2026 the listing answered "not found" for these.
+    for (const char* name : {"nul", "NUL", "gfx/nul", "common/con.txt", "gfx/AUX.tga", "gfx/com1.dds", "gfx/lpt9",
+                             "gfx/prn .txt", "nul/x.txt", "gfx/conin$", "gfx/CLOCK$"}) {
+        assert(Ask(lister, root, name, kind) == vp::Answer::Original);
+    }
+    // Names that only start like one are ordinary names.
+    for (const char* name : {"gfx/null.dds", "gfx/console.txt", "gfx/com10.dds", "gfx/auxiliary", "gfx/xnul"}) {
+        assert(Ask(lister, root, name, kind) == vp::Answer::NotFound);
+    }
+    assert(sb::listing_case::IsDeviceName("COM0") && sb::listing_case::IsDeviceName("CONOUT$.TXT"));
+    assert(!sb::listing_case::IsDeviceName("COM") && !sb::listing_case::IsDeviceName("") &&
+           !sb::listing_case::IsDeviceName(".NUL"));
+
     // A root the directory archiver would not give: too short, or without the trailing separator.
     assert(Ask(lister, "C:\\", "gfx", kind) == vp::Answer::Original);
     assert(Ask(lister, base.string(), "gfx", kind) == vp::Answer::Original);
