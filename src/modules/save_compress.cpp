@@ -78,6 +78,7 @@ struct Row {
     bool mismatch = false;
     bool tried = false;  // the parallel way took the member (a "fallback" row when it then went the game's way)
     bool wrote = false;  // the parallel way handed a piece to the game's writer: no fallback after that
+    bool uncompared = false;  // "verify" could not compare this member (a capture failed): written the "on" way
 };
 
 void AppendRow(const Row& row) {
@@ -112,6 +113,7 @@ struct Capture {
     std::vector<std::uint8_t> bytes;
     std::vector<std::int64_t> writes;  // the length of each write, in order
     bool failed = false;
+    bool otherSlot = false;  // the writer was called through a slot other than +0x50
 };
 
 void CaptureWrite(void* self, const std::uint8_t* data, std::int64_t length) {
@@ -124,7 +126,27 @@ void CaptureWrite(void* self, const std::uint8_t* data, std::int64_t length) {
     }
 }
 
-void CaptureOther(void* self) { static_cast<Capture*>(self)->failed = true; }
+void CaptureOther(void* self) {
+    auto* capture = static_cast<Capture*>(self);
+    capture->failed = true;
+    capture->otherSlot = true;
+}
+
+// A member "verify" could not compare is written without the check and its row says "uncompared"; the first of
+// each cause is logged, so a check that saw no mismatch is not read as one that compared every member.
+enum Uncompared { kGameMemory, kGameSlot, kOursMemory, kUncomparedCauses };
+volatile LONG g_loggedUncompared[kUncomparedCauses] = {};
+
+void NoteUncompared(Row& row, Uncompared cause) {
+    row.uncompared = true;
+    if (InterlockedExchange(&g_loggedUncompared[cause], 1) != 0) return;
+    static const char* const kText[kUncomparedCauses] = {
+        "no memory to capture the game's member; written the \"on\" way",
+        "the game's function used a writer slot other than write; written the \"on\" way",
+        "no memory to capture the member the \"on\" way; the game's is used"};
+    sb::Log(ANVIL_LOG_WARNING, "save_compress: a member was not compared (%s); \"uncompared\" in save_compress.tsv",
+            kText[cause]);
+}
 
 void* g_captureVtable[32] = {};
 
@@ -142,12 +164,17 @@ int VerifyEntry(const sb::savez::EntryIo& io, void* input, std::uint8_t* buffer,
     const std::int64_t start = Now();
     const int gameWritten = g_next(&gameWriter, input, buffer, size, &gameCrc, level);
     row.checkTicks = Now() - start;
-    if (game.failed) return sb::savez::CompressEntry(g_game, io, buffer, size, crc, level, false, &times, &Now);
+    if (game.failed) {
+        NoteUncompared(row, game.otherSlot ? kGameSlot : kGameMemory);
+        return sb::savez::CompressEntry(g_game, io, buffer, size, crc, level, false, &times, &Now);
+    }
     sb::savez::EntryIo captured = io;
     captured.writer = &ours;
     captured.write = CaptureWrite;
     const int ourWritten = sb::savez::CompressEntry(g_game, captured, buffer, size, &ourCrc, level, true, &times, &Now);
-    if (!ours.failed) {
+    if (ours.failed) {
+        NoteUncompared(row, kOursMemory);
+    } else {
         InterlockedIncrement64(&EU4SB_SaveCompressStats.verifications);
         if (ourWritten != gameWritten || ourCrc != gameCrc || ours.bytes != game.bytes || times.crcMismatch) {
             InterlockedIncrement64(&EU4SB_SaveCompressStats.mismatches);
@@ -241,7 +268,7 @@ int Detour(void* writer, void* input, std::uint8_t* buffer, std::uint64_t size, 
         sb::savez::EntryTimes times;
         written = g_verifyCrc ? VerifyEntry(io, input, buffer, size, crc, level, row, times)
                               : sb::savez::CompressEntry(g_game, io, buffer, size, crc, level, false, &times, &Now);
-        row.path = row.tried ? "fallback" : g_verifyCrc ? "verify" : "game";
+        row.path = row.tried ? "fallback" : row.uncompared ? "uncompared" : g_verifyCrc ? "verify" : "game";
         row.crcTicks = times.crcTicks;
         row.gameCrcTicks = times.referenceCrcTicks;
         row.input = times.inputSize;
