@@ -192,7 +192,10 @@ Findings while porting (both also apply to the lab build):
   directory (Documents\…\Europa Universalis IV), which the game renames during
   start-up after the listing was read. Both listing-based modules now never
   answer for the write directory or anything inside it (`PHYSFS_getWriteDir`);
-  after the change: 0 differences.
+  after the change: 0 differences. The comparison (`src/modules/write_root.hpp`)
+  takes `/` and `\` as one separator and a run of separators as one, since the
+  mounted root and the write directory come from different calls and a
+  `-userdir` the player typed may use either.
 
 Verify start (`verify` for all four modules that have it): verifypath
 932,405, exists_index 16,074, trigger_intern 2,347,067, metascript_subst

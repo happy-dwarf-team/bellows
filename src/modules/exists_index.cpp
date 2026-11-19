@@ -17,6 +17,7 @@
 // against the original ("verify": every one); a mismatch disables the index.
 #include "exists_index_core.hpp"
 #include "modules.hpp"
+#include "write_root.hpp"
 
 #include <memory>
 #include <string>
@@ -132,18 +133,13 @@ void LoadRoots(State& state) {
     if (list == nullptr) return;
     std::wstring writeDir;
     if (const char* w = g_getWriteDir ? g_getWriteDir() : nullptr) Utf8ToWide(w, writeDir);
-    while (!writeDir.empty() && (writeDir.back() == L'\\' || writeDir.back() == L'/')) writeDir.pop_back();
     for (char** entry = list; *entry != nullptr; ++entry) {
         const char* mountPoint = g_getMountPoint(*entry);
         if (mountPoint == nullptr || std::strcmp(mountPoint, "/") != 0) continue;
         std::wstring path;
         if (!Utf8ToWide(*entry, path)) continue;
         while (path.size() > 3 && (path.back() == L'\\' || path.back() == L'/')) path.pop_back();
-        if (!writeDir.empty() && path.size() >= writeDir.size() &&
-            _wcsnicmp(path.c_str(), writeDir.c_str(), writeDir.size()) == 0 &&
-            (path.size() == writeDir.size() || path[writeDir.size()] == L'\\' || path[writeDir.size()] == L'/')) {
-            continue;
-        }
+        if (sb::write_root::IsInside(path.c_str(), path.size(), writeDir.c_str(), writeDir.size())) continue;
         const DWORD attributes = GetFileAttributesW(path.c_str());
         if (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY)) {
             state.roots.push_back(Root{path});
