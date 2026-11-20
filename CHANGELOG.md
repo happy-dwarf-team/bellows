@@ -1,5 +1,50 @@
 # Changelog
 
+## [2.1.0](https://github.com/happy-dwarf-team/bellows/compare/v2.0.1...v2.1.0) (2026-11-19)
+
+
+### Features
+
+* **listing_lookup:** turn the module on by default ([#221](https://github.com/happy-dwarf-team/bellows/issues/221)) ([438d26d](https://github.com/happy-dwarf-team/bellows/commit/438d26dcf4851fb447742f62e33f0ba614f46319))
+* **range_witness:** check one answer in 1024 against the game in "on" mode ([#224](https://github.com/happy-dwarf-team/bellows/issues/224)) ([c864a1e](https://github.com/happy-dwarf-team/bellows/commit/c864a1e067c1c8b35bc4a0b03bcf53b3f055cb12)), closes [#218](https://github.com/happy-dwarf-team/bellows/issues/218)
+
+
+### Bug Fixes
+
+* **army_search_profile:** forget the per-army keys at a session change ([#251](https://github.com/happy-dwarf-team/bellows/issues/251)) ([dcd644b](https://github.com/happy-dwarf-team/bellows/commit/dcd644b7311800c20ea6766f06b2681cc8ac4c1f))
+* **attr_cache:** remove the W import hook when the install fails after it ([#232](https://github.com/happy-dwarf-team/bellows/issues/232)) ([bda52f0](https://github.com/happy-dwarf-team/bellows/commit/bda52f0aacf1b4572a7633f3a83d858c3549bf25))
+* **diagnostics:** keep a failed path in the profilers' writers inside their thread ([#239](https://github.com/happy-dwarf-team/bellows/issues/239)) ([f758475](https://github.com/happy-dwarf-team/bellows/commit/f758475cc2e6ece3fdefcaff124282b5f5f7ce99))
+* **diagnostics:** write the profilers' files after their lock is released ([#222](https://github.com/happy-dwarf-team/bellows/issues/222)) ([375f545](https://github.com/happy-dwarf-team/bellows/commit/375f54585383a4b4a6af8abe89c7b4ec430eb7d7)), closes [#216](https://github.com/happy-dwarf-team/bellows/issues/216)
+* **frame_pacing:** say that an interval up to the game's 50 ms keeps the game's ([#228](https://github.com/happy-dwarf-team/bellows/issues/228)) ([ad259a8](https://github.com/happy-dwarf-team/bellows/commit/ad259a86cf406726425d8cee28cbd1637c1e145b))
+* **listing_lookup:** show the module off, not failed, without verifypath_listing ([#219](https://github.com/happy-dwarf-team/bellows/issues/219)) ([8b5b681](https://github.com/happy-dwarf-team/bellows/commit/8b5b6815d48c325524ef4659713a1859a052b95a))
+* **modifier_merge:** leave a dense list with fewer than 0x286 entries to the game ([#230](https://github.com/happy-dwarf-team/bellows/issues/230)) ([fdfbc9c](https://github.com/happy-dwarf-team/bellows/commit/fdfbc9cc563884ba00be9c4b8c75c240345fccc5))
+* **modifier_merge:** leave a null list to the game's function ([#209](https://github.com/happy-dwarf-team/bellows/issues/209)) ([eee854f](https://github.com/happy-dwarf-team/bellows/commit/eee854f561c60c8d688fcf9f1db88ca61facad97))
+* **monthly_probe:** leave a null modifier list to the game's merge ([#236](https://github.com/happy-dwarf-team/bellows/issues/236)) ([1d95271](https://github.com/happy-dwarf-team/bellows/commit/1d9527129f719dfd044af46c350806f1a0f5133d))
+* **monthly_probe:** remove the random-draw hook when a later hook is refused ([#212](https://github.com/happy-dwarf-team/bellows/issues/212)) ([a25f93b](https://github.com/happy-dwarf-team/bellows/commit/a25f93b932a46ddda0084c938e294cd9249af9df))
+* **open_warmup:** stop learning at ready also when there is no profile to save ([#231](https://github.com/happy-dwarf-team/bellows/issues/231)) ([621fea8](https://github.com/happy-dwarf-team/bellows/commit/621fea8352a2988791c28a1811e7fe22a09ce1f0))
+* **plugin:** keep installing the other modules when one throws a non-standard exception ([#229](https://github.com/happy-dwarf-team/bellows/issues/229)) ([9d131e4](https://github.com/happy-dwarf-team/bellows/commit/9d131e40b39da0bc254fbe0cd4d2c7542dee5052))
+* **plugin:** keep installing the other modules when one throws something other than std::exception ([9d131e4](https://github.com/happy-dwarf-team/bellows/commit/9d131e40b39da0bc254fbe0cd4d2c7542dee5052))
+* **plugin:** let the Paradox launcher see the Workshop item as made for 1.37 ([#240](https://github.com/happy-dwarf-team/bellows/issues/240)) ([861c407](https://github.com/happy-dwarf-team/bellows/commit/861c407c99c4bb5e0fa3ebcf53f821c2b169567f))
+* **plugin:** replace every module's counter file only after a successful write ([#227](https://github.com/happy-dwarf-team/bellows/issues/227)) ([eefd2b3](https://github.com/happy-dwarf-team/bellows/commit/eefd2b32c9e7445ff85e2a0a36de9f27e7b2faae))
+* **plugin:** show verifypath_session off when verifypath_listing is off ([#237](https://github.com/happy-dwarf-team/bellows/issues/237)) ([4563438](https://github.com/happy-dwarf-team/bellows/commit/4563438b50e2444be1b441d0f6e111a42f3df661))
+* **ram_prefetch:** let the stop at ready see every worker the starter creates ([#233](https://github.com/happy-dwarf-team/bellows/issues/233)) ([2b0518a](https://github.com/happy-dwarf-team/bellows/commit/2b0518ab1e83ede63c9a9545ea96facb0cfa4756))
+* **ram_prefetch:** read the file info only of the ZIP archiver's own Io ([#246](https://github.com/happy-dwarf-team/bellows/issues/246)) ([256b578](https://github.com/happy-dwarf-team/bellows/commit/256b5781bc1dabcafb8a2c8ca150df688fda7115))
+* **range_witness:** forget the witnesses when a session starts or ends ([#242](https://github.com/happy-dwarf-team/bellows/issues/242)) ([0e2c476](https://github.com/happy-dwarf-team/bellows/commit/0e2c4769d381269143a073d66283d7769aaeea20))
+* **range_witness:** forget the witnesses when an earlier save is loaded ([#214](https://github.com/happy-dwarf-team/bellows/issues/214)) ([c5f7c49](https://github.com/happy-dwarf-team/bellows/commit/c5f7c490ff7f5c26288ddb567e431fcc441d7f66))
+* **range_witness:** publish the exported counters while the checks run ([#235](https://github.com/happy-dwarf-team/bellows/issues/235)) ([b919be3](https://github.com/happy-dwarf-team/bellows/commit/b919be35b62f2cd8139dd9443c7a1c3a484fbf9f))
+* **save_compress:** do not write a member again after the parallel way wrote part of it ([#234](https://github.com/happy-dwarf-team/bellows/issues/234)) ([c5e3405](https://github.com/happy-dwarf-team/bellows/commit/c5e3405bf573c2ddf4da042eecbd55aae25ad35f))
+* **save_compress:** mark the members the check could not compare ([#244](https://github.com/happy-dwarf-team/bellows/issues/244)) ([8f2ab7d](https://github.com/happy-dwarf-team/bellows/commit/8f2ab7d844864b53e2330bf91d5e69b9fb1b9091))
+* **save_compress:** say "uncompared" also after a fallback ([#248](https://github.com/happy-dwarf-team/bellows/issues/248)) ([ed2275a](https://github.com/happy-dwarf-team/bellows/commit/ed2275acb68e4d3640ea0aab28d7cc4929b2eb21))
+* **start-up:** cap trigger_intern's presize, close ram_prefetch's handles ([#223](https://github.com/happy-dwarf-team/bellows/issues/223)) ([2cc7dcd](https://github.com/happy-dwarf-team/bellows/commit/2cc7dcdff83a7a97df0a568865f99cb0771264fb)), closes [#217](https://github.com/happy-dwarf-team/bellows/issues/217)
+* **verifypath_listing:** know the write directory in any spelling of its separators ([#243](https://github.com/happy-dwarf-team/bellows/issues/243)) ([4e73a00](https://github.com/happy-dwarf-team/bellows/commit/4e73a00882acea33345aac6d8d892f5bf5c74cea))
+* **verifypath_listing:** leave case-sensitive folders to the game ([#213](https://github.com/happy-dwarf-team/bellows/issues/213)) ([aeed4dd](https://github.com/happy-dwarf-team/bellows/commit/aeed4dd1a131deaae91d779ca4533a15b75d1ea2))
+* **verifypath_listing:** leave Windows device names to the game ([#245](https://github.com/happy-dwarf-team/bellows/issues/245)) ([0e58185](https://github.com/happy-dwarf-team/bellows/commit/0e5818541250b5b0b2b18ee49c612c0b573eb5ae))
+
+
+### Performance
+
+* **verifypath_listing:** check device names without copying the component ([#247](https://github.com/happy-dwarf-team/bellows/issues/247)) ([7683da2](https://github.com/happy-dwarf-team/bellows/commit/7683da2eb02bf2862882bdcc5c4d700c0a971127))
+
 ## [2.0.1](https://github.com/happy-dwarf-team/bellows/compare/v2.0.0...v2.0.1) (2026-11-16)
 
 
