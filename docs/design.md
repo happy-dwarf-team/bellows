@@ -84,8 +84,9 @@ mod.
    lab from a start without mods; contains only paths, sizes and order (no game
    content). Works from the very first start on any machine.
 2. **Per-mod-set profile, learned**: key = enabled mods (from `dlc_load.json`
-   in the game's user folder: `-userdir`, then `userdir.txt`, then Documents)
-   + game build. Every start records what the game actually opened/read and
+   in the game's user folder: `-userdir`, then `userdir.txt`, then Documents;
+   a `-userdir` folder that does not exist yet is an empty mod set, and that
+   start learns no profile) + game build. Every start records what the game actually opened/read and
    merges it into the profile: this start's entries in first-use order, then
    the earlier entries it did not open, since a later start may open them,
    unless the file or ZIP member is gone. A file that exists and is no longer

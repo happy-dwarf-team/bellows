@@ -1,5 +1,7 @@
 #include "access_profile.hpp"
 
+#include "../common.hpp"
+
 #include <windows.h>
 #include <shlobj.h>
 #include <winioctl.h>
@@ -349,9 +351,16 @@ bool IsFolder(const std::wstring& path) {
 
 }  // namespace
 
-std::wstring UserDirectoryFor(const std::wstring& commandLine, const std::wstring& gameDir, const std::wstring& documents) {
+bool UserDirMissing(const std::wstring& commandLine) {
     const std::wstring named = UserDirArgument(commandLine);
-    if (!named.empty() && IsFolder(named)) return Tidy(named);
+    return !named.empty() && !IsFolder(named);
+}
+
+std::wstring UserDirectoryFor(const std::wstring& commandLine, const std::wstring& gameDir, const std::wstring& documents) {
+    // A -userdir folder that does not exist yet is still this start's user folder (bellows#254, anvil#542): its
+    // playset is empty, so no profile is read or learned from userdir.txt's or Documents' mod set.
+    const std::wstring named = UserDirArgument(commandLine);
+    if (!named.empty()) return Tidy(named);
     std::string text;
     if (ReadWhole(gameDir + L"\\userdir.txt", text, 1 << 16)) {
         const auto lines = ParseList(text);
@@ -376,7 +385,16 @@ std::wstring UserDirectory() {
     std::wstring folder;
     if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Documents, 0, nullptr, &documents)) && documents != nullptr) folder = documents;
     if (documents != nullptr) CoTaskMemFree(documents);
-    return UserDirectoryFor(GetCommandLineW(), gameDir, folder);
+    const std::wstring line = GetCommandLineW();
+    std::wstring user = UserDirectoryFor(line, gameDir, folder);
+    // Several modules ask, from their own threads; the log says it once per start.
+    static volatile LONG said = 0;
+    if (UserDirMissing(line) && InterlockedExchange(&said, 1) == 0) {
+        sb::Log(ANVIL_LOG_INFO,
+                "access_profile: the -userdir folder %s does not exist yet; an empty playset at this start, so no profile learned",
+                Narrow(user).c_str());
+    }
+    return user;
 }
 
 bool OnRotatingDisk(const std::wstring& path) {

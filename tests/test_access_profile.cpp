@@ -99,7 +99,13 @@ int main() {
     std::wstring slashes = profile;
     std::replace(slashes.begin(), slashes.end(), L'\\', L'/');
     assert(UserDirectoryWith(L"-userdir=" + slashes + L"/ -nolauncher", childOut2) == profile);
-    assert(UserDirectoryWith(L"-userdir=" + root + L"\\missing", childOut2) == usual);
+    // A -userdir folder that does not exist yet is that start's user folder, with an empty playset (bellows#254):
+    // not the usual one, whose dlc_load.json names another mod set.
+    assert(UserDirectoryWith(L"-userdir=" + root + L"\\missing", childOut2) == root + L"\\missing");
+    assert(UserDirMissing(L"eu4.exe -userdir=" + root + L"\\missing"));
+    assert(!UserDirMissing(L"eu4.exe -userdir=" + profile + L" -debug"));
+    assert(!UserDirMissing(L"eu4.exe -debug"));
+    assert(!UserDirMissing(L"eu4.exe -userdir="));
 
     assert(UserDirArgument(L"eu4.exe") == L"");
     assert(UserDirArgument(L"eu4.exe -debug") == L"");
@@ -126,6 +132,14 @@ int main() {
     Touch(gameDir + L"\\userdir.txt", "\xEF\xBB\xBF  " + Narrow(other) + "/\r\n");
     assert(UserDirectoryFor(L"eu4.exe", gameDir, L"D:\\docs") == other);
     assert(UserDirectoryFor(line, gameDir, L"D:\\docs") == profile);
+    // userdir.txt and Documents are not the fallback of a -userdir folder that does not exist, nor of one that is a file.
+    const std::wstring missing = root + L"\\new profile";
+    assert(UserDirectoryFor(L"eu4.exe -userdir=" + missing + L"/ -debug", gameDir, L"D:\\docs") == missing);
+    std::string dlc;
+    assert(!ReadWhole(UserDirectoryFor(L"eu4.exe -userdir=" + missing, gameDir, L"D:\\docs") + L"\\dlc_load.json", dlc, 1 << 20));
+    Touch(root + L"\\a file");
+    assert(UserDirMissing(L"eu4.exe -userdir=" + root + L"\\a file"));
+    assert(UserDirectoryFor(L"\"eu4.exe\" \"-userdir=" + root + L"\\a file\"", gameDir, L"D:\\docs") == root + L"\\a file");
     Touch(gameDir + L"\\goggame-2057001589.info");
     DeleteFileW((gameDir + L"\\userdir.txt").c_str());
     assert(UserDirectoryFor(L"eu4.exe", gameDir, L"D:\\docs") == standard + L" GOG");
