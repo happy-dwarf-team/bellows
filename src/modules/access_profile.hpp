@@ -67,10 +67,15 @@ std::wstring UserFolderName(const std::wstring& gameDir);
 // user_dir_argument (anvil#207), which no Anvil exposes to plugins yet.
 std::wstring UserDirArgument(std::wstring_view commandLine);
 
-// The game's user folder as the game chooses it: the folder of -userdir when it
-// exists, then the path in <gameDir>\userdir.txt, then UserFolderName in
-// `documents` (`documents` empty: empty). With backslashes, no slash at the end.
+// The game's user folder: the folder of -userdir, then the path in
+// <gameDir>\userdir.txt, then UserFolderName in `documents` (`documents` empty:
+// empty). With backslashes, no slash at the end. A -userdir folder that does not
+// exist yet is still the answer (bellows#254, as Anvil's loader, anvil#542): its
+// playset is empty, so no other profile's mod set is read or learned.
 std::wstring UserDirectoryFor(const std::wstring& commandLine, const std::wstring& gameDir, const std::wstring& documents);
+
+// True when the command line has -userdir and it names no existing folder.
+bool UserDirMissing(const std::wstring& commandLine);
 
 // That folder for the running game (empty when unknown).
 std::wstring UserDirectory();
