@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.1](https://github.com/happy-dwarf-team/bellows/compare/v2.1.0...v2.1.1) (2026-11-21)
+
+
+### Bug Fixes
+
+* **access_profile:** a -userdir folder that does not exist is an empty playset ([#257](https://github.com/happy-dwarf-team/bellows/issues/257)) ([0a5638b](https://github.com/happy-dwarf-team/bellows/commit/0a5638bc896bea29c4157a0aefa2e442022f1d82))
+
 ## [2.1.0](https://github.com/happy-dwarf-team/bellows/compare/v2.0.1...v2.1.0) (2026-11-19)
 
 
