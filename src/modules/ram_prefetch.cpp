@@ -525,7 +525,9 @@ DWORD WINAPI Starter(LPVOID) {
         const std::wstring user = profile::UserDirectory();
         std::string json;
         if (user.empty() || !profile::ReadWhole(user + L"\\dlc_load.json", json, 1 << 20)) {
-            sb::Log(ANVIL_LOG_WARNING, "ram_prefetch: dlc_load.json not found; prefetch and learning off");
+            // A new -userdir folder has no playset yet: expected, and access_profile already says so.
+            sb::Log(profile::UserDirMissing(GetCommandLineW()) ? ANVIL_LOG_INFO : ANVIL_LOG_WARNING,
+                    "ram_prefetch: dlc_load.json not found; prefetch and learning off");
             return 0;
         }
         const std::wstring dir = *g_dataDir + L"\\profiles";
