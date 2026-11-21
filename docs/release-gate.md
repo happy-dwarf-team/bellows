@@ -60,13 +60,17 @@ without Bellows, in conditions where the game without Bellows repeats itself exa
   game without Bellows also shows) is written up, and `lab-tiebreak` is extended to cover
   it. It does not block the release.
 
-Last pair: Bellows 1.4.1 with default settings, 9 November 2026 (lab batch `r84e`). Six
-runs without Bellows were the same as each other in all 60 days, and so were two runs with
-Bellows and one more without. The whole random log was the same byte for byte in all nine.
-The defaults have not changed since 1.4. The pair runs with `-seed`, which also runs the
-AI's daily work on one thread, so it shows that the default modules change no draw. It does
-not show that a player's game without `-seed` comes out the same (README, "AI ties and
-multiplayer").
+Last pair: Bellows 2.1.0 from the release files with default settings, 21 November 2026
+(lab batches `rp210a` and `rp210b`, Anvil 1.25.0, Tongs 0.37.0; #252). Four runs without
+Bellows and two with it were the same as each other in all 60 days, and the whole random
+log was the same byte for byte in all six. The first run without Bellows was also the same
+in all 60 days as the 1.4.1 pair's reference run (9 November 2026, lab batch `r84e`, nine
+runs). Without a change that needs it sooner, the next pair is due with the third release
+after 2.1.0.
+
+The pair runs with `-seed`, which also runs the AI's daily work on one thread, so it shows
+that the default modules change no draw. It does not show that a player's game without
+`-seed` comes out the same (README, "AI ties and multiplayer").
 
 ## Budgets
 
