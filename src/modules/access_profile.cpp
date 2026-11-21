@@ -391,7 +391,7 @@ std::wstring UserDirectory() {
     static volatile LONG said = 0;
     if (UserDirMissing(line) && InterlockedExchange(&said, 1) == 0) {
         sb::Log(ANVIL_LOG_INFO,
-                "access_profile: the -userdir folder %s does not exist; empty playset, no profile learned at this start",
+                "access_profile: the -userdir folder %s does not exist yet; an empty playset at this start, so no profile learned",
                 Narrow(user).c_str());
     }
     return user;
