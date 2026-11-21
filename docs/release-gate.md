@@ -33,17 +33,19 @@ Every release:
 6. **Claims.** A number the release adds to the README, the Workshop description or the
    plugin page comes from a measurement with the method written next to it.
 
-Every few releases, and before 1.0, the gate also covers what a single release does not
-touch: a big mod set (Anbennar) with the checks on, the repeatability pair below and the
-multiplayer test (host with Bellows, client without).
+At least every third release, and before 1.0, the gate also covers what a single release
+does not touch: a big mod set (Anbennar) with the checks on, the repeatability pair below
+and the multiplayer test (host with Bellows, client without).
 
 ### The repeatability pair
 
 The lab's repeatability oracle: the game with Bellows at its defaults against the same game
 without Bellows, in conditions where the game without Bellows repeats itself exactly.
 
-- **When:** every release that changes which simulation modules are on by default, and
-  every few releases otherwise.
+- **When:** every release that changes which simulation modules are on by default, or
+  that changes code of a default-on simulation module on a path that runs in a game with
+  default settings; otherwise at least every third release, counted from the release of
+  the last pair.
 - **Conditions:** speed 5, `-seed=12345` and `-randomlog`, the lab plugin `lab-tiebreak`
   (which breaks the known AI ties by a stable rule instead of the memory address), the
   save of Russia of 17 March 1719, 60 game days, one run to the end date without stops.
