@@ -42,8 +42,8 @@ code only.
 | `save_compress` | Saving: the game's own zlib with a faster CRC-32 (the game's bytes); optionally in parallel (§6a) | autosave 0.873 → 0.831 s; parallel 0.612 s |
 | `transfer_skip` | Loading in single player: no level 9 copy of a text save for a transfer nobody receives (§6a) | "Continue" of a 64.5 MB save 10.91 → 8.95 s |
 | `listing_lookup` | Start-up, on by default since 2.1: the stat after `verifyPath` in `getRealDir` and the opens of names that are not there answered from `verifypath_listing`'s listings; existing files opened by the game (§6a) | Anbennar 22.08 → 18.86 s to the menu; base game: in the noise |
-| `conquer_scan` | Simulation, prototype, off by default: the AI's conquest list on the calling thread, land provinces only (§6a) | not measured |
-| `opinion_serial` | Simulation, prototype, off by default: a country's opinion row on the calling thread instead of the pool (§6a) | not measured |
+| `conquer_scan` | Simulation, prototype, off by default: the AI's conquest list on the calling thread, land provinces only (§6a) | check: 0 differences; Anbennar 518 → 261 µs a list, base game 707 → 1,196 µs (module clocks) |
+| `opinion_serial` | Simulation, prototype, off by default: a country's opinion row on the calling thread instead of the pool (§6a) | check: 0 differences; base game 110 → 63 µs a row, Anbennar 195 → 329 µs (module clocks) |
 | `checksum_defer` | Loading, off by default: the game's checksum task waits until the databases are loaded, so the two no longer take turns on the file system locks; the same files and checksum (§6a) | Anbennar: −1.11 and −1.01 s to the menu (two series); base game: in the noise |
 
 The table's start-up modules are in the order they were ported; §6a has the
@@ -724,7 +724,7 @@ AI) is not measured yet, so the module stays off until a SIMULATION series.
 
 ### conquer_scan and opinion_serial (simulation, prototypes)
 
-Off by default, for 2.2.0; neither is measured yet. Both replace one `ParallelFor3` of
+Off by default, for 2.2.0; neither is measured under SIMULATION conditions yet. Both replace one `ParallelFor3` of
 the serial daily country update with a loop on the calling thread, in index order. The
 game's `ParallelFor3` hands the items to its worker pool and the calling thread takes
 items too while it waits, so a loop in index order on the calling thread is one of the
@@ -763,6 +763,22 @@ items to the pool costs about as much as the items. The module runs the same ite
 the calling thread; whether that is faster is what its check's times are for. The check
 runs the game's loop into the row and the module's into a scratch row, alternating which
 runs first, and compares the cells the item writes. `opinion_serial.tsv` every 5 s.
+
+Lab, game sessions with both checks on (22.11.2026, one marked run each, normal Process Lasso rule, observe mode:
+the 1719 save to 18.6.1719 and an Anbennar save from 11.11.1444 to 2.3.1445). The times are the modules' clocks
+of the loop that ran first in a checked call, per call; "a year" scales the session's calls to 365 days:
+
+| | Calls | Differences | Module | Game's pool | A year, by the clocks |
+| --- | --- | --- | --- | --- | --- |
+| `conquer_scan`, 1719 | 27 | 0 | 1,196 µs | 707 µs | 0.05 s more |
+| `conquer_scan`, Anbennar | 2,949 | 0 | 261 µs | 518 µs | 2.5 s less |
+| `opinion_serial`, 1719 | 416 | 0 | 63 µs | 110 µs | 0.08 s less |
+| `opinion_serial`, Anbennar | 9,355 | 0 | 329 µs | 195 µs | 4.1 s more |
+
+Both give the game's answers in every call compared. `conquer_scan` halves the loop where the time is (Anbennar
+rebuilds the lists about 90 times as often as the base game) and costs the base game about as little as it
+saves there. `opinion_serial` loses on Anbennar, whose opinion items cost more than handing them to the pool, so
+the one-thread loop is not the answer for that loop.
 
 ### save_compress (saving)
 
