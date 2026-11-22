@@ -783,6 +783,12 @@ In `"on"` without the check (the same saves and dates, Diagnostics off) the modu
 against 457 µs for the 175 calls of the pool's exploration); the 11 calls it checked on Anbennar had 0
 differences.
 
+A longer `"on"` session on Anbennar (the same build and save, 11.11.1444 to 2.3.1447, 840 days) rebuilt the list
+12,293 times, about 5,300 a year instead of the first months' 9,800: 11,101 serial calls (276 µs on average) and
+1,192 on the pool (494 µs), 297 µs a call in all, and 48 checked calls with 0 differences, whose game loop took
+493 µs when it ran first or later. By these clocks the module saves about 1 s a game year over that span, and
+2.6 s a year's rate only in the first months.
+
 The same one-thread loop for the opinion row of `CCountry::UpdateOpinionCache` (`0x38B1F0`, item `0x432E70`) was
 tried in the same sessions and dropped: the same values (9,771 rows, 0 differences), faster on the base game
 (63 µs a row against 110 µs) but slower on Anbennar (329 µs against 195 µs, about 4 s more a year), whose opinion
