@@ -37,6 +37,8 @@ bool InstallPortTable(anvil::Host& host, Mode mode);
 bool InstallProvinceModifierView(anvil::Host& host, Mode mode);
 bool InstallArmySearchMemo(anvil::Host& host, Mode mode);
 bool InstallConquerScan(anvil::Host& host, Mode mode);  // prototype, off by default
+bool InstallDiploScan(anvil::Host& host, Mode mode);    // prototype, off by default
+void NoteDiploScanSession() noexcept;  // from anvil-game's session event: every country's next scan is the game's
 bool InstallPopsPacing(anvil::Host& host, Mode mode);
 void NotePopsSession(bool multiplayer) noexcept;  // from anvil-game's session event
 bool InstallNeverThrottle(anvil::Host& host, Mode mode);

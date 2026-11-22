@@ -1257,3 +1257,55 @@ note = "a province's value for the AI's conquest list; 0 at once without a contr
 build."eu4-1.37.5-steam-win64" = { rva = 0x187C00 }
 build."eu4-1.37.5.2-gog-win64" = { rva = 0x187C30 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x187C30 }
+
+# --- diplo_scan (prototype, off by default) -----------------------------------------------
+# CCountry::DailyUpdateSerialCheckDiplomacyChange (0x2EE070) reads the change bit (_bHasChanged, bit 2 of the
+# flags byte +0x46) of each 72-byte CDiplomacyStatus row of a country's diplomacy, every day for every country,
+# and clears the set ones while no save is being loaded. Every code path of eu4.exe that sets the bit (the
+# inlined "set changed" of the CDiplomacyStatus and CCountryDiplomacy setters, CCountry::SetCurrentMonarch and
+# BreakOldRoyalMarriages, TransferRelationsFrom) also sets _bDiploDescriptionArraysDirty (+0x2884) of the row's
+# owner, which only the diplomacy view's update reads and clears; a new country starts with it set.
+
+[symbol.diplo_scan]
+memory = "code"
+signature = "void (void* country)"
+values.diplo_game_state = { at = 24, rip_relative = 28, type = "const unsigned char* const" }
+values.rows_end_offset = { at = 34, size = 4 }
+values.rows_begin_offset = { at = 41, size = 4 }
+values.row_flags_offset = { at = 91, size = 1 }
+values.row_changed_mask = { at = 93, size = 1 }
+values.loader_offset = { at = 99, size = 4 }
+note = "0x2EE070: for each row of country + 0x1510..0x1518 (72 B), a set bit 2 of +0x46 is cleared when the game state's save loader (+0x74C8) is null; with a loader, a set bit refreshes the trade routes"
+
+[symbol.diplo_scan.build."eu4-1.37.5-steam-win64"]
+rva = 0x2EE070
+bytes = "48 89 5C 24 18 48 89 6C 24 20 56 57 41 56 48 83 EC 30 48 8B E9 4C 8B 0D EC 1D 05 02 45 32 D2 48 8B 81 18 15 00 00 48 2B 81 10 15 00 00 48 C1 F8 03 48 B9 39 8E E3 38 8E E3 38 8E 48 0F AF C1 4C 63 C0 85 C0 0F 8E 6C 01 00 00 33 C9 0F 1F 40 00 48 8B 95 10 15 00 00 0F B6 44 0A 46 A8 04 74 13 49 83 B9 C8 74 00 00 00 75 06 24 FB 88 44 0A 46"
+
+[symbol.diplo_scan.build."eu4-1.37.5.2-gog-win64"]
+rva = 0x2EE020
+bytes = "48 89 5C 24 18 48 89 6C 24 20 56 57 41 56 48 83 EC 30 48 8B E9 4C 8B 0D BC 5C 03 02 45 32 D2 48 8B 81 18 15 00 00 48 2B 81 10 15 00 00 48 C1 F8 03 48 B9 39 8E E3 38 8E E3 38 8E 48 0F AF C1 4C 63 C0 85 C0 0F 8E 6C 01 00 00 33 C9 0F 1F 40 00 48 8B 95 10 15 00 00 0F B6 44 0A 46 A8 04 74 13 49 83 B9 C8 74 00 00 00 75 06 24 FB 88 44 0A 46"
+
+[symbol.diplo_scan.build."eu4-1.37.5.0-gog-win64"]
+rva = 0x2EE020
+bytes = "48 89 5C 24 18 48 89 6C 24 20 56 57 41 56 48 83 EC 30 48 8B E9 4C 8B 0D BC 5C 03 02 45 32 D2 48 8B 81 18 15 00 00 48 2B 81 10 15 00 00 48 C1 F8 03 48 B9 39 8E E3 38 8E E3 38 8E 48 0F AF C1 4C 63 C0 85 C0 0F 8E 6C 01 00 00 33 C9 0F 1F 40 00 48 8B 95 10 15 00 00 0F B6 44 0A 46 A8 04 74 13 49 83 B9 C8 74 00 00 00 75 06 24 FB 88 44 0A 46"
+
+[symbol.diplo_view_update]
+memory = "code"
+signature = "void (void* view)"
+values.view_country_offset = { at = 21, size = 4 }
+values.diplo_country_root = { at = 28, rip_relative = 32, type = "const unsigned char* const" }
+values.country_list_offset = { at = 43, size = 4 }
+values.diplo_dirty_offset = { at = 53, size = 4 }
+note = "CCountryDiplomacyView::UpdateDiplomaticInformation 0xF01DC0: country = countries[tag index of view + 0x138]; if its +0x2884 or the view's own flag is set, clears both and rebuilds the view; the only reader of +0x2884"
+
+[symbol.diplo_view_update.build."eu4-1.37.5-steam-win64"]
+rva = 0xF01DC0
+bytes = "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 40 48 8B F1 48 8B 91 38 01 00 00 48 8B 05 F0 BA 43 01 48 C1 EA 20 48 0F BF D2 48 8B 80 18 01 00 00 48 8B 0C D0 80 B9 84 28 00 00 00"
+
+[symbol.diplo_view_update.build."eu4-1.37.5.2-gog-win64"]
+rva = 0xF00570
+bytes = "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 40 48 8B F1 48 8B 91 38 01 00 00 48 8B 05 C0 11 42 01 48 C1 EA 20 48 0F BF D2 48 8B 80 18 01 00 00 48 8B 0C D0 80 B9 84 28 00 00 00"
+
+[symbol.diplo_view_update.build."eu4-1.37.5.0-gog-win64"]
+rva = 0xF00570
+bytes = "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 40 48 8B F1 48 8B 91 38 01 00 00 48 8B 05 C0 11 42 01 48 C1 EA 20 48 0F BF D2 48 8B 80 18 01 00 00 48 8B 0C D0 80 B9 84 28 00 00 00"

@@ -287,6 +287,15 @@ module = "diagnostics"
 advanced = true
 restart = true
 
+[setting.diplo_scan_check]
+type = "bool"
+default = false
+label = "Check: Diplomacy change scan"
+description = "Runs the game's own code as well and counts differences. Slower."
+module = "diagnostics"
+advanced = true
+restart = true
+
 [setting.save_compress_check]
 type = "bool"
 default = false

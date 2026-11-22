@@ -43,6 +43,7 @@ code only.
 | `transfer_skip` | Loading in single player: no level 9 copy of a text save for a transfer nobody receives (§6a) | "Continue" of a 64.5 MB save 10.91 → 8.95 s |
 | `listing_lookup` | Start-up, on by default since 2.1: the stat after `verifyPath` in `getRealDir` and the opens of names that are not there answered from `verifypath_listing`'s listings; existing files opened by the game (§6a) | Anbennar 22.08 → 18.86 s to the menu; base game: in the noise |
 | `conquer_scan` | Simulation, prototype, off by default: the AI's conquest list from the land provinces only, on the calling thread or the game's pool, whichever is cheaper (§6a) | check: 0 differences; Anbennar 521 → 256 µs a list (serial), base game 712 → 593 µs and 716 → 740 µs (pool), module clocks |
+| `diplo_scan` | Simulation, prototype, off by default: the daily diplomacy-change scan only for countries whose "diplomacy changed" byte is set (§6a) | see §6a |
 | `checksum_defer` | Loading, off by default: the game's checksum task waits until the databases are loaded, so the two no longer take turns on the file system locks; the same files and checksum (§6a) | Anbennar: −1.11 and −1.01 s to the menu (two series); base game: in the noise |
 
 The table's start-up modules are in the order they were ported; §6a has the
@@ -793,6 +794,39 @@ The same one-thread loop for the opinion row of `CCountry::UpdateOpinionCache` (
 tried in the same sessions and dropped: the same values (9,771 rows, 0 differences), faster on the base game
 (63 µs a row against 110 µs) but slower on Anbennar (329 µs against 195 µs, about 4 s more a year), whose opinion
 items cost more than handing them to the pool.
+
+### diplo_scan (simulation, prototype)
+
+`CCountry::DailyUpdateSerialCheckDiplomacyChange` (`0x2EE070`) runs for every living country every day in the
+serial country update. It reads the change bit (`_bHasChanged`, bit 2 of the flags byte `+0x46`) of each 72-byte
+`CDiplomacyStatus` row of the country, one row per tag, and clears the set ones while the game state has no save
+loader (`+0x74C8`); with a loader it refreshes the trade routes instead. On Anbennar (about 1,900 tags) that is
+about 134 KB a country and 125 MB a day, read to find almost nothing.
+
+Writers of the bit, from a scan of every instruction of `eu4.exe` that touches a byte at `+0x46` and of the
+functions that own the hits (22.11.2026):
+
+- set: an inlined "set changed" (`if (no loader) row.flags |= 4; countries[row.owner]+0x2884 = 1`) in 26
+  `CDiplomacyStatus` setters (`SetAlliance`, `SetRoyalMarriage`, …, `0xA6FE20`), 8 `CCountryDiplomacy` ones
+  (`SetWar`, `SetDependency`, `AddOpinion`, `RemoveOpinion`, `AddCasusBelli`, …), `CCountry::SetCurrentMonarch`
+  and `BreakOldRoyalMarriages`; `TransferRelationsFrom` copies the flags of another row and then, on its only
+  path to its only `ret`, does the same "set changed";
+- from a file: `DoReadMember`, in a load, which builds new countries;
+- cleared: the scan itself, `Clear`, a new row (`and 0x80`).
+
+The other writes of the byte change other bits (`CheckExpirations` bit 3, `SetSuccessionClaim` bit 0,
+`0xA6FE20`'s second write bit 1), and no code outside these copies rows. The owner's byte `+0x2884`
+(`_bDiploDescriptionArraysDirty`) is read and cleared only by `CCountryDiplomacyView::UpdateDiplomaticInformation`
+(`0xF01DC0`), for the country the view shows, and a new country starts with it set (`CCountry::CCountry`).
+
+So, while no save is loading, a country whose `+0x2884` is 0 had no bit set since that byte was last cleared.
+The module clears it only right after the game's scan of that country, which cleared every bit; it then holds
+the byte and gives it back to the country right before the view's update reads it. The module skips the scan of
+a country whose byte is 0 and runs the game's otherwise. The view reads the value the game would have, and no
+row differs. `"verify"` counts the set bits of every skipped country and times the game's scan of it as well;
+`"on"` counts them for every 256th skipped country and, after a set bit, gives back every held byte and leaves
+every scan to the game. `diplo_scan.tsv` every 5 s; `diplo_scan_core.hpp` and its test hold what does not touch
+the game.
 
 ### save_compress (saving)
 
