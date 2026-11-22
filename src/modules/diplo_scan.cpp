@@ -53,6 +53,9 @@ unsigned char g_changedMask = 0;
 bool g_verifyOnly = false;
 volatile LONG g_disabled = 0;
 ds::Shadow* g_shadow = nullptr;  // main thread
+// The countries the diplomacy view updated since their last scan: the view clears their byte without clearing
+// their rows' bits, so their next scan is the game's.
+ds::Shadow* g_viewed = nullptr;  // main thread
 // A session event or a scan during a load starts a new epoch; the first scan of a country in an epoch is the
 // game's, whatever its byte, in case a load read set bits into a country it did not build anew.
 volatile LONG g_epoch = 1;
@@ -102,7 +105,8 @@ void ScanDetour(void* country) {
     InterlockedExchangeAdd64(&g_rows, static_cast<LONG64>(rows));
     const int index = ds::TagIndex(sb::Read<std::uint64_t>(begin, ds::kRowOwner));
     const bool firstOfEpoch = g_scanned->Mark(index, static_cast<std::uint32_t>(g_epoch));
-    if (c[g_dirty] != 0 || firstOfEpoch) {
+    const bool viewed = g_viewed->Take(index);
+    if (c[g_dirty] != 0 || firstOfEpoch || viewed) {
         InterlockedIncrement64(&s.misses);
         {
             const sb::ScopedTicks t(&g_scanTicks);
@@ -139,11 +143,11 @@ void ScanDetour(void* country) {
 
 void ViewDetour(void* view) {
     InterlockedIncrement64(&g_viewCalls);
-    if (g_shadow->held() != 0) {
-        const int index = ds::TagIndex(sb::Read<std::uint64_t>(view, g_viewCountry));
-        if (g_shadow->Take(index)) GiveBack(index);
-    }
+    const int index = ds::TagIndex(sb::Read<std::uint64_t>(view, g_viewCountry));
+    if (g_shadow->Take(index)) GiveBack(index);
     g_view(view);
+    // The update may have cleared the byte of a country whose rows still have bits set.
+    g_viewed->Hold(index);
 }
 
 void WriteFile() {
@@ -185,6 +189,7 @@ bool InstallDiploScan(anvil::Host& host, Mode mode) {
     try {
         g_dir = new std::wstring(host.data_dir().wstring());
         g_shadow = new ds::Shadow();
+        g_viewed = new ds::Shadow();
         g_scanned = new ds::EpochMarks();
     } catch (...) {
         return false;

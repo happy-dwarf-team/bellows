@@ -821,12 +821,28 @@ The other writes of the byte change other bits (`CheckExpirations` bit 3, `SetSu
 
 So, while no save is loading, a country whose `+0x2884` is 0 had no bit set since that byte was last cleared.
 The module clears it only right after the game's scan of that country, which cleared every bit; it then holds
-the byte and gives it back to the country right before the view's update reads it. The module skips the scan of
-a country whose byte is 0 and runs the game's otherwise. The view reads the value the game would have, and no
-row differs. `"verify"` counts the set bits of every skipped country and times the game's scan of it as well;
+the byte and gives it back to the country right before the view's update reads it. The view's update clears the
+byte too, without touching the rows, so the next scan of the country the view showed is the game's. The module
+skips the scan of a country whose byte is 0 and that the view has not updated since its last scan, and runs the
+game's otherwise. The view reads the value the game would have, and no row differs. `"verify"` counts the set bits of every skipped country and times the game's scan of it as well;
 `"on"` counts them for every 256th skipped country and, after a set bit, gives back every held byte and leaves
 every scan to the game. `diplo_scan.tsv` every 5 s; `diplo_scan_core.hpp` and its test hold what does not touch
 the game.
+
+Lab check (22.11.2026, Steam 1.37.5, observer sessions at speed 5 in a test profile, `"verify"`):
+
+| Save | Scans | Skipped | Set bits in skipped | Game's scan of the skipped |
+| --- | ---: | ---: | ---: | ---: |
+| 1719 (base game) | 8,463 | 8,016 | 0 | 28 ms |
+| Anbennar 1444 to 1445.3.1 | 103,192 | 63,306 | 0 | 279 ms |
+| 1821 (base game) | 7,735 | 7,081 | 0 | 25 ms |
+
+The skipped scans read their rows cold, as the game does, so their cost is the saving: about 0.9 s a game year on
+Anbennar and 0.1 s on the base game, small beside `conquer_scan`. The view's hook did not run in these sessions
+(no diplomacy view open), so nothing was given back. A first session with a country's diplomacy view open found
+one country with 5 set bits and a clear byte, cleared by the view: the reason the view's country is scanned by
+the game next. With that, a 1719 session with the view open on Poland for 61 days and on France for 60 more:
+12,194 scans, 11,353 skipped and checked, 0 set bits, 136 view updates, 11 bytes given back.
 
 ### save_compress (saving)
 
