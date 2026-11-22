@@ -158,6 +158,8 @@ struct Bellows : anvil::Plugin {
             Feature("army_search_memo", sb::InstallArmySearchMemo, &cfg::army_search_memo_check),
             // prototype, off by default: redirects the call of 0x191F30 in 0x187AD0.
             Feature("conquer_scan", sb::InstallConquerScan, &cfg::conquer_scan_check),
+            // prototype, off by default: hooks the entries of 0x2EE070 and 0xF01DC0.
+            Feature("diplo_scan", sb::InstallDiploScan, &cfg::diplo_scan_check),
             Feature("save_compress", sb::InstallSaveCompress, &cfg::save_compress_check),
             Feature("transfer_skip", sb::InstallTransferSkip, &cfg::transfer_skip_check),
             Feature("history_add", sb::InstallHistoryAdd, &cfg::history_add_check),
@@ -258,6 +260,7 @@ struct Bellows : anvil::Plugin {
             sb::NoteNeverThrottleSession(session != nullptr && !ended && session->multiplayer != 0);
             sb::NoteRangeWitnessSession();
             sb::NoteArmySearchProfileSession();
+            sb::NoteDiploScanSession();
         });
         // A frame also collects once enough was freed (a counter read otherwise), for a load without a session
         // event: anvil-game published none for a save loaded from the in-game menu before Anvil 1.5.2.

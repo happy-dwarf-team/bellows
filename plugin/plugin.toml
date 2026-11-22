@@ -194,6 +194,14 @@ affects_gameplay = false
 default = false
 
 [[modules]]
+id = "diplo_scan"
+name = "Diplomacy change scan"
+description = "Prototype: skips a country's daily diplomacy change check when nothing in it changed. Same answers."
+group = "Simulation"
+affects_gameplay = false
+default = false
+
+[[modules]]
 id = "save_compress"
 name = "Save compression"
 description = "Compresses saves faster. The file is the game's, byte for byte, unless you choose several threads."
