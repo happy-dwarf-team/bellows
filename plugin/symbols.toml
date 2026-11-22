@@ -1186,11 +1186,11 @@ build."eu4-1.37.5-steam-win64" = { rva = 0xD45291 }
 build."eu4-1.37.5.2-gog-win64" = { rva = 0xD43A41 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0xD43A41 }
 
-# --- conquer_scan, opinion_serial (prototypes, off by default) ------------------------
-# Two ParallelFor3 of the serial daily country update run as a loop on the calling thread. ParallelFor3 is a
-# template: both instantiations (0x191F30, 0x424380) set the global "inside a parallel loop" byte to 1 around
-# the loop and, while the calling thread's random log is on, put that log in its collecting mode (flag bit 1)
-# and collect it afterwards; the modules do the same around their loop.
+# --- conquer_scan (prototype, off by default) --------------------------------------------
+# The ParallelFor3 of RebuildConquerList (0x191F30) runs as a loop on the calling thread. ParallelFor3 is a
+# template; its instantiations set the global "inside a parallel loop" byte to 1 around the loop and, while the
+# calling thread's random log is on, put that log in its collecting mode (flag bit 1) and collect it afterwards;
+# the module does the same around its loop.
 
 [symbol.parallel_for_head]
 memory = "code"
@@ -1257,33 +1257,3 @@ note = "a province's value for the AI's conquest list; 0 at once without a contr
 build."eu4-1.37.5-steam-win64" = { rva = 0x187C00 }
 build."eu4-1.37.5.2-gog-win64" = { rva = 0x187C30 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x187C30 }
-
-[symbol.opinion_fill_call]
-bytes = "E8 59 90 09 00"               # call 0x424380
-memory = "code"
-note = "0x38B1F0 (a country's opinion row): ParallelFor3(root + 0x1CE8 countries, {country}), the only call of 0x424380"
-build."eu4-1.37.5-steam-win64" = { rva = 0x38B322 }
-build."eu4-1.37.5.2-gog-win64" = { rva = 0x38B1F2 }
-build."eu4-1.37.5.0-gog-win64" = { rva = 0x38B1F2 }
-
-[symbol.opinion_item]
-bytes = "48 89 5C 24 08 57 48 83 EC 20 48 8B 41 10 48 8B 59 08 8B 3A 48 8B 08 48 8B 14 F9 83 BA 44 13 00 00 00 75 06 80 7A 26 07 75 20 48 8B 52 20 41 B1 01 48 8B 0B 45 33 C0 E8 04 0B F5 FF 48 8B 0B 48 8B 91 80 23 00 00 66 89 04 7A 48 8B 5C 24 30 48 83 C4 20 5F C3"
-memory = "code"
-values.provinces_offset = { at = 29, size = 4 }
-values.kind_offset = { at = 38, size = 1 }
-values.kind_value = { at = 39, size = 1 }
-values.tag_offset = { at = 45, size = 1 }
-values.row_offset = { at = 66, size = 4 }
-note = "the loop's item: for a country with provinces (or of kind 7), row[i] = 0x3839B0(country, tag, nullptr, true); opinion_serial's loop does the same"
-build."eu4-1.37.5-steam-win64" = { rva = 0x432E70 }
-build."eu4-1.37.5.2-gog-win64" = { rva = 0x432D40 }
-build."eu4-1.37.5.0-gog-win64" = { rva = 0x432D40 }
-
-[symbol.opinion_value]
-bytes = "48 89 5C 24 18 48 89 54 24 10 55 56 57 41 54 41 55 41 56 41 57"
-memory = "code"
-signature = "int16_t (void* country, uint64_t tag, void* reason, uint8_t a4)"
-note = "a country's opinion of another country (the tag by value, no reason text)"
-build."eu4-1.37.5-steam-win64" = { rva = 0x3839B0 }
-build."eu4-1.37.5.2-gog-win64" = { rva = 0x383880 }
-build."eu4-1.37.5.0-gog-win64" = { rva = 0x383880 }

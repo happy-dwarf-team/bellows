@@ -84,7 +84,7 @@ int main() {
         assert(description.find("Simulation:") == std::string::npos && description.find("Verify") == std::string::npos);
     }
     assert(groups == order);  // each group once, in the README's order
-    assert(declared.size() == 27 && declared.size() <= 32);  // Anvil's limit is 32 modules
+    assert(declared.size() == 26 && declared.size() <= 32);  // Anvil's limit is 32 modules
     assert(declared.at("diagnostics") == false);
 
     // Every setting belongs to a declared module and repeats no switch (ADR 0013, point 5).
@@ -114,7 +114,7 @@ int main() {
         }
     }
     // The features that had a "verify" mode in 1.x, and the modules new since 2.0 (each has a check).
-    const std::set<std::string> since2 = {"conquer_scan", "opinion_serial"};
+    const std::set<std::string> since2 = {"conquer_scan"};
     assert(checks.size() == 19 + since2.size());
     for (const std::string& id : since2) assert(checks.contains(id) && declared.at(id) == false);
 

@@ -1,13 +1,13 @@
 #pragma once
 
-// conquer_scan and opinion_serial: what the game's ParallelFor3 (0x191F30, 0x424380) does around its loop, so a
-// loop on the calling thread runs in the same state (symbols.toml, "conquer_scan, opinion_serial").
+// conquer_scan: what the game's ParallelFor3 (0x191F30) does around its loop, so a loop on the calling thread
+// runs in the same state (symbols.toml, "conquer_scan").
 
 #include "../common.hpp"
 
 namespace sb::serial_loop {
 
-// Resolves the symbols; true when they are there. Both modules call it; the second call does nothing new.
+// Resolves the symbols; true when they are there. A second call does nothing new.
 bool Resolve(anvil::Host& host);
 
 // For the lifetime of the scope, as ParallelFor3 for its loop: the game's "inside a parallel loop" byte is 1,

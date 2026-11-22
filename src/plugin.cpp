@@ -156,9 +156,8 @@ struct Bellows : anvil::Plugin {
             Feature("province_modifier_view", sb::InstallProvinceModifierView, &cfg::province_modifier_view_check),
             // redirects the call of 0x1022B0 in 0xEAB50; army_search_profile hooks its entry, so both chain.
             Feature("army_search_memo", sb::InstallArmySearchMemo, &cfg::army_search_memo_check),
-            // prototypes, off by default: redirect the calls of 0x191F30 in 0x187AD0 and of 0x424380 in 0x38B1F0.
+            // prototype, off by default: redirects the call of 0x191F30 in 0x187AD0.
             Feature("conquer_scan", sb::InstallConquerScan, &cfg::conquer_scan_check),
-            Feature("opinion_serial", sb::InstallOpinionSerial, &cfg::opinion_serial_check),
             Feature("save_compress", sb::InstallSaveCompress, &cfg::save_compress_check),
             Feature("transfer_skip", sb::InstallTransferSkip, &cfg::transfer_skip_check),
             Feature("history_add", sb::InstallHistoryAdd, &cfg::history_add_check),

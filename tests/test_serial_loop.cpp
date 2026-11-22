@@ -1,10 +1,9 @@
-// conquer_scan and opinion_serial: the candidate list, the fill in index order with its prefetch positions, and
+// conquer_scan: the candidate list, the fill in index order with its prefetch positions, and
 // the comparisons of a checked call.
 #include "../src/modules/serial_loop_core.hpp"
 
 #include <cassert>
 #include <cstdio>
-#include <set>
 #include <vector>
 
 using sb::serial_loop::Pair;
@@ -48,12 +47,6 @@ int main() {
     assert(sl::Differences(mine, sameButOne) == 1);
     std::vector<Pair> empty1, empty2;
     assert(sl::Differences(empty1, empty2) == 0);
-
-    // The opinion row: only the positions both runs wrote count.
-    const std::int16_t gameRow[] = {5, -3, 0, 100, 7};
-    const std::int16_t mineRow[] = {5, 9, 0, 100, 8};  // 1 was not written by the item, 4 differs
-    const std::set<std::size_t> writtenAt = {0, 2, 3, 4};
-    assert(sl::RowDifferences(gameRow, mineRow, 5, [&](std::size_t i) { return writtenAt.contains(i); }) == 1);
 
     // Checked calls: every one in "verify", one in 256 in "on"; who runs first alternates.
     assert(sl::Checked(true, 1) && sl::Checked(true, 7));

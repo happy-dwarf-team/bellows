@@ -109,7 +109,6 @@ set(SB_SOURCES
     src/modules/army_search_memo.cpp
     src/modules/serial_loop.cpp
     src/modules/conquer_scan.cpp
-    src/modules/opinion_serial.cpp
     src/modules/save_compress.cpp
     src/modules/save_compress_parallel.cpp
     src/modules/transfer_skip.cpp

@@ -1,4 +1,4 @@
-// conquer_scan and opinion_serial: the state the game's ParallelFor3 sets around its loop (serial_loop.hpp).
+// conquer_scan: the state the game's ParallelFor3 sets around its loop (serial_loop.hpp).
 #include "serial_loop.hpp"
 
 #include "modules.hpp"

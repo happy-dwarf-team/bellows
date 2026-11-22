@@ -194,14 +194,6 @@ affects_gameplay = false
 default = false
 
 [[modules]]
-id = "opinion_serial"
-name = "Opinions on one thread"
-description = "Prototype: fills a country's opinions of the others on one thread, not the pool. Same values."
-group = "Simulation"
-affects_gameplay = false
-default = false
-
-[[modules]]
 id = "save_compress"
 name = "Save compression"
 description = "Compresses saves faster. The file is the game's, byte for byte, unless you choose several threads."

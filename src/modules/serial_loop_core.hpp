@@ -1,12 +1,12 @@
 #pragma once
 
-// conquer_scan and opinion_serial (prototypes, off by default): the parts that do not touch the game, so that
+// conquer_scan (prototype, off by default): the parts that do not touch the game, so that
 // tests/test_serial_loop.cpp can run them.
 //
-// Both modules replace one ParallelFor3 of the serial daily country update with a loop on the calling thread,
+// The module replaces one ParallelFor3 of the serial daily country update with a loop on the calling thread,
 // in index order. The game's ParallelFor3 hands the items to its worker pool and the calling thread takes
 // items itself while it waits, so the loop in index order on the calling thread is one of the schedules the
-// game's own pool can produce: each item of these two loops writes only its own result.
+// game's own pool can produce: each item of the loop writes only its own result.
 
 #include <algorithm>
 #include <cstddef>
@@ -67,17 +67,6 @@ inline std::size_t Differences(std::vector<Pair>& a, std::vector<Pair>& b) {
     std::size_t differences = std::max(a.size(), b.size()) - common;
     for (std::size_t k = 0; k < common; ++k) {
         if (!(a[k] == b[k])) ++differences;
-    }
-    return differences;
-}
-
-// The opinion row: positions where both rows were written and differ. written(i) says whether the item wrote
-// index i (the same test in both runs: the inputs of the test do not change between them).
-template <class Written>
-std::size_t RowDifferences(const std::int16_t* game, const std::int16_t* mine, std::size_t count, Written&& written) {
-    std::size_t differences = 0;
-    for (std::size_t i = 0; i < count; ++i) {
-        if (written(i) && game[i] != mine[i]) ++differences;
     }
     return differences;
 }

@@ -287,15 +287,6 @@ module = "diagnostics"
 advanced = true
 restart = true
 
-[setting.opinion_serial_check]
-type = "bool"
-default = false
-label = "Check: Opinions on one thread"
-description = "Runs the game's own code as well and counts differences. Slower."
-module = "diagnostics"
-advanced = true
-restart = true
-
 [setting.save_compress_check]
 type = "bool"
 default = false
