@@ -186,6 +186,14 @@ group = "Simulation"
 affects_gameplay = false
 
 [[modules]]
+id = "conquer_scan"
+name = "AI conquest list scan"
+description = "Prototype: builds the AI's conquest list from land provinces only. Same list."
+group = "Simulation"
+affects_gameplay = false
+default = false
+
+[[modules]]
 id = "save_compress"
 name = "Save compression"
 description = "Compresses saves faster. The file is the game's, byte for byte, unless you choose several threads."

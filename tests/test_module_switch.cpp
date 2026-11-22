@@ -84,7 +84,7 @@ int main() {
         assert(description.find("Simulation:") == std::string::npos && description.find("Verify") == std::string::npos);
     }
     assert(groups == order);  // each group once, in the README's order
-    assert(declared.size() == 25 && declared.size() <= 32);  // Anvil's limit is 32 modules
+    assert(declared.size() == 26 && declared.size() <= 32);  // Anvil's limit is 32 modules
     assert(declared.at("diagnostics") == false);
 
     // Every setting belongs to a declared module and repeats no switch (ADR 0013, point 5).
@@ -113,12 +113,15 @@ int main() {
             assert(!s["advanced"].value_or(false) && s["group"].value<std::string>() == "Profiles");
         }
     }
-    assert(checks.size() == 19);  // the features that had a "verify" mode in 1.x
+    // The features that had a "verify" mode in 1.x, and the modules new since 2.0 (each has a check).
+    const std::set<std::string> since2 = {"conquer_scan"};
+    assert(checks.size() == 19 + since2.size());
+    for (const std::string& id : since2) assert(checks.contains(id) && declared.at(id) == false);
 
-    // Each module but Diagnostics was a mode setting of 1.x (verifypath_session an on / off one): its
-    // "off" turns the module off, and for a module off by default its "on" turns it on.
+    // Each module but Diagnostics and the modules new since 2.0 was a mode setting of 1.x (verifypath_session
+    // an on / off one): its "off" turns the module off, and for a module off by default its "on" turns it on.
     for (const auto& [id, on] : declared) {
-        if (id == "diagnostics") {
+        if (id == "diagnostics" || since2.contains(id)) {
             assert(!retired.contains(id));
             continue;
         }
