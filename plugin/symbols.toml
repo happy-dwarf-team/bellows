@@ -1185,3 +1185,105 @@ note = "0xD45250 (is a move blocked by a fort's zone of control): 0xD40AE0(army,
 build."eu4-1.37.5-steam-win64" = { rva = 0xD45291 }
 build."eu4-1.37.5.2-gog-win64" = { rva = 0xD43A41 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0xD43A41 }
+
+# --- conquer_scan, opinion_serial (prototypes, off by default) ------------------------
+# Two ParallelFor3 of the serial daily country update run as a loop on the calling thread. ParallelFor3 is a
+# template: both instantiations (0x191F30, 0x424380) set the global "inside a parallel loop" byte to 1 around
+# the loop and, while the calling thread's random log is on, put that log in its collecting mode (flag bit 1)
+# and collect it afterwards; the modules do the same around their loop.
+
+[symbol.parallel_for_head]
+memory = "code"
+values.parallel_flag = { at = 3, rip_relative = 7, type = "unsigned char" }
+values.random_log_flags = { at = 24, size = 1 }
+note = "ParallelFor3 0x191F30 (RebuildConquerList's): keeps the parallel byte, sets it to 1, asks for the thread's random log, tests bit 0 of its flags"
+
+[symbol.parallel_for_head.build."eu4-1.37.5-steam-win64"]
+rva = 0x191F68
+bytes = "0F B6 05 55 F1 E3 01 88 45 70 C6 05 4B F1 E3 01 01 E8 02 2D 34 01 F6 40 38 01"
+
+[symbol.parallel_for_head.build."eu4-1.37.5.2-gog-win64"]
+rva = 0x191F98
+bytes = "0F B6 05 25 31 E2 01 88 45 70 C6 05 1B 31 E2 01 01 E8 42 C8 33 01 F6 40 38 01"
+
+[symbol.parallel_for_head.build."eu4-1.37.5.0-gog-win64"]
+rva = 0x191F98
+bytes = "0F B6 05 25 31 E2 01 88 45 70 C6 05 1B 31 E2 01 01 E8 42 C8 33 01 F6 40 38 01"
+
+[symbol.random_log_impl]
+bytes = "48 83 EC 28 65 48 8B 04 25 58 00 00 00 BA 08 00 00 00 48 8B 08 8B 04 0A"
+memory = "code"
+signature = "void* ()"
+note = "the calling thread's random log object (thread-local)"
+build."eu4-1.37.5-steam-win64" = { rva = 0x14D4C80 }
+build."eu4-1.37.5.2-gog-win64" = { rva = 0x14CE7F0 }
+build."eu4-1.37.5.0-gog-win64" = { rva = 0x14CE7F0 }
+
+[symbol.random_log_collect]
+bytes = "48 89 4C 24 08 55 53 56 57 41 54 41 55 41 56 41 57 B8 48 10 00 00"
+memory = "code"
+signature = "void (void* log)"
+note = "the random log's collect, which ParallelFor3 calls after a loop in the log's collecting mode"
+build."eu4-1.37.5-steam-win64" = { rva = 0x14D4180 }
+build."eu4-1.37.5.2-gog-win64" = { rva = 0x14CDCF0 }
+build."eu4-1.37.5.0-gog-win64" = { rva = 0x14CDCF0 }
+
+[symbol.conquer_fill_call]
+bytes = "E8 A7 A3 00 00"               # call 0x191F30
+memory = "code"
+note = "0x187AD0 (the AI's conquest list): ParallelFor3(root + 0x1C90 provinces, {strategy, &count, &pairs}), the only call of 0x191F30"
+build."eu4-1.37.5-steam-win64" = { rva = 0x187B84 }
+build."eu4-1.37.5.2-gog-win64" = { rva = 0x187BB4 }
+build."eu4-1.37.5.0-gog-win64" = { rva = 0x187BB4 }
+
+[symbol.conquer_item]
+bytes = "48 89 5C 24 08 57 48 83 EC 20 48 8B 41 10 48 8B 59 08 8B 3A 48 8B 08 48 8B 14 F9 48 8B 0B E8 DD 37 FF FF 85 C0 7E 23 48 8B 4B 08 41 B8 01 00 00 00 48 8B 11 F0 44 0F C1 02 48 8B 4B 10 49 63 D0 48 8B 09 89 3C D1 89 44 D1 04 48 8B 5C 24 30 48 83 C4 20 5F C3"
+memory = "code"
+note = "the loop's item (the lambda's call): value = 0x187C00(strategy, provinces[i]); if > 0, pairs[count++] = (i, value); conquer_scan's loop does the same"
+build."eu4-1.37.5-steam-win64" = { rva = 0x194400 }
+build."eu4-1.37.5.2-gog-win64" = { rva = 0x194430 }
+build."eu4-1.37.5.0-gog-win64" = { rva = 0x194430 }
+
+[symbol.conquer_value]
+bytes = "48 89 54 24 10 48 89 4C 24 08 55 53 56 57 41 54 41 55 41 56 41 57 48 8D AC 24 48 FF FF FF 48 81 EC B8 01 00 00 4C 8B F2 48 8B F1 48 83 BA 38 03 00 00 00 0F 84 1E 22 00 00 48 8B 82 68 04 00 00 4C 8B 41 1C 49 8B D0 48 C1 EA 20 44 0F BF CA 48 C1 E8 20 0F BF C8 41 3B C9 0F 84 F8 21 00 00 49 8B 46 28 0F B6 88 28 02 00 00 C0 E9 03 F6 D1 80 E1 01 0F 85 DF 21 00 00"
+memory = "code"
+signature = "int32_t (void* strategy, void* province)"
+values.controller_area_offset = { at = 46, size = 4 }
+values.owner_offset = { at = 60, size = 4 }
+values.template_offset = { at = 98, size = 1 }
+values.land_flags_offset = { at = 102, size = 4 }
+values.land_bit = { at = 108, size = 1 }
+note = "a province's value for the AI's conquest list; 0 at once without a controller area, for the strategy's own province, and when the land bit of the province template's flags is clear"
+build."eu4-1.37.5-steam-win64" = { rva = 0x187C00 }
+build."eu4-1.37.5.2-gog-win64" = { rva = 0x187C30 }
+build."eu4-1.37.5.0-gog-win64" = { rva = 0x187C30 }
+
+[symbol.opinion_fill_call]
+bytes = "E8 59 90 09 00"               # call 0x424380
+memory = "code"
+note = "0x38B1F0 (a country's opinion row): ParallelFor3(root + 0x1CE8 countries, {country}), the only call of 0x424380"
+build."eu4-1.37.5-steam-win64" = { rva = 0x38B322 }
+build."eu4-1.37.5.2-gog-win64" = { rva = 0x38B1F2 }
+build."eu4-1.37.5.0-gog-win64" = { rva = 0x38B1F2 }
+
+[symbol.opinion_item]
+bytes = "48 89 5C 24 08 57 48 83 EC 20 48 8B 41 10 48 8B 59 08 8B 3A 48 8B 08 48 8B 14 F9 83 BA 44 13 00 00 00 75 06 80 7A 26 07 75 20 48 8B 52 20 41 B1 01 48 8B 0B 45 33 C0 E8 04 0B F5 FF 48 8B 0B 48 8B 91 80 23 00 00 66 89 04 7A 48 8B 5C 24 30 48 83 C4 20 5F C3"
+memory = "code"
+values.provinces_offset = { at = 29, size = 4 }
+values.kind_offset = { at = 38, size = 1 }
+values.kind_value = { at = 39, size = 1 }
+values.tag_offset = { at = 45, size = 1 }
+values.row_offset = { at = 66, size = 4 }
+note = "the loop's item: for a country with provinces (or of kind 7), row[i] = 0x3839B0(country, tag, nullptr, true); opinion_serial's loop does the same"
+build."eu4-1.37.5-steam-win64" = { rva = 0x432E70 }
+build."eu4-1.37.5.2-gog-win64" = { rva = 0x432D40 }
+build."eu4-1.37.5.0-gog-win64" = { rva = 0x432D40 }
+
+[symbol.opinion_value]
+bytes = "48 89 5C 24 18 48 89 54 24 10 55 56 57 41 54 41 55 41 56 41 57"
+memory = "code"
+signature = "int16_t (void* country, uint64_t tag, void* reason, uint8_t a4)"
+note = "a country's opinion of another country (the tag by value, no reason text)"
+build."eu4-1.37.5-steam-win64" = { rva = 0x3839B0 }
+build."eu4-1.37.5.2-gog-win64" = { rva = 0x383880 }
+build."eu4-1.37.5.0-gog-win64" = { rva = 0x383880 }

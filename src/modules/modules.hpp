@@ -36,6 +36,8 @@ bool InstallModifierMerge(anvil::Host& host, Mode mode);
 bool InstallPortTable(anvil::Host& host, Mode mode);
 bool InstallProvinceModifierView(anvil::Host& host, Mode mode);
 bool InstallArmySearchMemo(anvil::Host& host, Mode mode);
+bool InstallConquerScan(anvil::Host& host, Mode mode);  // prototype, off by default
+bool InstallOpinionSerial(anvil::Host& host, Mode mode);  // prototype, off by default
 bool InstallPopsPacing(anvil::Host& host, Mode mode);
 void NotePopsSession(bool multiplayer) noexcept;  // from anvil-game's session event
 bool InstallNeverThrottle(anvil::Host& host, Mode mode);
