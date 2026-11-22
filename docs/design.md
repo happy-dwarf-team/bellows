@@ -42,7 +42,7 @@ code only.
 | `save_compress` | Saving: the game's own zlib with a faster CRC-32 (the game's bytes); optionally in parallel (§6a) | autosave 0.873 → 0.831 s; parallel 0.612 s |
 | `transfer_skip` | Loading in single player: no level 9 copy of a text save for a transfer nobody receives (§6a) | "Continue" of a 64.5 MB save 10.91 → 8.95 s |
 | `listing_lookup` | Start-up, on by default since 2.1: the stat after `verifyPath` in `getRealDir` and the opens of names that are not there answered from `verifypath_listing`'s listings; existing files opened by the game (§6a) | Anbennar 22.08 → 18.86 s to the menu; base game: in the noise |
-| `conquer_scan` | Simulation, prototype, off by default: the AI's conquest list from the land provinces only, on the calling thread or the game's pool, whichever is cheaper (§6a) | check: 0 differences; Anbennar 485 → 211 µs a list (serial), base game 787 → 732 µs and 774 → 910 µs (pool), module clocks |
+| `conquer_scan` | Simulation, prototype, off by default: the AI's conquest list from the land provinces only, on the calling thread or the game's pool, whichever is cheaper (§6a) | check: 0 differences; Anbennar 521 → 256 µs a list (serial), base game 712 → 593 µs and 716 → 740 µs (pool), module clocks |
 | `checksum_defer` | Loading, off by default: the game's checksum task waits until the databases are loaded, so the two no longer take turns on the file system locks; the same files and checksum (§6a) | Anbennar: −1.11 and −1.01 s to the menu (two series); base game: in the noise |
 
 The table's start-up modules are in the order they were ported; §6a has the
@@ -769,14 +769,19 @@ are the module's clocks of the loop that ran first in a checked call, per call:
 
 | | Calls | Differences (serial, pool) | Game's pool | Serial | Pool on land |
 | --- | --- | --- | --- | --- | --- |
-| 1719 | 33 | 0, 0 | 787 µs | 1,154 µs | 732 µs |
-| Anbennar | 2,952 | 0, 0 | 485 µs | 211 µs | 439 µs |
-| 1821 | 61 | 0, 0 | 774 µs | 1,216 µs | 910 µs |
+| 1719 | 30 | 0, 0 | 712 µs | 1,142 µs | 593 µs |
+| Anbennar | 2,956 | 0, 0 | 521 µs | 256 µs | 471 µs |
+| 1821 | 60 | 0, 0 | 716 µs | 1,597 µs | 740 µs |
 
 Both ways give the game's answers in every call compared. On Anbennar, which rebuilds the lists about 90 times as
-often as the base game, the serial loop takes less than half the game's time (about 2.7 s a game year by these
-clocks); on the base game the pool way is about as fast as the game's pool (−7% and +18%, with 20 to 33 calls per
+often as the base game, the serial loop takes about half the game's time (about 2.6 s a game year by these
+clocks); on the base game the pool way is about as fast as the game's pool (−17% and +3%, with 10 and 20 calls per
 cell), and the base game rebuilds the list about 100–250 times a year.
+
+In `"on"` without the check (the same saves and dates, Diagnostics off) the module took the pool for 27 of the
+1719 save's 29 calls (592 µs a call on average) and the serial loop for 2,777 of Anbennar's 2,963 (228 µs a call,
+against 457 µs for the 175 calls of the pool's exploration); the 11 calls it checked on Anbennar had 0
+differences.
 
 The same one-thread loop for the opinion row of `CCountry::UpdateOpinionCache` (`0x38B1F0`, item `0x432E70`) was
 tried in the same sessions and dropped: the same values (9,771 rows, 0 differences), faster on the base game
