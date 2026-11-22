@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.2.0](https://github.com/happy-dwarf-team/bellows/compare/v2.1.0...v2.2.0) (2026-11-22)
+
+
+### Features
+
+* **conquer_scan:** new module, off by default: the AI's list of provinces worth conquering is built from the land provinces only, on one thread or the game's pool, with the same list. Turn it on under Bellows in Anvil Manager (`bellows.conquer_scan`); in the lab it saved about 1 s a game year on Anbennar (more in the first months after 1444) and nothing on the base game ([d64ba9c](https://github.com/happy-dwarf-team/bellows/commit/d64ba9c5c85b991fc8dfb1218beda2046cf14d08))
+* **diplo_scan:** new prototype module, off by default: a country's daily check for changed relations is skipped when nothing in its diplomacy changed, with the same answers. Turn it on under Bellows in Anvil Manager (`bellows.diplo_scan`); in the lab it saved about 0.9 s a game year on Anbennar and 0.1 s on the base game ([c7ad8a0](https://github.com/happy-dwarf-team/bellows/commit/c7ad8a0a3859164db34e400cbe061bf0ecb9841b))
+
+
+### Bug Fixes
+
+* **access_profile:** a `-userdir` folder that does not exist yet is now a new, empty playset, so that start no longer learns its start-up profiles from your usual playset's mods ([0a5638b](https://github.com/happy-dwarf-team/bellows/commit/0a5638bc896bea29c4157a0aefa2e442022f1d82))
+* **access_profile:** a start with a `-userdir` folder that does not exist yet no longer writes the missing `dlc_load.json` as a warning to `anvil/anvil.log` ([4ac44c8](https://github.com/happy-dwarf-team/bellows/commit/4ac44c82748d9e2e987ae05c796729b747c2955d))
+
 ## [2.1.0](https://github.com/happy-dwarf-team/bellows/compare/v2.0.1...v2.1.0) (2026-11-19)
 
 
