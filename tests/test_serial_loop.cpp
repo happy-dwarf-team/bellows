@@ -1,5 +1,5 @@
-// conquer_scan: the candidate list, the fill in index order with its prefetch positions, and
-// the comparisons of a checked call.
+// conquer_scan: the candidate list, the fill in index order with its prefetch positions, the pool's index
+// mapping, the choice of the way, and the comparisons of a checked call.
 #include "../src/modules/serial_loop_core.hpp"
 
 #include <cassert>
@@ -48,15 +48,31 @@ int main() {
     std::vector<Pair> empty1, empty2;
     assert(sl::Differences(empty1, empty2) == 0);
 
-    // Checked calls: every one in "verify", one in 256 in "on"; who runs first alternates.
+    // The pool's way: positions in the land list map back to province indices, in the same order.
+    std::vector<Pair> pooled = {{9, 1}, {2, 3}, {0, 5}, {3, 7}};  // positions 9, 2, 0, 3 of `list`
+    sl::MapToProvinces(pooled.data(), 1, 4, list);  // the entry before `from` is not the pool's
+    assert((pooled == std::vector<Pair>{{9, 1}, {4, 3}, {1, 5}, {5, 7}}));
+
+    // The choice of the way: each once to start, then the cheaper, and the other every 16th call.
+    sl::WayChooser way;
+    assert(way.Pick(1) == sl::WayChooser::kSerial);
+    way.Add(sl::WayChooser::kSerial, 800);
+    assert(way.Pick(2) == sl::WayChooser::kPool);
+    way.Add(sl::WayChooser::kPool, 400);
+    assert(way.Pick(3) == sl::WayChooser::kPool && way.Pick(16) == sl::WayChooser::kSerial);
+    for (int k = 0; k < 40; ++k) way.Add(sl::WayChooser::kSerial, 100);  // the serial loop became cheap
+    assert(way.Average(sl::WayChooser::kSerial) < 400 && way.Pick(17) == sl::WayChooser::kSerial);
+    assert(way.Pick(32) == sl::WayChooser::kPool);
+
+    // Checked calls: every one in "verify", one in 256 in "on"; which loop runs first goes round the three.
     assert(sl::Checked(true, 1) && sl::Checked(true, 7));
     assert(!sl::Checked(false, 1) && !sl::Checked(false, 255) && sl::Checked(false, 256) && sl::Checked(false, 512));
-    assert(sl::GameFirst(1) && !sl::GameFirst(2) && sl::GameFirst(3));
+    assert(sl::FirstOf3(1) == 1 && sl::FirstOf3(2) == 2 && sl::FirstOf3(3) == 0);
     sl::OrderedTimes t;
-    t.Add(true, true, 10);
-    t.Add(false, false, 4);
-    t.Add(false, true, 6);
-    assert(t.ticks[1][0] == 10 && t.calls[1][0] == 1 && t.ticks[0][1] == 4 && t.ticks[0][0] == 6 && t.calls[1][1] == 0);
+    t.Add(0, true, 10);
+    t.Add(1, false, 4);
+    t.Add(2, true, 6);
+    assert(t.ticks[0][0] == 10 && t.calls[0][0] == 1 && t.ticks[1][1] == 4 && t.ticks[2][0] == 6 && t.calls[0][1] == 0);
 
     std::puts("serial_loop: ok");
     return 0;

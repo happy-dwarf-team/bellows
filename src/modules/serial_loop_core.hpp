@@ -3,10 +3,11 @@
 // conquer_scan (prototype, off by default): the parts that do not touch the game, so that
 // tests/test_serial_loop.cpp can run them.
 //
-// The module replaces one ParallelFor3 of the serial daily country update with a loop on the calling thread,
-// in index order. The game's ParallelFor3 hands the items to its worker pool and the calling thread takes
-// items itself while it waits, so the loop in index order on the calling thread is one of the schedules the
-// game's own pool can produce: each item of the loop writes only its own result.
+// The module fills the AI's conquest list from the land provinces only, one of two ways: a loop on the calling
+// thread in index order, or the game's own ParallelFor3 on an array of the land provinces. The game's
+// ParallelFor3 hands the items to its worker pool and the calling thread takes items itself while it waits, so
+// the loop in index order on the calling thread is one of the schedules the game's own pool can produce: each
+// item of the loop writes only its own result.
 
 #include <algorithm>
 #include <cstddef>
@@ -71,21 +72,56 @@ inline std::size_t Differences(std::vector<Pair>& a, std::vector<Pair>& b) {
     return differences;
 }
 
+// The pool's way: the game's item writes the index in the array it was given, here the position in the list of
+// land provinces. Maps the entries [from, count) back to the province indices; the mapping keeps their order.
+inline void MapToProvinces(Pair* pairs, std::int32_t from, std::int32_t count, const std::vector<std::int32_t>& list) {
+    for (std::int32_t j = from; j < count; ++j) pairs[j].index = list[static_cast<std::size_t>(pairs[j].index)];
+}
+
+// Which way a call takes. Both give the same list; the loop on the calling thread wins where the items are
+// cheap (the pool's hand-out costs more than they do: Anbennar), the pool where they are dear (the base game).
+// Keeps a moving average of each way's time per call (1/8 of each new call), takes the cheaper, and every
+// 16th call the other one, so that its average follows the game. Not thread-safe: the caller holds a lock.
+class WayChooser {
+public:
+    static constexpr int kSerial = 0, kPool = 1;
+    int Pick(std::uint64_t call) const noexcept {
+        if (!seen_[kSerial]) return kSerial;
+        if (!seen_[kPool]) return kPool;
+        const int best = average_[kPool] < average_[kSerial] ? kPool : kSerial;
+        return call % 16 == 0 ? 1 - best : best;
+    }
+    void Add(int way, std::int64_t ticks) noexcept {
+        if (!seen_[way]) {
+            average_[way] = ticks;
+            seen_[way] = true;
+        } else {
+            average_[way] += (ticks - average_[way]) / 8;
+        }
+    }
+    std::int64_t Average(int way) const noexcept { return average_[way]; }
+
+private:
+    std::int64_t average_[2] = {};
+    bool seen_[2] = {};
+};
+
 // Which call is checked against the game's ParallelFor3: every call in "verify", one in 256 in "on".
 inline bool Checked(bool verifyOnly, std::uint64_t sequence) noexcept { return verifyOnly || (sequence & 255) == 0; }
 
-// In a checked call both loops run, one after the other. The second finds the memory the first loaded in the
-// cache, so the times are kept by who ran first: [0] the module's loop, [1] the game's; [.][0] ran first.
+// In a checked call the three loops run one after the other: the game's on all provinces, and the module's two
+// ways. A later one finds the memory an earlier one loaded in the cache, so each time is kept by whether that
+// loop ran first: ticks[who][0] first, [who][1] later; who: 0 the game, 1 the serial loop, 2 the pool.
 struct OrderedTimes {
-    std::int64_t ticks[2][2] = {};
-    std::int64_t calls[2][2] = {};
-    void Add(bool game, bool first, std::int64_t t) noexcept {
-        ticks[game ? 1 : 0][first ? 0 : 1] += t;
-        ++calls[game ? 1 : 0][first ? 0 : 1];
+    std::int64_t ticks[3][2] = {};
+    std::int64_t calls[3][2] = {};
+    void Add(int who, bool first, std::int64_t t) noexcept {
+        ticks[who][first ? 0 : 1] += t;
+        ++calls[who][first ? 0 : 1];
     }
 };
 
-// Who runs first in the n-th checked call (counted from 1): alternate, so each loop runs first in half of them.
-inline bool GameFirst(std::uint64_t checkedCall) noexcept { return (checkedCall & 1) != 0; }
+// Which loop runs first in the n-th checked call (counted from 1): in turn, so each runs first in a third of them.
+inline int FirstOf3(std::uint64_t checkedCall) noexcept { return static_cast<int>(checkedCall % 3); }
 
 }  // namespace sb::serial_loop

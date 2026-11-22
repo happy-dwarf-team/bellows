@@ -42,7 +42,7 @@ code only.
 | `save_compress` | Saving: the game's own zlib with a faster CRC-32 (the game's bytes); optionally in parallel (§6a) | autosave 0.873 → 0.831 s; parallel 0.612 s |
 | `transfer_skip` | Loading in single player: no level 9 copy of a text save for a transfer nobody receives (§6a) | "Continue" of a 64.5 MB save 10.91 → 8.95 s |
 | `listing_lookup` | Start-up, on by default since 2.1: the stat after `verifyPath` in `getRealDir` and the opens of names that are not there answered from `verifypath_listing`'s listings; existing files opened by the game (§6a) | Anbennar 22.08 → 18.86 s to the menu; base game: in the noise |
-| `conquer_scan` | Simulation, prototype, off by default: the AI's conquest list on the calling thread, land provinces only (§6a) | check: 0 differences; Anbennar 518 → 261 µs a list, base game 707 → 1,196 µs (module clocks) |
+| `conquer_scan` | Simulation, prototype, off by default: the AI's conquest list from the land provinces only, on the calling thread or the game's pool, whichever is cheaper (§6a) | check: 0 differences; Anbennar 485 → 211 µs a list (serial), base game 787 → 732 µs and 774 → 910 µs (pool), module clocks |
 | `checksum_defer` | Loading, off by default: the game's checksum task waits until the databases are loaded, so the two no longer take turns on the file system locks; the same files and checksum (§6a) | Anbennar: −1.11 and −1.01 s to the menu (two series); base game: in the noise |
 
 The table's start-up modules are in the order they were ported; §6a has the
@@ -723,47 +723,60 @@ AI) is not measured yet, so the module stays off until a SIMULATION series.
 
 ### conquer_scan (simulation, prototype)
 
-Off by default, for 2.2.0; not measured under SIMULATION conditions yet. It replaces one `ParallelFor3` of
-the serial daily country update with a loop on the calling thread, in index order. The
-game's `ParallelFor3` hands the items to its worker pool and the calling thread takes
-items too while it waits, so a loop in index order on the calling thread is one of the
-schedules the game's own pool can produce; each item of the loop writes only its
-own result. The loop runs inside a scope that does what `ParallelFor3` does around its
-items (`serial_loop.cpp`): it sets the global "in a parallel loop" byte and, when the
-thread's random log is on, its collecting bit, and collects the log afterwards as the
-game does. `serial_loop_core.hpp` holds what does not touch the game; its test is
-`tests/test_serial_loop.cpp`.
+Off by default, for 2.2.0; not measured under SIMULATION conditions yet.
 
-**conquer_scan.** `CAIStrategy::RebuildConquerList` (`0x187AD0`) fills a buffer of
-(province index, value) pairs on the pool: the item (`0x194400`) calls
+`CAIStrategy::RebuildConquerList` (`0x187AD0`) fills a buffer of (province index, value)
+pairs in a `ParallelFor3` (`0x191F30`) on the pool: the item (`0x194400`) calls
 `CalcProvinceConquerValue` (`0x187C00`) for every province of the map and appends the
 pair with an atomic counter when the value is above 0. The function then sorts the
 buffer by index (the indices are unique, so the order of the pool does not matter) and
 adds the entries in that order. The lab's samples of a year at speed 5 put up to about
-4.5 s a game year on Anbennar into this loop, most of them in cache misses of the value
-function's first checks: the controller area (`+0x338`), the owner (`+0x468`) and the
-template's land flag (`+0x28`, then `+0x228` bit 3). For a province whose template is
-not land the function returns 0 before it reads anything that changes during a game, so
-the module builds the list of land provinces once per province array and calls the
-game's value function only for those, with a software prefetch of the next provinces'
-lines. It redirects the call of `ParallelFor3` in `RebuildConquerList` (`0x187B84`). Its
-check runs the game's loop into the game's buffer and the module's into a scratch
-buffer, alternating which runs first, compares the sorted lists, and keeps the times of
-both by who ran first (the second finds the first's memory in the cache). In `"on"` it
-does that for every 256th call and goes back to the game's loop for good after a
-mismatch. `conquer_scan.tsv` every 5 s.
+4.5 s a game year on Anbennar into this loop. For a province whose template is not land
+(`+0x28`, then `+0x228` bit 3) the value function returns 0 before it reads anything that
+changes during a game, so the module builds the list of land provinces once per province
+array and runs the game's item only for those, one of two ways:
+
+- **serial:** a loop on the calling thread, in index order, with a software prefetch of
+  the next provinces' first checks (the controller area `+0x338`, the owner `+0x468`, the
+  template). The game's `ParallelFor3` hands the items to its worker pool and the calling
+  thread takes items too while it waits, so a loop in index order on the calling thread
+  is one of the schedules the game's own pool can produce; each item writes only its own
+  result. The loop runs inside a scope that does what `ParallelFor3` does around its
+  items (`serial_loop.cpp`): it sets the global "in a parallel loop" byte and, when the
+  thread's random log is on, its collecting bit, and collects the log afterwards as the
+  game does.
+- **pool:** the game's own `ParallelFor3` on an array of the land provinces. The
+  function reads only the array's begin and end, and the item writes the position in the
+  array it was given, which the module maps back to the province index afterwards; the
+  mapping keeps the order, so the game's sort gives the same list.
+
+The serial loop wins where the items are cheap and handing them out costs more than they
+do (Anbennar's many small countries); the pool wins where the items are dear (the base
+game, whose few big countries rebuild the list). The module keeps a moving average of
+each way's time per call, takes the cheaper and tries the other every 16th call
+(`WayChooser`). It redirects the call of `ParallelFor3` in `RebuildConquerList`
+(`0x187B84`). Its check runs the game's loop into the game's buffer and both ways into
+scratch buffers, in turn which runs first, compares the sorted lists, checks that every
+left-out province is still not land, and keeps each loop's time by whether it ran first
+(a later loop finds the memory in the cache). In `"on"` it does that for every 256th
+call and goes back to the game's loop for good after a mismatch. `conquer_scan.tsv`
+every 5 s. `serial_loop_core.hpp` holds what does not touch the game; its test is
+`tests/test_serial_loop.cpp`.
 
 Lab, game sessions with the check on (22.11.2026, one marked run each, normal Process Lasso rule, observe mode:
-the 1719 save to 18.6.1719 and an Anbennar save from 11.11.1444 to 2.3.1445). The times are the module's clocks
-of the loop that ran first in a checked call, per call; "a year" scales the session's calls to 365 days:
+the 1719 save to 18.6.1719, an Anbennar save from 11.11.1444 to 2.3.1445 and the 1821 save to 2.4.1821). The times
+are the module's clocks of the loop that ran first in a checked call, per call:
 
-| | Calls | Differences | Module | Game's pool | A year, by the clocks |
+| | Calls | Differences (serial, pool) | Game's pool | Serial | Pool on land |
 | --- | --- | --- | --- | --- | --- |
-| 1719 | 27 | 0 | 1,196 µs | 707 µs | 0.05 s more |
-| Anbennar | 2,949 | 0 | 261 µs | 518 µs | 2.5 s less |
+| 1719 | 33 | 0, 0 | 787 µs | 1,154 µs | 732 µs |
+| Anbennar | 2,952 | 0, 0 | 485 µs | 211 µs | 439 µs |
+| 1821 | 61 | 0, 0 | 774 µs | 1,216 µs | 910 µs |
 
-It gives the game's answers in every call compared. It halves the loop where the time is (Anbennar rebuilds the
-lists about 90 times as often as the base game) and costs the base game about as little as it saves there.
+Both ways give the game's answers in every call compared. On Anbennar, which rebuilds the lists about 90 times as
+often as the base game, the serial loop takes less than half the game's time (about 2.7 s a game year by these
+clocks); on the base game the pool way is about as fast as the game's pool (−7% and +18%, with 20 to 33 calls per
+cell), and the base game rebuilds the list about 100–250 times a year.
 
 The same one-thread loop for the opinion row of `CCountry::UpdateOpinionCache` (`0x38B1F0`, item `0x432E70`) was
 tried in the same sessions and dropped: the same values (9,771 rows, 0 differences), faster on the base game

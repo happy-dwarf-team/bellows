@@ -188,7 +188,7 @@ affects_gameplay = false
 [[modules]]
 id = "conquer_scan"
 name = "AI conquest list scan"
-description = "Prototype: builds the AI's conquest list on one thread, land provinces only. Same list."
+description = "Prototype: builds the AI's conquest list from land provinces only. Same list."
 group = "Simulation"
 affects_gameplay = false
 default = false

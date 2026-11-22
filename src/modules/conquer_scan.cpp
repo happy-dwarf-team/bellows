@@ -1,4 +1,4 @@
-// conquer_scan (prototype, off by default): the AI's conquest list without the worker pool.
+// conquer_scan (prototype, off by default): the AI's conquest list from the land provinces only.
 //
 // CAIStrategy::RebuildConquerList (0x187AD0) runs in a country's strategy recalculation, inside the serial daily
 // country update. It values every province of the map in a ParallelFor3 (0x191F30): each item calls
@@ -6,16 +6,23 @@
 // then sorts the buffer by index and adds the entries in that order. On a big map most items return 0 at the
 // first checks, and the time goes to the cache misses of those checks and to the pool.
 //
-// The module redirects the call of 0x191F30 (0x187B84) to a loop on the calling thread, in index order, with the
-// game's item: the same function, the same buffer, the same count. It leaves out the provinces whose template is
-// not land, for which 0x187C00 returns 0 before it reads anything else, and prefetches the fields those first
-// checks read a few provinces ahead. The game's sort and the adding run as before.
+// The module redirects the call of 0x191F30 (0x187B84) and leaves out the provinces whose template is not land,
+// for which 0x187C00 returns 0 before it reads anything else. It runs the game's item for the land provinces one
+// of two ways, with the same function, the same buffer and the same count:
+// - serial: a loop on the calling thread, in index order, which prefetches the fields of the first checks a few
+//   provinces ahead. It wins where the items are cheap and the pool's hand-out costs more than they do
+//   (Anbennar's many small countries).
+// - pool: the game's own ParallelFor3 on an array of the land provinces; the item writes the position in that
+//   array, which the module maps back to the province index (the mapping keeps the order). It wins where the
+//   items are dear (the base game).
+// It takes the way whose recent time per call is lower and tries the other every 16th call (WayChooser). The
+// game's sort and the adding run as before.
 //
 // "verify" runs the game's ParallelFor3 for every call as well, into the game's buffer (the game's answer is
-// the one kept), and the module's loop into a buffer of its own; it compares the two lists and checks that
-// every left-out province is still not land. "on" does that for every 256th call and goes back to the game's
-// loop for good after a difference. A background thread writes the counters every 5 s to conquer_scan.tsv in
-// the data directory, with the time of each loop by whether it ran first or second in a checked call.
+// the one kept), and both ways into buffers of their own; it compares the three lists and checks that every
+// left-out province is still not land. "on" does that for every 256th call and goes back to the game's loop for
+// good after a difference. A background thread writes the counters every 5 s to conquer_scan.tsv in the data
+// directory, with the time of each loop in a checked call by whether it ran first.
 #include "modules.hpp"
 #include "serial_loop.hpp"
 #include "serial_loop_core.hpp"
@@ -55,7 +62,9 @@ constexpr DWORD kWriteEveryMs = 5000;
 constexpr std::size_t kPrefetchDistance = 8;
 
 volatile LONG64 g_provinces = 0, g_evaluated = 0, g_written = 0, g_loopTicks = 0, g_checked = 0, g_landChecks = 0;
+volatile LONG64 g_wayCalls[2] = {}, g_wayTicks[2] = {};  // unchecked calls by way (WayChooser)
 sl::OrderedTimes g_times;  // checked calls; updated on the calling thread under g_timesLock
+sl::WayChooser g_way;      // under g_timesLock
 SRWLOCK g_timesLock = SRWLOCK_INIT;
 
 // The land provinces of the map, by the province array they were taken from.
@@ -105,6 +114,19 @@ std::size_t Fill(const sl::PointerArray& provinces, const std::vector<std::int32
     return sl::FillPairs(land, value, prefetch, prefetchNear, kPrefetchDistance, out);
 }
 
+// The pool's way: the game's ParallelFor3 on an array of the land provinces, then the entries it added mapped
+// back to province indices. `lambda` is the game's capture or one of the same layout; its count goes up by the
+// entries written.
+void PoolFill(const sl::PointerArray& provinces, const std::vector<std::int32_t>& land, const Capture& lambda) {
+    thread_local std::vector<void*> compact;
+    compact.resize(land.size());
+    for (std::size_t k = 0; k < land.size(); ++k) compact[k] = provinces.begin[land[k]];
+    const sl::PointerArray only{compact.data(), compact.data() + compact.size()};
+    const std::int32_t from = **lambda.count;
+    g_gameFill(&only, &lambda);
+    sl::MapToProvinces(*lambda.pairs, from, **lambda.count, land);
+}
+
 // Every province the list leaves out is still not land; the number that are.
 std::size_t LandChanged(const sl::PointerArray& provinces, const std::vector<std::int32_t>& land) {
     std::size_t changed = 0, k = 0;
@@ -119,35 +141,45 @@ std::size_t LandChanged(const sl::PointerArray& provinces, const std::vector<std
 }
 
 void CheckedCall(const sl::PointerArray& provinces, const Capture& game, const std::vector<std::int32_t>& land) {
-    thread_local std::vector<sl::Pair> mine, theirs;
-    mine.resize(land.size());
-    const bool gameFirst = sl::GameFirst(static_cast<std::uint64_t>(InterlockedIncrement64(&g_checked)));
+    thread_local std::vector<sl::Pair> serial, pool, theirs;
+    serial.resize(land.size());
+    pool.resize(land.size());
+    const int first = sl::FirstOf3(static_cast<std::uint64_t>(InterlockedIncrement64(&g_checked)));
     std::size_t written = 0;
-    LONG64 gameTicks = 0, mineTicks = 0;
-    for (int run = 0; run < 2; ++run) {
+    std::int32_t poolCount = 0;
+    std::int32_t* poolCountAt = &poolCount;
+    sl::Pair* poolPairs = pool.data();
+    const Capture poolLambda{game.strategy, &poolCountAt, &poolPairs};
+    LONG64 ticks[3] = {};
+    for (int run = 0; run < 3; ++run) {
+        const int who = (first + run) % 3;  // 0 the game, 1 serial, 2 pool
         const LONG64 start = sb::Ticks();
-        if ((run == 0) == gameFirst) {
+        if (who == 0) {
             g_gameFill(&provinces, &game);
-            gameTicks = sb::Ticks() - start;
+        } else if (who == 1) {
+            written = Fill(provinces, land, game.strategy, serial.data());
         } else {
-            written = Fill(provinces, land, game.strategy, mine.data());
-            mineTicks = sb::Ticks() - start;
+            PoolFill(provinces, land, poolLambda);
         }
+        ticks[who] = sb::Ticks() - start;
     }
-    mine.resize(written);
+    serial.resize(written);
+    pool.resize(static_cast<std::size_t>(poolCount));
     const std::int32_t count = **game.count;
     theirs.assign(*game.pairs, *game.pairs + (count > 0 ? count : 0));
     const std::size_t changed = LandChanged(provinces, land);
     InterlockedExchangeAdd64(&g_landChecks, static_cast<LONG64>(provinces.size() - land.size()));
     InterlockedIncrement64(&EU4SB_ConquerScanStats.verifications);
     AcquireSRWLockExclusive(&g_timesLock);
-    g_times.Add(true, gameFirst, gameTicks);
-    g_times.Add(false, !gameFirst, mineTicks);
+    for (int who = 0; who < 3; ++who) g_times.Add(who, who == first, ticks[who]);
     ReleaseSRWLockExclusive(&g_timesLock);
-    if (sl::Differences(mine, theirs) != 0 || changed != 0) {
+    const bool serialDiffers = sl::Differences(serial, theirs) != 0;
+    const bool poolDiffers = sl::Differences(pool, theirs) != 0;
+    if (serialDiffers || poolDiffers || changed != 0) {
         InterlockedIncrement64(&EU4SB_ConquerScanStats.mismatches);
         if (!g_verifyOnly && InterlockedExchange(&EU4SB_ConquerScanStats.cacheDisabled, 1) == 0)
-            sb::Log(ANVIL_LOG_WARNING, "conquer_scan: a conquest list differed from the game's; back to the game's loop");
+            sb::Log(ANVIL_LOG_WARNING, "conquer_scan: a conquest list differed from the game's (%s); back to the game's loop",
+                    serialDiffers ? (poolDiffers ? "both ways" : "serial") : (poolDiffers ? "pool" : "land"));
     }
 }
 
@@ -167,12 +199,25 @@ void FillDetour(const void* array, const void* lambda) {
         CheckedCall(provinces, game, land);
     } else {
         // The game set the count to 0 before the call; the module's entries go after it, as the items' do.
+        AcquireSRWLockShared(&g_timesLock);
+        const int way = g_way.Pick(static_cast<std::uint64_t>(call));
+        ReleaseSRWLockShared(&g_timesLock);
         std::int32_t* count = *game.count;
+        const std::int32_t before = *count;
         const LONG64 start = sb::Ticks();
-        const std::size_t written = Fill(provinces, land, game.strategy, *game.pairs + *count);
-        InterlockedExchangeAdd64(&g_loopTicks, sb::Ticks() - start);
-        *count += static_cast<std::int32_t>(written);
-        InterlockedExchangeAdd64(&g_written, static_cast<LONG64>(written));
+        if (way == sl::WayChooser::kSerial) {
+            *count += static_cast<std::int32_t>(Fill(provinces, land, game.strategy, *game.pairs + before));
+        } else {
+            PoolFill(provinces, land, game);
+        }
+        const LONG64 ticks = sb::Ticks() - start;
+        AcquireSRWLockExclusive(&g_timesLock);
+        g_way.Add(way, ticks);
+        ReleaseSRWLockExclusive(&g_timesLock);
+        InterlockedExchangeAdd64(&g_loopTicks, ticks);
+        InterlockedIncrement64(&g_wayCalls[way]);
+        InterlockedExchangeAdd64(&g_wayTicks[way], ticks);
+        InterlockedExchangeAdd64(&g_written, static_cast<LONG64>(*count - before));
         InterlockedIncrement64(&EU4SB_ConquerScanStats.hits);
     }
     ReleaseSRWLockShared(&g_listLock);
@@ -188,12 +233,14 @@ void WriteFile() {
         const double ms = sb::TicksToMs(1);
         std::ostringstream out;
         out << "mode\tcalls\tloop_calls\tgame_calls\tchecked\tmismatches\tdisabled\tprovinces\tevaluated\twritten\tloop_ms"
-               "\tland_checks\tmine_first_calls\tmine_first_ms\tmine_second_calls\tmine_second_ms\tgame_first_calls"
-               "\tgame_first_ms\tgame_second_calls\tgame_second_ms\n"
+               "\tland_checks\tserial_calls\tserial_ms\tpool_calls\tpool_ms\tgame_first_calls\tgame_first_ms"
+               "\tgame_later_calls\tgame_later_ms\tserial_first_calls\tserial_first_ms\tserial_later_calls"
+               "\tserial_later_ms\tpool_first_calls\tpool_first_ms\tpool_later_calls\tpool_later_ms\n"
             << (g_verifyOnly ? "verify" : "on") << "\t" << s.requests << "\t" << s.hits << "\t" << s.skips << "\t"
             << s.verifications << "\t" << s.mismatches << "\t" << s.cacheDisabled << "\t" << g_provinces << "\t"
             << g_evaluated << "\t" << g_written << "\t" << g_loopTicks * ms << "\t" << g_landChecks;
-        for (int who = 0; who < 2; ++who) {
+        for (int way = 0; way < 2; ++way) out << "\t" << g_wayCalls[way] << "\t" << g_wayTicks[way] * ms;
+        for (int who = 0; who < 3; ++who) {
             for (int order = 0; order < 2; ++order) out << "\t" << t.calls[who][order] << "\t" << t.ticks[who][order] * ms;
         }
         out << "\n";
@@ -240,7 +287,7 @@ bool InstallConquerScan(anvil::Host& host, Mode mode) {
         SetThreadDescription(thread, L"bellows conquer_scan writer");
         CloseHandle(thread);
     }
-    Log(ANVIL_LOG_INFO, "conquer_scan: %s the AI's conquest list on the calling thread, land provinces only",
+    Log(ANVIL_LOG_INFO, "conquer_scan: %s the AI's conquest list from the land provinces only",
         g_verifyOnly ? "verifying" : "building");
     return true;
 }
