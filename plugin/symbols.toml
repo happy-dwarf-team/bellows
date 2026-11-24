@@ -1309,3 +1309,67 @@ bytes = "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 40 48 8B F1 48 8B 91 38 01 00
 [symbol.diplo_view_update.build."eu4-1.37.5.0-gog-win64"]
 rva = 0xF00570
 bytes = "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 40 48 8B F1 48 8B 91 38 01 00 00 48 8B 05 C0 11 42 01 48 C1 EA 20 48 0F BF D2 48 8B 80 18 01 00 00 48 8B 0C D0 80 B9 84 28 00 00 00"
+
+# --- opinion_prefetch (prototype, off by default) -----------------------------------------
+# CCountry::UpdateOpinionCache (0x38B1F0) fills a country's opinion row in a ParallelFor3 (0x424380) over the
+# root's country array; the item computes CalculateOpinionValue(A, B) for B = countries[i]. The module hooks the
+# item to prefetch what the item a few positions ahead reads, and redirects the loop's call to time a row. The
+# read sites below are in CCountry::CalculateOpinionValuesOnly (0x3D32B0) and give the offsets of B's fields it
+# reads for every cell.
+
+[symbol.opinion_fill_call]
+bytes = "E8 59 90 09 00"               # call 0x424380
+memory = "code"
+note = "0x38B1F0 (the opinion row): ParallelFor3(root + 0x1CE8 countries, {&country}), the only call of 0x424380"
+build."eu4-1.37.5-steam-win64" = { rva = 0x38B322 }
+build."eu4-1.37.5.2-gog-win64" = { rva = 0x38B1F2 }
+build."eu4-1.37.5.0-gog-win64" = { rva = 0x38B1F2 }
+
+[symbol.opinion_item]
+bytes = "48 89 5C 24 08 57 48 83 EC 20 48 8B 41 10 48 8B 59 08 8B 3A 48 8B 08 48 8B 14 F9 83 BA 44 13 00 00 00 75 06 80 7A 26 07 75 20 48 8B 52 20 41 B1 01 48 8B 0B 45 33 C0 E8 04 0B F5 FF 48 8B 0B 48 8B 91 80 23 00 00 66 89 04 7A 48 8B 5C 24 30 48 83 C4 20 5F C3"
+memory = "code"
+signature = "void (void* self, int32_t* index, void* counter)"
+values.array_offset = { at = 13, size = 1 }
+values.country_offset = { at = 17, size = 1 }
+values.owned_offset = { at = 29, size = 4 }
+values.tag_offset = { at = 45, size = 1 }
+note = "the row's item (the lambda's call): B = (*(self + 0x10))[i]; if B + 0x1344 (owned provinces) or B + 0x26 == 7, row[i] = CalculateOpinionValue(**(self + 8), B + 0x20 tag, null, 1), the row at A + 0x2380"
+build."eu4-1.37.5-steam-win64" = { rva = 0x432E70 }
+build."eu4-1.37.5.2-gog-win64" = { rva = 0x432D40 }
+build."eu4-1.37.5.0-gog-win64" = { rva = 0x432D40 }
+
+[symbol.opinion_status_read]
+bytes = "48 8B 82 18 01 00 00 48 8B 0C C8 48 81 C1 10 15 00 00 41 8B D0"
+memory = "code"
+values.rows_offset = { at = 14, size = 4 }
+note = "0x3D32B0: B's diplomacy rows (B + 0x1510, end at + 0x1518) passed with A's tag index to CDiplomacyStatusSerializer::Access (begin + index * 72); the row's flags byte + 0x46 is read next"
+build."eu4-1.37.5-steam-win64" = { rva = 0x3D5CFC }
+build."eu4-1.37.5.2-gog-win64" = { rva = 0x3D5BCC }
+build."eu4-1.37.5.0-gog-win64" = { rva = 0x3D5BCC }
+
+[symbol.opinion_religion_read]
+bytes = "48 8B 82 18 01 00 00 48 8B 14 C8 48 8B 9A 30 0F 00 00 48 89 5D A0"
+memory = "code"
+values.religion_offset = { at = 14, size = 4 }
+note = "0x3D32B0: B's _pReligion (B + 0xF30; _pSecondaryReligion at + 0xF38 is read next)"
+build."eu4-1.37.5-steam-win64" = { rva = 0x3D3346 }
+build."eu4-1.37.5.2-gog-win64" = { rva = 0x3D3216 }
+build."eu4-1.37.5.0-gog-win64" = { rva = 0x3D3216 }
+
+[symbol.opinion_allies_read]
+bytes = "48 8B 82 18 01 00 00 4C 8B 04 C8 4D 8B 80 B8 19 00 00 4D 85 C0"
+memory = "code"
+values.allies_offset = { at = 14, size = 4 }
+note = "0x3D32B0: the head of B's _Allies list (B + 0x19B8)"
+build."eu4-1.37.5-steam-win64" = { rva = 0x3D50CA }
+build."eu4-1.37.5.2-gog-win64" = { rva = 0x3D4F9A }
+build."eu4-1.37.5.0-gog-win64" = { rva = 0x3D4F9A }
+
+[symbol.opinion_rivals_read]
+bytes = "48 0F BF CB 48 8B 80 18 01 00 00 48 8B 14 C8 48 8B 92 48 22 00 00 48 85 D2 0F 84 86 03 00 00"
+memory = "code"
+values.rivals_offset = { at = 18, size = 4 }
+note = "0x3D32B0: the head of B's _Rivals list (B + 0x2248); a node's tag at + 0x10, the next node at + 0x28"
+build."eu4-1.37.5-steam-win64" = { rva = 0x3D4D13 }
+build."eu4-1.37.5.2-gog-win64" = { rva = 0x3D4BE3 }
+build."eu4-1.37.5.0-gog-win64" = { rva = 0x3D4BE3 }

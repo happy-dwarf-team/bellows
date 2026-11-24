@@ -44,6 +44,7 @@ code only.
 | `listing_lookup` | Start-up, on by default since 2.1: the stat after `verifyPath` in `getRealDir` and the opens of names that are not there answered from `verifypath_listing`'s listings; existing files opened by the game (§6a) | Anbennar 22.08 → 18.86 s to the menu; base game: in the noise |
 | `conquer_scan` | Simulation, prototype, off by default: the AI's conquest list from the land provinces only, on the calling thread or the game's pool, whichever is cheaper (§6a) | check: 0 differences; Anbennar 521 → 256 µs a list (serial), base game 712 → 593 µs and 716 → 740 µs (pool), module clocks |
 | `diplo_scan` | Simulation, prototype, off by default: the daily diplomacy-change scan only for countries whose "diplomacy changed" byte is set (§6a) | see §6a |
+| `opinion_prefetch` | Simulation, prototype, off by default: the AI's opinion row prefetches the other country's memory a few cells ahead; the cells are the game's item's (§6a) | see §6a |
 | `checksum_defer` | Loading, off by default: the game's checksum task waits until the databases are loaded, so the two no longer take turns on the file system locks; the same files and checksum (§6a) | Anbennar: −1.11 and −1.01 s to the menu (two series); base game: in the noise |
 
 The table's start-up modules are in the order they were ported; §6a has the
@@ -843,6 +844,33 @@ Anbennar and 0.1 s on the base game, small beside `conquer_scan`. The view's hoo
 one country with 5 set bits and a clear byte, cleared by the view: the reason the view's country is scanned by
 the game next. With that, a 1719 session with the view open on Poland for 61 days and on France for 60 more:
 12,194 scans, 11,353 skipped and checked, 0 set bits, 136 view updates, 11 bytes given back.
+
+### opinion_prefetch (simulation, prototype)
+
+`CCountry::UpdateOpinionCache` (`0x38B1F0`) fills a country's opinion row, one cell per entry of the root's
+country array, in a `ParallelFor3` (`0x424380`) whose item (`0x432E70`) computes
+`CCountry::CalculateOpinionValue(A, B)` for `B = countries[i]` when B owns provinces or is of kind 7, and stores
+it in `A._OpinionCache[i]` (`+0x2380`). The pool hands the items out one index at a time from a shared counter
+(`CPdxWorkSet::ProcessWorker` and `SpinTryStealWait`, `+0x44`), in increasing order, to whichever thread asks
+next. On Anbennar a row has about 1,900 entries, 940 of them computed, costs about 200 µs and is rebuilt about 80
+times a game day; in a main-thread profile of 22.11.2026 (RIP samples) the loop is about 8% of the main thread's
+time, about half of it the main thread's own items and the rest waiting for the pool's last items.
+
+Each cell reads B's object at places far apart: the tag (`+0x20`), the owned provinces' count (`+0x1344`), the
+religions (`+0xF30`, `+0xF38`), the allies' and the rivals' lists (`+0x19B8`, `+0x2248`) and B's diplomacy row
+for A (`B + 0x1510`, 72 bytes a row, about 134 KB a country), and A's row for B. Going down the column, B's row
+for A is a cache miss for nearly every cell: a fifth of the samples inside `CalculateOpinionValuesOnly`
+(`0x3D32B0`) are on the instruction after that load (`0x3D5D16`), another sixth on the walk of B's rivals.
+
+The module hooks the item. Before it runs the game's item for index i, it prefetches B's lines for the entry 16
+positions ahead and, for the entry 8 positions ahead (whose lines an earlier item asked for), reads B's
+diplomacy rows' and rivals' pointers and prefetches B's row for A, A's row for B and B's first rival. It runs
+the game's item for every cell; it writes nothing, and the two pointers it reads are ones the item reads too,
+which no thread writes while the loop runs (the items write only A's row). It also redirects the loop's call
+(`0x38B322`) to time each row. `"verify"` (`opinion_prefetch_check`) prefetches in every other row only, so both
+arms run in the same game days, and keeps each arm's time; there is no other answer to compare. `"on"` prefetches
+in every row. `opinion_prefetch.tsv` every 5 s; `opinion_prefetch_core.hpp` and its test hold what does not
+touch the game.
 
 ### save_compress (saving)
 

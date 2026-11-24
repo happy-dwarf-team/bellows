@@ -149,6 +149,7 @@ const std::pair<const char*, AnvilSetting> kChecks[] = {
     {"army_search_memo", CFG_ARMY_SEARCH_MEMO_CHECK},
     {"conquer_scan", CFG_CONQUER_SCAN_CHECK},
     {"diplo_scan", CFG_DIPLO_SCAN_CHECK},
+    {"opinion_prefetch", CFG_OPINION_PREFETCH_CHECK},
     {"save_compress", CFG_SAVE_COMPRESS_CHECK},
     {"transfer_skip", CFG_TRANSFER_SKIP_CHECK},
     {"history_add", CFG_HISTORY_ADD_CHECK},
@@ -528,15 +529,15 @@ int main(int argc, char** argv) {
     const std::string rest = ", metascript_subst=off, metascript_blocks=on, attr_cache=" + std::string(modules ? "on" : "verify") +
                              ", zip_profile=" + diag + ", token_dict_cache=on, token_dict_profile=off, range_profile=" + diag +
                              ", range_witness=on, frame_pacing=on, pops_pacing=on, never_throttle=" + diag +
-                             ", modifier_merge=on, port_table=on, province_modifier_view=on, army_search_memo=on, conquer_scan=on, diplo_scan=on, save_compress=on, "
+                             ", modifier_merge=on, port_table=on, province_modifier_view=on, army_search_memo=on, conquer_scan=on, diplo_scan=on, opinion_prefetch=on, save_compress=on, "
                              "transfer_skip=on, history_add=on, checksum_defer=on, tick_profile=" + diag + ", army_search_profile=" + diag +
                              ", score_probe=" + diag + ", monthly_probe=" + (g_scenario == "refuse" ? "FAILED" : diag) +
                              ", verifypath_session=" + (modules ? "off" : "on");
     {
         // Every module of [[modules]] asked once, Diagnostics and verifypath_session included, none of the profiles.
         std::lock_guard lock(g_mutex);
-        // The code asks for exactly plugin.toml's modules (27), each once.
-        assert(g_manifestModules.size() == 27 && g_moduleCalls.size() == 27);
+        // The code asks for exactly plugin.toml's modules (28), each once.
+        assert(g_manifestModules.size() == 28 && g_moduleCalls.size() == 28);
         const std::set<std::string> asked(g_moduleCalls.begin(), g_moduleCalls.end());
         assert(asked == g_manifestModules && asked.contains("mimalloc") && asked.contains("checksum_defer") &&
                asked.contains("diagnostics") && asked.contains("verifypath_session"));

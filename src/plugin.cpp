@@ -160,6 +160,8 @@ struct Bellows : anvil::Plugin {
             Feature("conquer_scan", sb::InstallConquerScan, &cfg::conquer_scan_check),
             // prototype, off by default: hooks the entries of 0x2EE070 and 0xF01DC0.
             Feature("diplo_scan", sb::InstallDiploScan, &cfg::diplo_scan_check),
+            // prototype, off by default: hooks the entry of 0x432E70, redirects the call of 0x424380 in 0x38B1F0.
+            Feature("opinion_prefetch", sb::InstallOpinionPrefetch, &cfg::opinion_prefetch_check),
             Feature("save_compress", sb::InstallSaveCompress, &cfg::save_compress_check),
             Feature("transfer_skip", sb::InstallTransferSkip, &cfg::transfer_skip_check),
             Feature("history_add", sb::InstallHistoryAdd, &cfg::history_add_check),

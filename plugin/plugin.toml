@@ -202,6 +202,14 @@ affects_gameplay = false
 default = false
 
 [[modules]]
+id = "opinion_prefetch"
+name = "AI opinion prefetch"
+description = "Prototype: loads the other country's data early while the AI's opinions are computed. Same opinions."
+group = "Simulation"
+affects_gameplay = false
+default = false
+
+[[modules]]
 id = "save_compress"
 name = "Save compression"
 description = "Compresses saves faster. The file is the game's, byte for byte, unless you choose several threads."

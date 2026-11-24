@@ -365,6 +365,7 @@ says in the Manager is one sentence; the details are here.
 | **AI army search memo** (`army_search_memo`) | **On by default since 1.4.** In the AI's daily search for each army, in a path search and when a unit's moves from a province are listed, works out once whether modifier `0xE0` lets the army ignore forts' zones of control and what its speed modifier is, instead of for every move (each of these builds a modifier list from the army's regiments): the same answers. Its check runs the game's check for every move and compares. Lab: 183 million answers compared with the game's on the 1719 save and an 1821 save, 0 differences; 99.6–99.8% of the checks answered from the memo. See [A year at speed 5](#a-year-at-speed-5) |
 | **AI conquest list scan** (`conquer_scan`) | **Since 2.2. Prototype, off by default; no SIMULATION series yet.** Turn it on under Bellows on the **Plugins** page of Anvil Manager, or with `enabled_modules = ["bellows.conquer_scan"]` in `anvil.toml`. Builds the AI's daily list of provinces worth conquering from the land provinces only (the game's answer for the others is always 0), either on one thread or on the game's worker pool, whichever has been cheaper lately: the same list. Its check runs the game's loop and both ways, compares the lists and times all three. Lab, by the module's clocks: on Anbennar about 1 s less a game year from 11.11.1444 to 1.3.1447 (the list took about 300 µs instead of about 490 µs, 5,300 times a year), more in the first months, which rebuild it more often (2.6 s a year's rate from 11.11.1444 to 1.3.1445); on the base game, which rebuilds it rarely, the pool way takes about the game's time |
 | **Diplomacy change scan** (`diplo_scan`) | **Since 2.2. Prototype, off by default; no SIMULATION series yet.** Turn it on under Bellows on the **Plugins** page of Anvil Manager, or with `enabled_modules = ["bellows.diplo_scan"]` in `anvil.toml`. Every day the game reads the "changed" mark of each of a country's diplomatic relations, one per tag (about 1,900 on Anbennar), to clear the few that are set. Every change of a relation also marks its country, so the module skips the countries that are not marked; it keeps the marks the diplomacy view reads and gives each back when the view asks. Its check counts the set marks of every skipped country and times the game's scan of it |
+| **AI opinion prefetch** (`opinion_prefetch`) | **Since 2.3. Prototype, off by default; no SIMULATION series yet.** Turn it on under Bellows on the **Plugins** page of Anvil Manager, or with `enabled_modules = ["bellows.opinion_prefetch"]` in `anvil.toml`. When the AI recomputes a country's opinion of every other country (about 80 times a game day on Anbennar), each opinion waits for the other country's data to come from memory. The module asks for it a few countries ahead, so it is in the cache when the game's own code computes that opinion: the same opinions. Its check prefetches in every other row only and times the rows with and without it |
 
 ### Saving
 
@@ -390,8 +391,9 @@ choose it:
   search's scoring functions repeat within a game day), `monthly_probe` (time of the monthly tick's
   loops, modifier merges and random draws per context);
 - under Advanced, a check for each feature that had a `verify` mode in 1.x and for
-  `conquer_scan` and `diplo_scan` (new in 2.2), `<module>_check`
-  ("Check: <name>"): the module runs the game's own code as well and counts differences.
+  `conquer_scan` and `diplo_scan` (new in 2.2) and `opinion_prefetch` (new in 2.3), `<module>_check`
+  ("Check: <name>"): the module runs the game's own code as well and counts differences
+  (`opinion_prefetch`'s check prefetches in every other row only and times the rows with and without it).
   `mimalloc`, `open_warmup`, `verifypath_session`, `frame_pacing` and `never_throttle` have none. A check runs
   while Diagnostics and its module are on. It makes the module slower.
 

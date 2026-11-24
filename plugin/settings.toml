@@ -296,6 +296,15 @@ module = "diagnostics"
 advanced = true
 restart = true
 
+[setting.opinion_prefetch_check]
+type = "bool"
+default = false
+label = "Check: AI opinion prefetch"
+description = "Prefetches in every other opinion row only and times the rows with and without it."
+module = "diagnostics"
+advanced = true
+restart = true
+
 [setting.save_compress_check]
 type = "bool"
 default = false
