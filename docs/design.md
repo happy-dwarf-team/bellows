@@ -863,13 +863,16 @@ for A is a cache miss for nearly every cell: a fifth of the samples inside `Calc
 (`0x3D32B0`) are on the instruction after that load (`0x3D5D16`), another sixth on the walk of B's rivals.
 
 The module hooks the item. Before it runs the game's item for index i, it prefetches B's lines for the entry 16
-positions ahead and, for the entry 8 positions ahead (whose lines an earlier item asked for), reads B's
-diplomacy rows' and rivals' pointers and prefetches B's row for A, A's row for B and B's first rival. It runs
-the game's item for every cell; it writes nothing, and the two pointers it reads are ones the item reads too,
-which no thread writes while the loop runs (the items write only A's row). It also redirects the loop's call
-(`0x38B322`) to time each row. `"verify"` (`opinion_prefetch_check`) prefetches in every other row only, so both
-arms run in the same game days, and keeps each arm's time; there is no other answer to compare. `"on"` prefetches
-in every row. `opinion_prefetch.tsv` every 5 s; `opinion_prefetch_core.hpp` and its test hold what does not
+positions ahead and, for the entry 8 positions ahead (whose lines an earlier item asked for), if the item will
+compute that cell (B's owned count and kind, as the item tests them), reads the two countries' tags, their
+diplomacy rows' bounds and B's rivals' head and prefetches B's row for A, A's row for B and B's first rival. It
+runs the game's item for every cell and writes nothing. Every load is a field of the item's capture or of a
+live country object, which no thread writes while the loop runs (the items write only A's row); a stale value
+would only make a prefetch address useless. It also redirects the loop's call (`0x38B322`) to time each row.
+`"verify"` (`opinion_prefetch_check`) prefetches in about half of the rows, picked by a hash of the row's number,
+so both arms run in the same game days and a country's rows do not all land in one arm; it keeps each arm's
+time, and there is no other answer to compare. A plain row that follows a prefetched one can still find some of
+B's lines in the cache, which pulls the measured difference towards zero. `"on"` prefetches in every row. `opinion_prefetch.tsv` every 5 s; `opinion_prefetch_core.hpp` and its test hold what does not
 touch the game.
 
 ### save_compress (saving)

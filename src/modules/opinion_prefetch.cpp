@@ -9,10 +9,12 @@
 // in a vector of about 134 KB: going down the column of a row means a cache miss for nearly every one of them.
 //
 // The module hooks the item. Before it runs the game's item for index i, it prefetches B's lines of the entry
-// kFar positions ahead and, for the entry kNear positions ahead (whose lines the earlier item asked for), reads
-// its diplomacy rows' and rivals' pointers and prefetches A's row in B's diplomacy, B's row in A's and B's first
-// rival. Prefetch instructions do not change memory or the game's results; the two pointers it reads are ones
-// the game's item reads as well, and no thread writes them while the loop runs (the items write only A's row).
+// kFar positions ahead and, for the entry kNear positions ahead (whose lines the earlier item asked for), when
+// the game's item will compute that cell, reads the two countries' tags and diplomacy rows' bounds and B's
+// rivals' head and prefetches A's row in B's diplomacy, B's row in A's and B's first rival. Prefetch
+// instructions do not change memory or the game's results. Every load is a field of the item's capture or of a
+// live country object; no thread writes them while the loop runs (the items write only A's row), and a stale
+// value would only make a prefetch address useless.
 //
 // "on" prefetches in every row. "verify" (opinion_prefetch_check) alternates rows with and without the prefetch
 // and times every row, so the module's clocks say what it saves in the same game. There is no other answer to
@@ -46,8 +48,9 @@ void (*g_item)(void*, std::int32_t*, void*) = nullptr;
 // row's country.
 std::size_t g_arrayAt = 0, g_countryAt = 0;
 // Offsets in a country: the tag, the count of owned provinces, the diplomacy rows (begin; end 8 bytes after),
-// the religion, the allies and the rivals (list heads).
-std::size_t g_tag = 0, g_owned = 0, g_rows = 0, g_religion = 0, g_allies = 0, g_rivals = 0;
+// the religion, the allies and the rivals (list heads), and the kind (a byte) with the value the item computes.
+std::size_t g_tag = 0, g_owned = 0, g_kind = 0, g_rows = 0, g_religion = 0, g_allies = 0, g_rivals = 0;
+std::uint8_t g_kindValue = 0;
 constexpr std::size_t kRivalNodeTag = 0x10, kRivalNodeNext = 0x28;  // CList<CRival> node: the tag, the next node
 
 volatile LONG g_active = 0;  // 1 while a row with the prefetch runs
@@ -60,15 +63,11 @@ volatile LONG64 g_cells = 0, g_ticks[2] = {}, g_calls[2] = {};  // [1] rows with
 inline void Fetch(const void* p) noexcept { _mm_prefetch(static_cast<const char*>(p), _MM_HINT_T0); }
 
 void Prefetch(const void* self, std::int32_t index) noexcept {
-    const auto* array = sb::Read<const unsigned char* const*>(self, g_arrayAt);
-    if (array == nullptr) return;
-    const auto* begin = reinterpret_cast<const unsigned char* const*>(array[0]);
-    const auto* end = reinterpret_cast<const unsigned char* const*>(array[1]);
-    if (begin == nullptr || end <= begin) return;
-    const auto count = static_cast<std::size_t>(end - begin);
-    const std::ptrdiff_t ahead = op::Ahead(index, count, op::kFar);
+    const op::Capture c = op::ReadCapture(self, g_arrayAt, g_countryAt);
+    if (c.begin == nullptr) return;
+    const std::ptrdiff_t ahead = op::Ahead(index, c.count, op::kFar);
     if (ahead >= 0) {
-        if (const unsigned char* b = begin[ahead]) {
+        if (const unsigned char* b = c.begin[ahead]) {
             Fetch(b + g_tag);
             Fetch(b + g_owned);
             Fetch(b + g_rows);
@@ -77,12 +76,11 @@ void Prefetch(const void* self, std::int32_t index) noexcept {
             Fetch(b + g_rivals);
         }
     }
-    const std::ptrdiff_t close = op::Ahead(index, count, op::kNear);
+    const std::ptrdiff_t close = op::Ahead(index, c.count, op::kNear);
     if (close < 0) return;
-    const unsigned char* b = begin[close];
-    const void* aAt = sb::Read<const void*>(self, g_countryAt);
-    const unsigned char* a = aAt != nullptr ? sb::Read<const unsigned char*>(aAt, 0) : nullptr;
-    if (b == nullptr || a == nullptr) return;
+    const unsigned char* b = c.begin[close];
+    const unsigned char* a = c.a;
+    if (b == nullptr || a == nullptr || !op::Computed(b, g_owned, g_kind, g_kindValue)) return;
     const int aTag = op::TagIndex(sb::Read<std::uint64_t>(a, g_tag));
     const int bTag = op::TagIndex(sb::Read<std::uint64_t>(b, g_tag));
     if (const unsigned char* row = op::Row(sb::Read<const unsigned char*>(b, g_rows),
@@ -101,24 +99,21 @@ void Prefetch(const void* self, std::int32_t index) noexcept {
     }
 }
 
-// Runs on the pool's threads and the calling thread; must not throw.
-void ItemDetour(void* self, std::int32_t* index, void* counter) {
+// Runs on the pool's threads and the calling thread; must not throw. The third register is passed on unchanged
+// (the game's item does not read it).
+void ItemDetour(void* self, std::int32_t* index, void* unused) {
     if (g_active != 0) Prefetch(self, *index);
-    g_item(self, index, counter);
+    g_item(self, index, unused);
 }
 
-std::size_t Cells(const void* array) noexcept {
-    const auto* v = static_cast<const unsigned char* const*>(array);
-    return v[0] != nullptr && v[1] > v[0] ? static_cast<std::size_t>(v[1] - v[0]) / sizeof(void*) : 0;
-}
-
-// The call of the row's ParallelFor3 in UpdateOpinionCache (main thread).
+// The call of the row's ParallelFor3 in UpdateOpinionCache (on the thread that updates the row; g_active and the
+// arm assume one row at a time, and a wrong arm would only count a row's time on the other side).
 void FillDetour(const void* array, const void* lambda) {
     sb::Stats& s = EU4SB_OpinionPrefetchStats;
     const LONG64 row = InterlockedIncrement64(&s.requests);
     const bool prefetch = !g_verifyOnly || op::CheckedRowPrefetches(static_cast<std::uint64_t>(row));
     InterlockedIncrement64(prefetch ? &s.hits : &s.skips);
-    InterlockedExchangeAdd64(&g_cells, static_cast<LONG64>(Cells(array)));
+    InterlockedExchangeAdd64(&g_cells, static_cast<LONG64>(op::Countries(array).count));
     const LONG before = InterlockedExchange(&g_active, prefetch ? 1 : 0);
     const LONG64 start = sb::Ticks();
     g_gameFill(array, lambda);
@@ -170,6 +165,8 @@ bool InstallOpinionPrefetch(anvil::Host& host, Mode mode) {
     g_countryAt = static_cast<std::size_t>(host.value(sym::opinion_item, "country_offset"));
     g_owned = static_cast<std::size_t>(host.value(sym::opinion_item, "owned_offset"));
     g_tag = static_cast<std::size_t>(host.value(sym::opinion_item, "tag_offset"));
+    g_kind = static_cast<std::size_t>(host.value(sym::opinion_item, "kind_offset"));
+    g_kindValue = static_cast<std::uint8_t>(host.value(sym::opinion_item, "kind_value"));
     g_rows = static_cast<std::size_t>(host.value(sym::opinion_status_read, "rows_offset"));
     g_religion = static_cast<std::size_t>(host.value(sym::opinion_religion_read, "religion_offset"));
     g_allies = static_cast<std::size_t>(host.value(sym::opinion_allies_read, "allies_offset"));

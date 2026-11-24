@@ -1328,10 +1328,12 @@ build."eu4-1.37.5.0-gog-win64" = { rva = 0x38B1F2 }
 [symbol.opinion_item]
 bytes = "48 89 5C 24 08 57 48 83 EC 20 48 8B 41 10 48 8B 59 08 8B 3A 48 8B 08 48 8B 14 F9 83 BA 44 13 00 00 00 75 06 80 7A 26 07 75 20 48 8B 52 20 41 B1 01 48 8B 0B 45 33 C0 E8 04 0B F5 FF 48 8B 0B 48 8B 91 80 23 00 00 66 89 04 7A 48 8B 5C 24 30 48 83 C4 20 5F C3"
 memory = "code"
-signature = "void (void* self, int32_t* index, void* counter)"
+signature = "void (void* self, int32_t* index, void* unused)"
 values.array_offset = { at = 13, size = 1 }
 values.country_offset = { at = 17, size = 1 }
 values.owned_offset = { at = 29, size = 4 }
+values.kind_offset = { at = 38, size = 1 }
+values.kind_value = { at = 39, size = 1 }
 values.tag_offset = { at = 45, size = 1 }
 note = "the row's item (the lambda's call): B = (*(self + 0x10))[i]; if B + 0x1344 (owned provinces) or B + 0x26 == 7, row[i] = CalculateOpinionValue(**(self + 8), B + 0x20 tag, null, 1), the row at A + 0x2380"
 build."eu4-1.37.5-steam-win64" = { rva = 0x432E70 }
