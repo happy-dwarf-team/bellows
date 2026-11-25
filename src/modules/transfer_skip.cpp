@@ -1,17 +1,17 @@
 // transfer_skip (on by default): "Continue" without the level 9 copy of the save that only a multiplayer client
 // could receive (transfer_skip_core.hpp; lab docs: docs/autosave-cost.md, "Wczytanie przez „Continue”").
 //
-// The hook on CFileTransferManager::AddFile (0xD7AAD0) looks at the session of the manager:
-//   - dummy, not a server (single player), compress asked: "on" calls the game's AddFile with compress = false,
-//     as for a save that is compressed already. The entry has its Data and checksum and no CompressedData, and
+// The hook on the file transfer's add (0xD7AAD0) looks at the session of the manager:
+//   - dummy, not a server (single player), compress asked: "on" calls the game's add with compress = false,
+//     as for a save that is compressed already. The entry has its data and checksum and no compressed copy, and
 //     the load goes on as before: it never read the copy.
 //   - anything else (a server, a client, no session, a file that needs no compression): the game's call as it
 //     came. Hosted multiplayer keeps the copy it sends (save_compress_parallel still applies to it).
 //   - "verify": the game's call as it came, and the claims behind "on" are checked on what the game does: the copy
-//     decodes to exactly Data (nothing else is in it), CGameSetup::LoadFile (0x110D760) then gets the entry's Data
-//     with the flag 0 (the load does not use the copy), and CFileTransferManager::SendFile (0xD7B2A0) is not called
+//     decodes to exactly the data (nothing else is in it), the game setup's file load (0x110D760) then gets the
+//     entry's data with the flag 0 (the load does not use the copy), and the transfer's send (0xD7B2A0) is not called
 //     in a dummy session (nobody receives it). Each difference is a mismatch; the game's result stands.
-// Every AddFile that was asked to compress appends a row to transfer_skip.tsv in the data directory.
+// Every add that was asked to compress appends a row to transfer_skip.tsv in the data directory.
 #include "modules.hpp"
 #include "transfer_skip_core.hpp"
 
@@ -20,7 +20,7 @@
 #include <string>
 
 extern "C" {
-// requests = AddFile calls asked to compress, hits = copies skipped, skips = calls left as they came (no single
+// requests = add calls asked to compress, hits = copies skipped, skips = calls left as they came (no single
 // player session), verifications = the checks of "verify", mismatches = checks that differed, mode = 1 on / 2 verify.
 __declspec(dllexport) sb::Stats EU4SB_TransferSkipStats = SB_STATS_INIT;
 }
@@ -35,7 +35,7 @@ anvil::HookOf<sym::game_setup_load_file> g_loadHook;
 decltype(g_addHook.next_pointer()) g_addNext = nullptr;
 decltype(g_sendHook.next_pointer()) g_sendNext = nullptr;
 decltype(g_loadHook.next_pointer()) g_loadNext = nullptr;
-std::size_t g_sessionIsServer = 0, g_sessionIsDummy = 0;  // CSession offsets, from the game's own check
+std::size_t g_sessionIsServer = 0, g_sessionIsDummy = 0;  // the session's offsets, from the game's own check
 bool g_verify = false;
 std::wstring* g_dir = nullptr;
 std::mutex* g_fileLock = nullptr;
@@ -43,7 +43,7 @@ std::mutex* g_fileLock = nullptr;
 // "verify": the Data of the entry whose load is still to come. All of it on the main thread.
 const void* g_expectedData = nullptr;
 
-// CSession::_bIsServer and _bIsDummy, read as the game reads them.
+// The session's server and dummy bytes, read as the game reads them.
 struct SessionKind {
     bool have = false, server = false, dummy = false;
 };
@@ -113,7 +113,7 @@ void CheckCopy(void* manager, int index, Row& row) {
     }
 }
 
-int AddFileDetour(void* manager, const char* name, void** data, bool compress) {
+int TransferAddDetour(void* manager, const char* name, void** data, bool compress) {
     if (!compress) return g_addNext(manager, name, data, compress);
     InterlockedIncrement64(&EU4SB_TransferSkipStats.requests);
     const std::int64_t start = sb::Ticks();
@@ -140,7 +140,7 @@ int AddFileDetour(void* manager, const char* name, void** data, bool compress) {
     return index;
 }
 
-std::uint64_t LoadFileDetour(void* handler, const char* name, void* data, bool compressed) {
+std::uint64_t SetupLoadDetour(void* handler, const char* name, void* data, bool compressed) {
     if (g_expectedData != nullptr) {
         InterlockedIncrement64(&EU4SB_TransferSkipStats.verifications);
         if (data != g_expectedData || compressed) {
@@ -155,7 +155,7 @@ std::uint64_t LoadFileDetour(void* handler, const char* name, void* data, bool c
     return g_loadNext(handler, name, data, compressed);
 }
 
-std::uint64_t SendFileDetour(void* manager, std::uint32_t index, std::uint32_t peer) {
+std::uint64_t TransferSendDetour(void* manager, std::uint32_t index, std::uint32_t peer) {
     const SessionKind kind = ReadSession(manager);
     if (kind.have && kind.dummy) {
         InterlockedIncrement64(&EU4SB_TransferSkipStats.verifications);
@@ -181,14 +181,14 @@ bool InstallTransferSkip(anvil::Host& host, Mode mode) {
     g_sessionIsServer = static_cast<std::size_t>(host.value(sym::session_kind_check, "session_is_server"));
     g_sessionIsDummy = static_cast<std::size_t>(host.value(sym::session_kind_check, "session_is_dummy"));
     Undo undo;
-    host.hook(g_addHook, sym::file_transfer_add, &AddFileDetour);
+    host.hook(g_addHook, sym::file_transfer_add, &TransferAddDetour);
     undo.add(g_addHook);
     g_addNext = g_addHook.next_pointer();
     if (g_verify) {
-        host.hook(g_sendHook, sym::file_transfer_send, &SendFileDetour);
+        host.hook(g_sendHook, sym::file_transfer_send, &TransferSendDetour);
         undo.add(g_sendHook);
         g_sendNext = g_sendHook.next_pointer();
-        host.hook(g_loadHook, sym::game_setup_load_file, &LoadFileDetour);
+        host.hook(g_loadHook, sym::game_setup_load_file, &SetupLoadDetour);
         undo.add(g_loadHook);
         g_loadNext = g_loadHook.next_pointer();
     }

@@ -6,13 +6,13 @@
 
 namespace sb::diplo_scan {
 
-// A CDiplomacyStatus row: 72 bytes, the owner's tag at +8 (PDB layout; the game's scan divides the array's
-// size by 72, which its bytes in symbols.toml check).
+// A relation row: 72 bytes, the owner's tag at +8 (the game's scan divides the array's size by 72, which
+// symbols.toml checks).
 constexpr std::size_t kRowSize = 72;
 constexpr std::size_t kRowOwner = 8;
 
-// The country index of a tag as the game reads it from the 8 bytes of a CCountryTag: the low 16 bits of the
-// high half, sign-extended (shr 0x20; movsx).
+// The country index of a tag as the game reads it from the 8 bytes of a country tag: the low 16 bits of the
+// high half, sign-extended.
 inline int TagIndex(std::uint64_t tag) noexcept { return static_cast<std::int16_t>(tag >> 32); }
 
 // The rows whose flags byte has `mask` set: what the game's scan finds.

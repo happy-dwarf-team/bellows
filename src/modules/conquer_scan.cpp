@@ -1,7 +1,7 @@
 // conquer_scan (prototype, off by default): the AI's conquest list from the land provinces only.
 //
-// CAIStrategy::RebuildConquerList (0x187AD0) runs in a country's strategy recalculation, inside the serial daily
-// country update. It values every province of the map in a ParallelFor3 (0x191F30): each item calls
+// The AI's conquest list (0x187AD0) is rebuilt in a country's strategy recalculation, inside the serial daily
+// country update. It values every province of the map in a parallel loop (0x191F30): each item calls
 // 0x187C00(strategy, province) and appends (index, value) to a buffer when the value is above 0; the function
 // then sorts the buffer by index and adds the entries in that order. On a big map most items return 0 at the
 // first checks, and the time goes to the cache misses of those checks and to the pool.
@@ -12,13 +12,13 @@
 // - serial: a loop on the calling thread, in index order, which prefetches the fields of the first checks a few
 //   provinces ahead. It wins where the items are cheap and the pool's hand-out costs more than they do
 //   (Anbennar's many small countries).
-// - pool: the game's own ParallelFor3 on an array of the land provinces; the item writes the position in that
+// - pool: the game's own parallel loop on an array of the land provinces; the item writes the position in that
 //   array, which the module maps back to the province index (the mapping keeps the order). It wins where the
 //   items are dear (the base game).
 // It takes the way whose recent time per call is lower and tries the other every 16th call (WayChooser). The
 // game's sort and the adding run as before.
 //
-// "verify" runs the game's ParallelFor3 for every call as well, into the game's buffer (the game's answer is
+// "verify" runs the game's parallel loop for every call as well, into the game's buffer (the game's answer is
 // the one kept), and both ways into buffers of their own; it compares the three lists and checks that every
 // left-out province is still not land. "on" does that for every 256th call and goes back to the game's loop for
 // good after a difference. A background thread writes the counters every 5 s to conquer_scan.tsv in the data
@@ -114,7 +114,7 @@ std::size_t Fill(const sl::PointerArray& provinces, const std::vector<std::int32
     return sl::FillPairs(land, value, prefetch, prefetchNear, kPrefetchDistance, out);
 }
 
-// The pool's way: the game's ParallelFor3 on an array of the land provinces, then the entries it added mapped
+// The pool's way: the game's parallel loop on an array of the land provinces, then the entries it added mapped
 // back to province indices. `lambda` is the game's capture or one of the same layout; its count goes up by the
 // entries written.
 void PoolFill(const sl::PointerArray& provinces, const std::vector<std::int32_t>& land, const Capture& lambda) {

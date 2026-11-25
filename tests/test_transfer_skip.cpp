@@ -39,7 +39,7 @@ Bytes Deflate(const Bytes& data) {
     return out;
 }
 
-// An archive as AddFile builds it: one deflated member, local header, central directory, end record.
+// An archive as the game's add builds it: one deflated member, local header, central directory, end record.
 Bytes Zip(const Bytes& data, const std::string& name = "save", std::uint16_t members = 1) {
     const Bytes stream = Deflate(data);
     const auto crc = static_cast<std::uint32_t>(crc32(0, data.data(), static_cast<uInt>(data.size())));
@@ -111,7 +111,7 @@ void TestDecide() {
     assert(Decide(false, true, false, true, true) == Action::Pass);
 }
 
-// CFileTransferManager's start and a handler with the game's vtable shape.
+// The transfer manager's start and a handler with the game's vtable shape.
 struct FakeManager {
     void* vtable = nullptr;
     std::uint8_t referenceObject[0x18] = {};
@@ -124,12 +124,12 @@ static_assert(offsetof(FakeManager, handler) == sb::transfer::kManagerHandler);
 static_assert(offsetof(FakeManager, filesBegin) == sb::transfer::kManagerFiles);
 
 std::uint8_t g_session[0x100];
-void* GetSession(void*) { return g_session; }
+void* SessionSlot(void*) { return g_session; }
 void* NotASlot(void*) {
     assert(false);
     return nullptr;
 }
-void* g_handlerVtable[] = {reinterpret_cast<void*>(&NotASlot), reinterpret_cast<void*>(&GetSession)};
+void* g_handlerVtable[] = {reinterpret_cast<void*>(&NotASlot), reinterpret_cast<void*>(&SessionSlot)};
 
 void TestStructures() {
     void* handler[] = {g_handlerVtable};

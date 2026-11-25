@@ -163,8 +163,8 @@ SB_DAY_PART(p3288b0, country_day_3288b0, "0x3288B0", (void* a, void* b), (a, b))
 SB_DAY_PART(modifiers, country_modifiers, "country modifiers 0x93D130", (void* a), (a))
 #undef SB_DAY_PART
 
-// 0x327DC0 is CalculateModifier (country.cpp, "CalculateModifier %s, %s"): its second argument is the
-// caller's source file. Per call site (return address) and day class: calls, time, and that file.
+// 0x327DC0 is the modifier calculation (country.cpp, named in the game's own log line): its second argument is
+// the caller's source file. Per call site (return address) and day class: calls, time, and that file.
 DayPart g_part_p327dc0{"CalculateModifier 0x327DC0"};
 anvil::HookOf<sym::country_day_327dc0> g_partHook_p327dc0;
 void (*g_partNext_p327dc0)(void*, char*, std::uint8_t) = nullptr;

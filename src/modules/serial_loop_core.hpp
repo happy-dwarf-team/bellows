@@ -4,8 +4,8 @@
 // tests/test_serial_loop.cpp can run them.
 //
 // The module fills the AI's conquest list from the land provinces only, one of two ways: a loop on the calling
-// thread in index order, or the game's own ParallelFor3 on an array of the land provinces. The game's
-// ParallelFor3 hands the items to its worker pool and the calling thread takes items itself while it waits, so
+// thread in index order, or the game's own parallel loop on an array of the land provinces. The game's
+// parallel loop hands the items to its worker pool and the calling thread takes items itself while it waits, so
 // the loop in index order on the calling thread is one of the schedules the game's own pool can produce: each
 // item of the loop writes only its own result.
 
@@ -57,7 +57,7 @@ std::size_t FillPairs(const std::vector<std::int32_t>& list, Value&& value, Pref
     return written;
 }
 
-// The game sorts its buffer by province index after the loop (CAIStrategy::RebuildConquerList, the comparator
+// The game sorts its buffer by province index after the loop (the conquest list 0x187AD0, the comparator
 // reads only the index) and adds the entries in that order, so two buffers give the same list when they hold
 // the same pairs. Sorts both and returns the number of positions where they differ (0: the same list).
 inline std::size_t Differences(std::vector<Pair>& a, std::vector<Pair>& b) {
@@ -106,7 +106,7 @@ private:
     bool seen_[2] = {};
 };
 
-// Which call is checked against the game's ParallelFor3: every call in "verify", one in 256 in "on".
+// Which call is checked against the game's parallel loop: every call in "verify", one in 256 in "on".
 inline bool Checked(bool verifyOnly, std::uint64_t sequence) noexcept { return verifyOnly || (sequence & 255) == 0; }
 
 // In a checked call the three loops run one after the other: the game's on all provinces, and the module's two

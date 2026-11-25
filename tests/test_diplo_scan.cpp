@@ -9,7 +9,7 @@
 namespace ds = sb::diplo_scan;
 
 int main() {
-    // The game's shr 0x20; movsx of a CCountryTag: the low 16 bits of the high half, with their sign.
+    // The game's reading of a country tag: the low 16 bits of the high half, with their sign.
     assert(ds::TagIndex(0x0000001234567890ull) == 0x12);
     assert(ds::TagIndex(0xABCD07490000FFFFull) == 0x0749);
     assert(ds::TagIndex(0x0000FFFF00000000ull) == -1);

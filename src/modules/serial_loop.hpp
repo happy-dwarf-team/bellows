@@ -1,6 +1,6 @@
 #pragma once
 
-// conquer_scan: what the game's ParallelFor3 (0x191F30) does around its loop, so a loop on the calling thread
+// conquer_scan: what the game's parallel loop (0x191F30) does around its loop, so a loop on the calling thread
 // runs in the same state (symbols.toml, "conquer_scan").
 
 #include "../common.hpp"
@@ -10,9 +10,9 @@ namespace sb::serial_loop {
 // Resolves the symbols; true when they are there. A second call does nothing new.
 bool Resolve(anvil::Host& host);
 
-// For the lifetime of the scope, as ParallelFor3 for its loop: the game's "inside a parallel loop" byte is 1,
+// For the lifetime of the scope, as the parallel loop for its loop: the game's "inside a parallel loop" byte is 1,
 // and while the calling thread's random log is on, the log is in its collecting mode and is collected at the
-// end. ParallelFor3 does nothing of this for an empty array; neither does the caller.
+// end. The parallel loop does nothing of this for an empty array; neither does the caller.
 class GameLoopScope {
 public:
     GameLoopScope() noexcept;
