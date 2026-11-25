@@ -1,16 +1,16 @@
 // diplo_scan (prototype, off by default): skips the daily diplomacy-change scan of a country none of whose
 // diplomacy rows changed.
 //
-// CCountry::DailyUpdateSerialCheckDiplomacyChange (0x2EE070) runs for every living country every day, in the
-// serial country update. It reads the change bit (bit 2 of +0x46) of every 72-byte CDiplomacyStatus row of the
+// The daily diplomacy-change check of a country (0x2EE070) runs for every living country every day, in the
+// serial country update. It reads the change bit (bit 2 of +0x46) of every 72-byte relation row of the
 // country, one row per tag (about 1,900 on Anbennar, so about 134 KB a country), and clears the set ones while
 // no save is being loaded; with a save loader present it refreshes the trade routes instead. Nearly every day
 // it finds nothing: the time goes to reading memory.
 //
-// Every code path of eu4.exe that sets the bit also sets _bDiploDescriptionArraysDirty (+0x2884) of the row's
-// owner: the inlined "set changed" of the CDiplomacyStatus and CCountryDiplomacy setters, of
-// CCountry::SetCurrentMonarch and BreakOldRoyalMarriages, and TransferRelationsFrom, which copies a row's flags
-// and then sets both. A new country starts with the byte set. The only code that reads the byte, and the only
+// Every code path of eu4.exe that sets the bit also sets the dirty byte +0x2884 of the row's owner: the inlined
+// "set changed" of the setters of a relation row and of a country's diplomacy, of the change of a ruler and the
+// end of old royal marriages, and the move of relations from another country, which copies a row's flags and
+// then sets both. A new country starts with the byte set. The only code that reads the byte, and the only
 // code that clears it, is the diplomacy view's update (0xF01DC0), for the country it shows.
 //
 // So while no save is loading: a country whose byte is 0 has had no bit set since the module last cleared its
@@ -45,7 +45,7 @@ anvil::FunctionHook<void(void*)> g_scanHook;
 anvil::FunctionHook<void(void*)> g_viewHook;
 void (*g_scan)(void*) = nullptr;
 void (*g_view)(void*) = nullptr;
-const unsigned char* const* g_state = nullptr;        // CCurrentGameState::_pInstance
+const unsigned char* const* g_state = nullptr;        // the current game state's instance pointer
 const unsigned char* const* g_countryRoot = nullptr;  // the object whose +0x118 is the country array
 std::size_t g_rowsBegin = 0, g_rowsEnd = 0, g_rowFlags = 0, g_loader = 0;
 std::size_t g_viewCountry = 0, g_countryList = 0, g_dirty = 0;

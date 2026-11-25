@@ -1,6 +1,6 @@
 #pragma once
 // province_modifier_view: what 0x2FFC60 copies and what 0x300720 reads from the copy (lab docs:
-// docs/simulation-profile.md, "RefreshKnowledge").
+// docs/simulation-profile.md, the section on CCountry::RefreshKnowledge).
 //
 // 0x2FFC60 copies a province's modifier list into a sparse list (dense flag 0): every entry in order except
 // those with id 0x286, the placeholder of an unset static slot, growing the buffer from 8 entries by doubling.

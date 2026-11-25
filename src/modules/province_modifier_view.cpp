@@ -1,5 +1,5 @@
 // province_modifier_view (on by default since 1.4): 0x2FFC60 without its copy of the province's modifier list (lab docs:
-// docs/simulation-profile.md, "RefreshKnowledge"; the reasoning in province_modifier_view_core.hpp).
+// docs/simulation-profile.md, the section on CCountry::RefreshKnowledge; the reasoning in province_modifier_view_core.hpp).
 //
 // 0x2FFC60 copies a province's whole modifier list (hundreds of entries, reallocating from 8 by doubling,
 // plus its vector of sources) only so that 0x3003B0 and 0x300720 can read one value from it. The daily

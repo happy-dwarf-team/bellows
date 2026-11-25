@@ -61,7 +61,7 @@ struct PhysfsStat {
     std::int32_t filetype;
     std::int32_t readonly;
 };
-static_assert(sizeof(PhysfsStat) == 0x28, "PHYSFS_Stat layout drift");
+static_assert(sizeof(PhysfsStat) == 0x28, "PhysFS stat layout drift");
 
 uintptr_t g_dirArchiver = 0;
 SetErrorFn g_setError = nullptr;

@@ -648,7 +648,7 @@ for every 1,024th call and goes back to the game's function for good after a
 mismatch. Counters and the time of both paths: `province_modifier_view.tsv`
 every 5 s.
 
-Lab (lab `docs/simulation-profile.md`, "RefreshKnowledge"): `0x93FE30` is about
+Lab (lab `docs/simulation-profile.md`, the section on `CCountry::RefreshKnowledge`): `0x93FE30` is about
 9% of the tick without frames in 1720 and 1821; in the samples of the 1821
 autosave `0x2FFC60` is 2.2% of the main thread (0.7% in 1720), mostly its copy
 loop and the allocations.
@@ -726,9 +726,9 @@ AI) is not measured yet, so the module stays off until a SIMULATION series.
 
 Off by default, for 2.2.0; not measured under SIMULATION conditions yet.
 
-`CAIStrategy::RebuildConquerList` (`0x187AD0`) fills a buffer of (province index, value)
-pairs in a `ParallelFor3` (`0x191F30`) on the pool: the item (`0x194400`) calls
-`CalcProvinceConquerValue` (`0x187C00`) for every province of the map and appends the
+The AI's conquest list (`0x187AD0`) fills a buffer of (province index, value)
+pairs in a parallel loop (`0x191F30`) on the pool: the item (`0x194400`) calls
+the province's conquest value (`0x187C00`) for every province of the map and appends the
 pair with an atomic counter when the value is above 0. The function then sorts the
 buffer by index (the indices are unique, so the order of the pool does not matter) and
 adds the entries in that order. The lab's samples of a year at speed 5 put up to about
@@ -739,14 +739,14 @@ array and runs the game's item only for those, one of two ways:
 
 - **serial:** a loop on the calling thread, in index order, with a software prefetch of
   the next provinces' first checks (the controller area `+0x338`, the owner `+0x468`, the
-  template). The game's `ParallelFor3` hands the items to its worker pool and the calling
+  template). The game's parallel loop hands the items to its worker pool and the calling
   thread takes items too while it waits, so a loop in index order on the calling thread
   is one of the schedules the game's own pool can produce; each item writes only its own
-  result. The loop runs inside a scope that does what `ParallelFor3` does around its
+  result. The loop runs inside a scope that does what the parallel loop does around its
   items (`serial_loop.cpp`): it sets the global "in a parallel loop" byte and, when the
   thread's random log is on, its collecting bit, and collects the log afterwards as the
   game does.
-- **pool:** the game's own `ParallelFor3` on an array of the land provinces. The
+- **pool:** the game's own parallel loop on an array of the land provinces. The
   function reads only the array's begin and end, and the item writes the position in the
   array it was given, which the module maps back to the province index afterwards; the
   mapping keeps the order, so the game's sort gives the same list.
@@ -755,7 +755,7 @@ The serial loop wins where the items are cheap and handing them out costs more t
 do (Anbennar's many small countries); the pool wins where the items are dear (the base
 game, whose few big countries rebuild the list). The module keeps a moving average of
 each way's time per call, takes the cheaper and tries the other every 16th call
-(`WayChooser`). It redirects the call of `ParallelFor3` in `RebuildConquerList`
+(`WayChooser`). It redirects the conquest list's call of the parallel loop
 (`0x187B84`). Its check runs the game's loop into the game's buffer and both ways into
 scratch buffers, in turn which runs first, compares the sorted lists, checks that every
 left-out province is still not land, and keeps each loop's time by whether it ran first
@@ -790,16 +790,16 @@ A longer `"on"` session on Anbennar (the same build and save, 11.11.1444 to 2.3.
 493 µs when it ran first or later. By these clocks the module saves about 1 s a game year over that span, and
 2.6 s a year's rate only in the first months.
 
-The same one-thread loop for the opinion row of `CCountry::UpdateOpinionCache` (`0x38B1F0`, item `0x432E70`) was
+The same one-thread loop for the opinion row of the country's opinion cache update (`0x38B1F0`, item `0x432E70`) was
 tried in the same sessions and dropped: the same values (9,771 rows, 0 differences), faster on the base game
 (63 µs a row against 110 µs) but slower on Anbennar (329 µs against 195 µs, about 4 s more a year), whose opinion
 items cost more than handing them to the pool.
 
 ### diplo_scan (simulation, prototype)
 
-`CCountry::DailyUpdateSerialCheckDiplomacyChange` (`0x2EE070`) runs for every living country every day in the
-serial country update. It reads the change bit (`_bHasChanged`, bit 2 of the flags byte `+0x46`) of each 72-byte
-`CDiplomacyStatus` row of the country, one row per tag, and clears the set ones while the game state has no save
+The daily diplomacy-change check of a country (`0x2EE070`) runs for every living country every day in the
+serial country update. It reads the change bit (bit 2 of the flags byte `+0x46`) of each 72-byte relation row of
+the country, one row per tag, and clears the set ones while the game state has no save
 loader (`+0x74C8`); with a loader it refreshes the trade routes instead. On Anbennar (about 1,900 tags) that is
 about 134 KB a country and 125 MB a day, read to find almost nothing.
 
@@ -807,17 +807,17 @@ Writers of the bit, from a scan of every instruction of `eu4.exe` that touches a
 functions that own the hits (22.11.2026):
 
 - set: an inlined "set changed" (`if (no loader) row.flags |= 4; countries[row.owner]+0x2884 = 1`) in 26
-  `CDiplomacyStatus` setters (`SetAlliance`, `SetRoyalMarriage`, …, `0xA6FE20`), 8 `CCountryDiplomacy` ones
-  (`SetWar`, `SetDependency`, `AddOpinion`, `RemoveOpinion`, `AddCasusBelli`, …), `CCountry::SetCurrentMonarch`
-  and `BreakOldRoyalMarriages`; `TransferRelationsFrom` copies the flags of another row and then, on its only
-  path to its only `ret`, does the same "set changed";
-- from a file: `DoReadMember`, in a load, which builds new countries;
-- cleared: the scan itself, `Clear`, a new row (`and 0x80`).
+  setters of a relation row (alliance, royal marriage, …, `0xA6FE20`), 8 of a country's diplomacy (war,
+  dependency, opinion added and removed, casus belli, …), the change of a country's ruler and the end of old
+  royal marriages; the move of relations from another country copies the flags of another row and then, on its
+  only path to its only return, does the same "set changed";
+- from a file: the reader of a relation in a load, which builds new countries;
+- cleared: the scan itself, the clear of a row, a new row (the flags masked with `0x80`).
 
-The other writes of the byte change other bits (`CheckExpirations` bit 3, `SetSuccessionClaim` bit 0,
-`0xA6FE20`'s second write bit 1), and no code outside these copies rows. The owner's byte `+0x2884`
-(`_bDiploDescriptionArraysDirty`) is read and cleared only by `CCountryDiplomacyView::UpdateDiplomaticInformation`
-(`0xF01DC0`), for the country the view shows, and a new country starts with it set (`CCountry::CCountry`).
+The other writes of the byte change other bits (the expiry check bit 3, the succession claim bit 0,
+`0xA6FE20`'s second write bit 1), and no code outside these copies rows. The owner's byte `+0x2884` is read and
+cleared only by the diplomacy view's update (`0xF01DC0`), for the country the view shows, and a new country
+starts with it set (the country's constructor).
 
 So, while no save is loading, a country whose `+0x2884` is 0 had no bit set since that byte was last cleared.
 The module clears it only right after the game's scan of that country, which cleared every bit; it then holds
@@ -950,48 +950,48 @@ ironman and cloud saves.
 
 ### transfer_skip (loading)
 
-On by default since 1.1.0. Starting a game from a save (`CGameSetup::Load`,
+On by default since 1.1.0. Starting a game from a save (the game setup's load,
 `0x1132CA0`; "Continue" and the lobby's Play go this way) reads the whole file
-and, on a session that is a server or a dummy, hands it to
-`CFileTransferManager::AddFile` (`0xD7AAD0`), which makes it an entry of the
-transfer manager. For a file that is not a ZIP yet, `AddFile` first deflates it
-at level 9 into a second buffer, `SFileDesc::CompressedData` ("Compressing save
-for transfer" in the game's log): about 2.4 s for a 64.5 MB save, on the main
-thread, before anything is parsed. That buffer has one reader,
-`CFileTransferManager::SendFile` (`0xD7B2A0`), which sends it to a client instead
-of `Data` when it exists and sets the receiver's "compressed" flag from it. The
-game's own load does not use it: the start command (`0x279310`) calls
-`CGameSetup::LoadFile` (`0x110D760`) with the entry's `Data` and the flag 0, with
-or without a copy. A save that is compressed already has no copy, so every path
-after `AddFile` runs without one in the unmodified game.
+and, on a session that is a server or a dummy, hands it to the file transfer's
+add (`0xD7AAD0`), which makes it an entry of the transfer manager. For a file
+that is not a ZIP yet, the add first deflates it at level 9 into a second
+buffer, the entry's compressed copy ("Compressing save for transfer" in the
+game's log): about 2.4 s for a 64.5 MB save, on the main thread, before
+anything is parsed. That buffer has one reader, the transfer's send
+(`0xD7B2A0`), which sends it to a client instead of the entry's data when it
+exists and sets the receiver's "compressed" flag from it. The game's own load
+does not use it: the start command (`0x279310`) calls the game setup's file
+load (`0x110D760`) with the entry's data and the flag 0, with or without a copy.
+A save that is compressed already has no copy, so every path after the add runs
+without one in the unmodified game.
 
-A single-player session is the dummy session (`CSession::_bIsDummy`, `+0x55`,
-next to `_bIsServer`, `+0x54`; the constructor sets one of the two from the
-session's basic type). When `AddFile` is asked to compress and its session (the
-handler's slot 1, as `CFileTransferManager::GetSession`) is a dummy and not a
-server, the hook calls the game's `AddFile` with `compress = false`. Nothing else
-changes: the entry has its bytes and checksum, the load gets the same bytes and
-flag. Hosted multiplayer is a server session and keeps its copy, compressed by
-the game or with `save_compress_threads`; a client never reaches `AddFile`. If a
-session did turn out to send an entry without a copy, `SendFile` sends `Data`
-with the flag off, as it does for a compressed save: a larger transfer, not a
+A single-player session is the dummy session (the session's byte `+0x55`, next
+to its server byte `+0x54`; the constructor sets one of the two from the
+session's basic type). When the add is asked to compress and its session (the
+handler's slot 1) is a dummy and not a server, the hook calls the game's add
+with `compress = false`. Nothing else changes: the entry has its bytes and
+checksum, the load gets the same bytes and flag. Hosted multiplayer is a server
+session and keeps its copy, compressed by the game or with
+`save_compress_threads`; a client never reaches the add. If a session did turn
+out to send an entry without a copy, the send sends the entry's data with the
+flag off, as it does for a compressed save: a larger transfer, not a
 wrong one. In the game (2.0.0, 15 November 2026): a host alone in a hosted game
 started from a 40.2 MB text save logged "the game keeps its copy" with server 1
 and dummy 0 (`transfer_skip.tsv`: `kept`). Later that day a client joined such a
 lobby (a 37.1 MB text save, the host's copy kept and compressed in parallel),
 received the copy and started the game; the client wrote no `transfer_skip` row,
-since it never reaches `AddFile`.
+since it never reaches the add.
 
 `"verify"` keeps the game's copy and checks each thing `"on"` relies on: the copy
-is an archive of one member that decodes to exactly `Data` with its CRC-32, the
-next `LoadFile` gets that entry's `Data` with the flag 0, and `SendFile` is not
-called in a dummy session (the last two with hooks that `"on"` does not install).
-Every `AddFile` asked to compress appends a row (action, session bytes, sizes,
-time) to `transfer_skip.tsv`.
+is an archive of one member that decodes to exactly the entry's data with its
+CRC-32, the next file load gets that entry's data with the flag 0, and the send
+is not called in a dummy session (the last two with hooks that `"on"` does not
+install). Every add asked to compress appends a row (action, session bytes,
+sizes, time) to `transfer_skip.tsv`.
 
-The names come from the `eu4.pdb` of the GOG build; the Steam build has the same
-code and offsets. `symbols.toml` checks both functions' entries, the game's own
-reads of the session bytes in `CGameSetup::Load` and of the handler in `AddFile`.
+The Steam and GOG builds have the same code and offsets here. `symbols.toml`
+checks both functions' entries, the game's own reads of the session bytes in the
+game setup's load and of the handler in the add.
 
 In the game (lab `docs/autosave-cost.md`, 4 November 2026): `eu4.exe` 1.37.5
 (Steam), Anvil 1.9.0, Tongs 0.26.0, the process on CPUs 1–7, a warm start to the
@@ -1007,13 +1007,13 @@ Tongs.
 | 1821 | 11.26 s (10.84–11.69) | 10.91 s (10.78–11.06) | 8.97 s (8.88–9.18) | **8.95 s** (8.55–9.23) |
 | Vanilla 1450 | 6.11 s (5.70–6.17) | 5.84 s (5.70–6.14) | not run | **4.47 s** (4.35–4.99) |
 
-The ranges of on and off do not overlap. `AddFile` itself took 2,459 ms and 1,385 ms
+The ranges of on and off do not overlap. The add itself took 2,459 ms and 1,385 ms
 with the copy and 66 ms and 41 ms without it (what remains is the game's CRC-32
 of the file). On the 1821 save the module and the parallel compression come out
 the same to within the spread, but the parallel way changes bytes a client
 receives and stays opt-in, while this one changes nothing that is read. `"verify"`
 on both saves (two sessions each, on a dummy session, not a server): the copy decoded
-to the save with its CRC, the load got the entry's `Data` with the flag 0, `SendFile`
+to the save with its CRC, the load got the entry's data with the flag 0, the send
 was not called, 0 mismatches. After the load, with the module on and off, `game.log`
 and `error.log` are the same once digits are replaced, `RandomCount` is the same in
 all runs of a save, and Tongs' reads of the player, three countries and three
@@ -1212,7 +1212,7 @@ loop whose items draw from the shared generator gives a different game when
 the items run in another order. Per merge it records the shape (dense or
 sparse lists, counts, entries that take the linear scan of the destination)
 per context, scan size and call site. The daily country update `0x2EE280`,
-its largest parts and every call site of `CalculateModifier` (`0x327DC0`,
+its largest parts and every call site of the modifier calculation (`0x327DC0`,
 with the caller's source file it is given) are also timed per day class, from
 the date on entering the daily tick as in `tick_profile`'s rows: dated the 1st
 of a month, dated a month's last day (the call that runs the monthly tick) and
@@ -1221,7 +1221,7 @@ the others.
 Lab (Russia 1719, 360 s): on the day dated the 1st the daily country update
 takes 48.8 ms instead of 7.8 ms. About 90 countries have their modifier flag
 `+0x2882` set after the monthly tick, and the daily update then runs
-`0x93FE30` (+18 ms) and `CalculateModifier` from `country.cpp:9210` (+13 ms,
+`0x93FE30` (+18 ms) and the modifier calculation from `country.cpp:9210` (+13 ms,
 almost all in the full recompute `0x93D130`) for each of them, a day after the
 monthly tick recalculated the modifiers of all 1,378 countries.
 `monthly_probe.tsv`, `monthly_probe_countries.tsv`, `monthly_probe_merges.tsv`
@@ -1501,19 +1501,17 @@ Bellows declares both builds and needs Anvil 1.7 (`anvil = ">=1.7.0"`, SDK
   instructions in the GOG executable: functions through `.pdata` and their
   disassembly with addresses masked, leaf code by the gap between two matched
   functions, pointer slots by the matched target and the neighbouring slots.
-  The GOG build ships `eu4.pdb`, which names each match
-  (`CCountry::GetTradingRangeTo`, `CPdxSystem::FileExists`,
-  `CZipArchive::WriteDeflateCompressed`, …); `modifier_merge` is
-  `CModifier::operator+=` there, whose first chunk equals that of
-  `operator-=`, so whole bodies were compared. 72 symbols keep their bytes
+  The function `modifier_merge` hooks has a twin whose first bytes are the
+  same (the one that subtracts a modifier list), so whole bodies were
+  compared. 72 symbols keep their bytes
   and only move; 20 differ only in RIP-relative or call displacements (and
   one absolute table address in `nested_frame_threshold`) and get their bytes
   per build. No value with a size differs, and the numbers in the functions
   around every symbol are the same apart from addresses, so the struct
   layouts written in the modules (`range_witness`, `trigger_intern`,
   `token_dict_profile`, `metascript_*`, `modifier_merge`, the ZIP entry) hold
-  on both builds; the PDB's types agree (`CProvince` 0x2E10 bytes, `CMap`,
-  the game root's province and country arrays). The offsets that do differ
+  on both builds, as do the sizes the code relies on (a province 0x2E10
+  bytes, the map, the game root's province and country arrays). The offsets that do differ
   in that code (the application at `+0xB48`/`+0xB38`, the session's speed
   object at `+0x418`/`+0x408`) are not ones Bellows reads.
 - **Profiles.** The shipped base layers are lists of files in the game

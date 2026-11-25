@@ -90,15 +90,25 @@ must not throw.
 
 ## Game addresses
 
-Every address, expected byte, pointer target and export the modules use is
+Every address, expected code, pointer target and export the modules use is
 declared once in `plugin/symbols.toml`; a module refers to it as
 `sym::<name>`. Anvil verifies the whole file before it loads the DLL and skips
 the plugin on any mismatch, so a symbol is declared only with bytes validated
 in the lab. Prefer `values` on code that reads a global or an offset over
 writing the number in C++ again.
 
+**Game code and names.** This repository holds no code of eu4.exe and no
+names from its debug symbols. `symbols.toml` verifies each address with
+`sha256` and `size`, not with the game's bytes; write `bytes` while you work
+and run Anvil's `tools/symbols-to-digest.py` before you commit. Name the
+game's functions, classes and fields by their address and what they do,
+unless eu4.exe itself shows the name (its RTTI or its own log and assert
+texts). Our own symbol keys, addresses, offsets and signatures are fine.
+
 After a change to `plugin/symbols.toml`, run the check against the real game
-(it only reads `eu4.exe`) and commit the rewritten `plugin/symbols.lock`:
+(it only reads `eu4.exe`) with the `eu4.exe` of each build in `builds`
+(Steam 1.37.5, GOG 1.37.5.2 and 1.37.5.0) and commit the rewritten
+`plugin/symbols.lock`:
 
 ```powershell
 build\_deps\anvil-build\Release\anvil.exe check plugin --exe "<EU4>\eu4.exe"
