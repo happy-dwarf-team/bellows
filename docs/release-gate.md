@@ -4,7 +4,9 @@ What a release of Bellows passes before its draft is published
 ([CONTRIBUTING.md](../CONTRIBUTING.md#versions-and-releases)), and what Bellows may cost.
 The game checks run in the lab (`eu4-engine-lab`, private), whose harness starts the
 game, drives it through Tongs and compares the logs; this file says what they must
-show, not how the lab runs them.
+show, not how the lab runs them. The lab runs points 3 to 5 with `scripts/bellows-gate.ps1`,
+which takes the release files of this gate (the draft's zip, checked against its
+`SHA256SUMS.txt`) or a local build, whose hashes it records.
 
 ## Gate
 
