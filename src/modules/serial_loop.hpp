@@ -26,7 +26,7 @@ private:
     std::uint32_t savedLogFlags_ = 0;
 };
 
-// The game's array of pointers (CArray<T*>: begin, end).
+// The game's array of pointers (begin, end).
 struct PointerArray {
     void* const* begin;
     void* const* end;
