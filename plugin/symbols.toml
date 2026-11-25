@@ -5,12 +5,15 @@
 # in the lab (Ghidra + byte checks) on the Steam build; the symbols that only
 # carry `values` prove a global or a struct offset the modules use. The GOG
 # build 1.37.5.2 has the same code at other addresses: each symbol was matched
-# to the same instructions there and named from the eu4.pdb GOG ships, and only
-# rva, bytes and points_to differ (in `build."<id>"`). The GOG build 1.37.5.0
-# has every symbol at the GOG 1.37.5.2 address (anvil port, anvil#187).
-# Addresses in notes are the Steam build's.
-# After a change run `anvil check plugin --exe <eu4.exe>` with each build's
-# eu4.exe and commit symbols.lock.
+# to the same instructions there, and only rva, the digest and points_to differ
+# (in `build."<id>"`). The GOG build 1.37.5.0 has every symbol at the GOG
+# 1.37.5.2 address (anvil port, anvil#187). Addresses in notes are the Steam
+# build's.
+# Each code symbol states the SHA-256 and the size of its bytes, not the bytes
+# (Anvil ADR 0003): while you work, write `bytes` and run Anvil's
+# tools/symbols-to-digest.py before the commit. After a change run
+# `anvil check plugin --exe <eu4.exe>` with each build's eu4.exe and commit
+# symbols.lock.
 builds = ["eu4-1.37.5-steam-win64", "eu4-1.37.5.2-gog-win64", "eu4-1.37.5.0-gog-win64"]
 
 # --- PhysFS, exported by eu4.exe (verifypath_listing, exists_index) -----------
@@ -46,7 +49,8 @@ signature = "int ()"
 # --- verifypath_listing --------------------------------------------------------
 
 [symbol.verifypath_stat_call]
-bytes = "41 FF 51 68 8B E8"            # call [r9+68h]; mov ebp,eax
+sha256 = "31BBB725319586FC1D5D87044E765A22E5A822B29BC9F9D9368E1E6112E6CAF9"
+size = 6
 memory = "code"
 note = "PhysFS verifyPath: the archiver's stat call and the copy of its result; replaced as a block"
 build."eu4-1.37.5-steam-win64" = { rva = 0x19FB7F4 }
@@ -56,7 +60,8 @@ build."eu4-1.37.5.0-gog-win64" = { rva = 0x19E5474 }
 # --- listing_lookup (prototype, off by default) ---------------------------------
 
 [symbol.realdir_stat_call]
-bytes = "FF 50 68 85 C0"                  # call [rax+68h]; test eax,eax
+sha256 = "D821B1B4A4BB1E9BBC95FBC9DBDA092D823DACFB8091F10D3325554E3B0E1FC7"
+size = 5
 memory = "code"
 note = "PhysFS getRealDir (PHYSFS_exists, PHYSFS_getRealDir): the archiver's stat after verifyPath and the test of its result; replaced as a block"
 build."eu4-1.37.5-steam-win64" = { rva = 0x19FAE7D }
@@ -64,7 +69,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x19E4AFD }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x19E4AFD }
 
 [symbol.dir_openread_call]
-bytes = "FF 50 40 48 8B F0"               # call [rax+40h]; mov rsi,rax
+sha256 = "2A16166D3096D41DC4A679C264E91A31913E3BA1E1905837539A4D9F50EE4B86"
+size = 6
 memory = "code"
 note = "PHYSFS_openRead: the archiver's openRead after verifyPath and the copy of its result; replaced as a block"
 build."eu4-1.37.5-steam-win64" = { rva = 0x19F8072 }
@@ -88,7 +94,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x1D84D60, points_to = 0x15C39A0 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x1D84D60, points_to = 0x15C39A0 }
 
 [symbol.fs_exists]
-bytes = "48 83 EC 28 48 83 7A 18 10 72 03 48 8B 12 48 85 D2 74 18 80 3A 00 74 13"
+sha256 = "B8AEA6CD2B5FA94AC5CCBCDE1D4291D295E80866AD90408A7E9EC4593FF96846"
+size = 24
 memory = "code"
 signature = "bool (void* self, const void* name)"
 note = "thin wrapper around PHYSFS_exists"
@@ -99,7 +106,8 @@ build."eu4-1.37.5.0-gog-win64" = { rva = 0x15C39A0 }
 # --- trigger_intern ------------------------------------------------------------
 
 [symbol.trigger_intern_args_a]
-bytes = "48 8B D7 48 8B C8"            # mov rdx,rdi; mov rcx,rax
+sha256 = "8C17F8E73760CFC9BF401F8EF5758F36E1C793013C25B0E15EFC58D3BB20D41E"
+size = 6
 memory = "code"
 note = "the arguments of trigger_intern_call_a: (singleton, node)"
 build."eu4-1.37.5-steam-win64" = { rva = 0x205C09 }
@@ -112,18 +120,22 @@ note = "loading tail, first registry list: node+0x58 = lookup(singleton, node) i
 
 [symbol.trigger_intern_call_a.build."eu4-1.37.5-steam-win64"]
 rva = 0x205C0F
-bytes = "E8 CC 58 99 00 48 89 47 58"   # call 0xB9B4E0 (profile lookup); mov [rdi+58h],rax
+sha256 = "0EFA58BDD3A7ABF12822892289A6E24B98AC9B9DB6B0B3C3E5FBB6BDC95CDC39"
+size = 9  # the call of the profile lookup 0xB9B4E0 and the store of its result
 
 [symbol.trigger_intern_call_a.build."eu4-1.37.5.2-gog-win64"]
 rva = 0x205BCF
-bytes = "E8 BC 40 99 00 48 89 47 58"
+sha256 = "4405F016F5ABEFD063296448A65A777EC76DF0825FE8C0AE451B6CBB58A3B06D"
+size = 9
 
 [symbol.trigger_intern_call_a.build."eu4-1.37.5.0-gog-win64"]
 rva = 0x205BCF
-bytes = "E8 BC 40 99 00 48 89 47 58"
+sha256 = "4405F016F5ABEFD063296448A65A777EC76DF0825FE8C0AE451B6CBB58A3B06D"
+size = 9
 
 [symbol.trigger_intern_args_b]
-bytes = "48 8B D7 48 8B C8"            # mov rdx,rdi; mov rcx,rax
+sha256 = "8C17F8E73760CFC9BF401F8EF5758F36E1C793013C25B0E15EFC58D3BB20D41E"
+size = 6
 memory = "code"
 note = "the arguments of trigger_intern_call_b"
 build."eu4-1.37.5-steam-win64" = { rva = 0x205C39 }
@@ -136,15 +148,18 @@ note = "loading tail, second registry list"
 
 [symbol.trigger_intern_call_b.build."eu4-1.37.5-steam-win64"]
 rva = 0x205C3F
-bytes = "E8 9C 58 99 00 48 89 47 58"   # call 0xB9B4E0 (profile lookup); mov [rdi+58h],rax
+sha256 = "33EE375F30192CCE67CDC9D5F7AB1D2F544D19902D08527F2A65088D9D6E0323"
+size = 9  # the call of the profile lookup 0xB9B4E0 and the store of its result
 
 [symbol.trigger_intern_call_b.build."eu4-1.37.5.2-gog-win64"]
 rva = 0x205BFF
-bytes = "E8 8C 40 99 00 48 89 47 58"
+sha256 = "8CF12E84EA93777CD61F6B2664FB76826A1FB2322A619BCF63678F3690310D4C"
+size = 9
 
 [symbol.trigger_intern_call_b.build."eu4-1.37.5.0-gog-win64"]
 rva = 0x205BFF
-bytes = "E8 8C 40 99 00 48 89 47 58"
+sha256 = "8CF12E84EA93777CD61F6B2664FB76826A1FB2322A619BCF63678F3690310D4C"
+size = 9
 
 [symbol.trigger_registry_load]
 memory = "code"
@@ -153,20 +168,24 @@ note = "loading tail: the trigger registry global the walk reads"
 
 [symbol.trigger_registry_load.build."eu4-1.37.5-steam-win64"]
 rva = 0x205BAA
-bytes = "48 8B 0D 5F A4 13 02"         # mov rcx,[rip -> 0x2340010]
+sha256 = "F41CB4D9E9689BF6A65D6E18C59623336F25FB0BF9C86987C2369CFE662F130A"
+size = 7  # the load of the registry global 0x2340010
 
 [symbol.trigger_registry_load.build."eu4-1.37.5.2-gog-win64"]
 rva = 0x205B6A
-bytes = "48 8B 0D 1F E3 11 02"
+sha256 = "91865CA4EB76F40AD4E416426BF8F53BA75F2633CE249A9D30440DAEA25D18EF"
+size = 7
 
 [symbol.trigger_registry_load.build."eu4-1.37.5.0-gog-win64"]
 rva = 0x205B6A
-bytes = "48 8B 0D 1F E3 11 02"
+sha256 = "91865CA4EB76F40AD4E416426BF8F53BA75F2633CE249A9D30440DAEA25D18EF"
+size = 7
 
 # --- metascript_subst ----------------------------------------------------------
 
 [symbol.metascript_args_a]
-bytes = "4C 8B C6 48 8B D7"            # mov r8,rsi; mov rdx,rdi
+sha256 = "92ED05E353CD6E8A33975E4BB1324FFEDC6C1C9695C27D3DB97D0617E8919D72"
+size = 6
 memory = "code"
 note = "the arguments of metascript_call_a: (text, arguments, tokens)"
 build."eu4-1.37.5-steam-win64" = { rva = 0xDB0908 }
@@ -174,7 +193,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0xDAF088 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0xDAF088 }
 
 [symbol.metascript_call_a]
-bytes = "E8 ED 0E 00 00"               # call 0xDB1800 ($param$ substitution)
+sha256 = "C2CF96BC6C953650087B2A82D9490C4E5922585BB6C2FCA7585BE78C882EB389"
+size = 5  # the call of the $param$ substitution 0xDB1800
 memory = "code"
 note = "first call of the substitution in 0xDB0860"
 build."eu4-1.37.5-steam-win64" = { rva = 0xDB090E }
@@ -182,7 +202,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0xDAF08E }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0xDAF08E }
 
 [symbol.metascript_args_b]
-bytes = "4C 8B C6 48 8B D7"            # mov r8,rsi; mov rdx,rdi
+sha256 = "92ED05E353CD6E8A33975E4BB1324FFEDC6C1C9695C27D3DB97D0617E8919D72"
+size = 6
 memory = "code"
 note = "the arguments of metascript_call_b"
 build."eu4-1.37.5-steam-win64" = { rva = 0xDB0961 }
@@ -190,7 +211,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0xDAF0E1 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0xDAF0E1 }
 
 [symbol.metascript_call_b]
-bytes = "E8 94 0E 00 00"               # call 0xDB1800
+sha256 = "0731C34459678482381C58C07BC1207830916533EDE4D0066AA441476DA2DC4D"
+size = 5  # the same call
 memory = "code"
 note = "second call of the substitution in 0xDB0860"
 build."eu4-1.37.5-steam-win64" = { rva = 0xDB0967 }
@@ -198,7 +220,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0xDAF0E7 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0xDAF0E7 }
 
 [symbol.metascript_blocks_args]
-bytes = "4C 8B C6 48 8B D7 48 8B CB"   # mov r8,rsi; mov rdx,rdi; mov rcx,rbx
+sha256 = "5009E9181BDCEEC8B829B239708B9B207B88D3C7535599EFC9B96ABFEF32E020"
+size = 9
 memory = "code"
 note = "the arguments of metascript_blocks_call: (script, text, arguments)"
 build."eu4-1.37.5-steam-win64" = { rva = 0xDB08B7 }
@@ -206,7 +229,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0xDAF037 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0xDAF037 }
 
 [symbol.metascript_blocks_call]
-bytes = "E8 4B 0B 00 00"               # call 0xDB1410 (conditional blocks [[param] ...])
+sha256 = "F9083713CB4DCF883FF2D5A66D99C6481C6C7D03FC7168E6BFDA45D0A9719B2C"
+size = 5  # the call of the conditional blocks [[param] ...] 0xDB1410
 memory = "code"
 note = "the only call of the block resolution, in 0xDB0860 before the substitution"
 build."eu4-1.37.5-steam-win64" = { rva = 0xDB08C0 }
@@ -214,7 +238,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0xDAF040 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0xDAF040 }
 
 [symbol.string_assign]
-bytes = "48 89 5C 24 10 48 89 6C 24 18 56 57 41 57"
+sha256 = "CB5C422C7422F5BCD476563A4947D10CA1A9CA594184CDEEDC835207ADE262A9"
+size = 14
 memory = "code"
 signature = "void* (void* text, const char* data, size_t size)"
 note = "the game's std::string assign(data, size)"
@@ -246,7 +271,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x1C066C0, points_to = 0x19F1030 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x1C066C0, points_to = 0x19F1030 }
 
 [symbol.tinfl_decompress]
-bytes = "48 89 5C 24 20 55 56 57 41 54 41 55 41 56 41 57"
+sha256 = "ED1C98BEC13AEA4BAFAA823FA2A21B07ED9530C4998EAF7E6E609621C60B1CCA"
+size = 16
 memory = "code"
 signature = "int (void* state, const uint8_t* in, size_t* in_size, uint8_t* out_start, uint8_t* out_next, size_t* out_size, unsigned flags)"
 note = "miniz tinfl_decompress (pure; the caller owns the state)"
@@ -262,7 +288,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x1C06610, points_to = 0x19F1690 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x1C06610, points_to = 0x19F1690 }
 
 [symbol.mz_inflate_call]
-bytes = "E8 00 CA FF FF"               # call 0x1A080D0 (mz_inflate)
+sha256 = "DD3C0D5452E4B4682FE1652BD6975EBD1A626E30762ABBD4F2DC8F89B80959D5"
+size = 5  # the call of mz_inflate 0x1A080D0
 memory = "code"
 note = "the call of mz_inflate outside the ZIP Io read"
 build."eu4-1.37.5-steam-win64" = { rva = 0x1A0B6CB }
@@ -278,15 +305,18 @@ note = "the arguments of token_lookup_tokenizer_call: (keyword dictionary, key)"
 
 [symbol.token_lookup_tokenizer_args.build."eu4-1.37.5-steam-win64"]
 rva = 0x170EA08
-bytes = "48 8B D6 48 8D 0D 0E 7D C1 00"   # mov rdx,rsi; lea rcx,[rip -> 0x2326720]
+sha256 = "25F3CCEF1D5F939E013BCADD1EA246A03FC12311DE27DD5B22061F70A97DB2DD"
+size = 10  # the key and the address of the dictionary 0x2326720
 
 [symbol.token_lookup_tokenizer_args.build."eu4-1.37.5.2-gog-win64"]
 rva = 0x16F8628
-bytes = "48 8B D6 48 8D 0D CE 20 C1 00"
+sha256 = "F27205695918020AA2CCA2A142B99AC998BF85F50853E54BE627DBF764F78616"
+size = 10
 
 [symbol.token_lookup_tokenizer_args.build."eu4-1.37.5.0-gog-win64"]
 rva = 0x16F8628
-bytes = "48 8B D6 48 8D 0D CE 20 C1 00"
+sha256 = "F27205695918020AA2CCA2A142B99AC998BF85F50853E54BE627DBF764F78616"
+size = 10
 
 [symbol.token_lookup_tokenizer_call]
 memory = "code"
@@ -294,15 +324,18 @@ note = "the script tokenizer's keyword lookup"
 
 [symbol.token_lookup_tokenizer_call.build."eu4-1.37.5-steam-win64"]
 rva = 0x170EA12
-bytes = "E8 69 5E FD FE 48 85 C0"      # call 0x6E4880 (lookup); test rax,rax
+sha256 = "0A6499EEC9E6FDE55F60A7FB1949F29CD27D74B2BE21AF46EC19FF04CE54CCEA"
+size = 8  # the call of the lookup 0x6E4880 and the test of its result
 
 [symbol.token_lookup_tokenizer_call.build."eu4-1.37.5.2-gog-win64"]
 rva = 0x16F8632
-bytes = "E8 19 BD FE FE 48 85 C0"
+sha256 = "0F5C18D1067EDEA86E2E57547A0D4D558379B9BB1B782C948F92F63F01B87931"
+size = 8
 
 [symbol.token_lookup_tokenizer_call.build."eu4-1.37.5.0-gog-win64"]
 rva = 0x16F8632
-bytes = "E8 19 BD FE FE 48 85 C0"
+sha256 = "0F5C18D1067EDEA86E2E57547A0D4D558379B9BB1B782C948F92F63F01B87931"
+size = 8
 
 [symbol.token_lookup_get_or_add_args]
 memory = "code"
@@ -310,15 +343,18 @@ note = "the dictionary argument of token_lookup_get_or_add_call"
 
 [symbol.token_lookup_get_or_add_args.build."eu4-1.37.5-steam-win64"]
 rva = 0x170D477
-bytes = "48 8D 0D A2 92 C1 00"         # lea rcx,[rip -> 0x2326720], the same dictionary
+sha256 = "AE60B2AA469E9103040C0EAFF74125D0898EEC45C1F7CD014602F72319FC7A42"
+size = 7  # the address of the same dictionary 0x2326720
 
 [symbol.token_lookup_get_or_add_args.build."eu4-1.37.5.2-gog-win64"]
 rva = 0x16F7097
-bytes = "48 8D 0D 62 36 C1 00"
+sha256 = "B346C8D30AD43C1D2C94D37C8064077989EFC2A3E4E8E089A81C6706E43AC72E"
+size = 7
 
 [symbol.token_lookup_get_or_add_args.build."eu4-1.37.5.0-gog-win64"]
 rva = 0x16F7097
-bytes = "48 8D 0D 62 36 C1 00"
+sha256 = "B346C8D30AD43C1D2C94D37C8064077989EFC2A3E4E8E089A81C6706E43AC72E"
+size = 7
 
 [symbol.token_lookup_get_or_add_call]
 memory = "code"
@@ -326,15 +362,18 @@ note = "the get-or-add lookup"
 
 [symbol.token_lookup_get_or_add_call.build."eu4-1.37.5-steam-win64"]
 rva = 0x170D47E
-bytes = "E8 FD 73 FD FE 48 85 C0"      # call 0x6E4880; test rax,rax
+sha256 = "D222ADA10D707AF14227BFF1D49A540DC70C2487062CAA7DD71CBB63CCDADE2F"
+size = 8  # the same lookup and test
 
 [symbol.token_lookup_get_or_add_call.build."eu4-1.37.5.2-gog-win64"]
 rva = 0x16F709E
-bytes = "E8 AD D2 FE FE 48 85 C0"
+sha256 = "2DD7B88634D6C5B3A332F3F02C428DCBD589ECE0F43C240C161D430D45426A46"
+size = 8
 
 [symbol.token_lookup_get_or_add_call.build."eu4-1.37.5.0-gog-win64"]
 rva = 0x16F709E
-bytes = "E8 AD D2 FE FE 48 85 C0"
+sha256 = "2DD7B88634D6C5B3A332F3F02C428DCBD589ECE0F43C240C161D430D45426A46"
+size = 8
 
 [symbol.token_dynamic_tokens]
 memory = "code"
@@ -344,38 +383,45 @@ note = "get-or-add: the vector of tokens added at run time"
 
 [symbol.token_dynamic_tokens.build."eu4-1.37.5-steam-win64"]
 rva = 0x170D48F
-bytes = "48 8B 0D 12 E4 D1 00 48 2B 0D 03 E4 D1 00"   # mov rcx,[end]; sub rcx,[begin]
+sha256 = "3BF0E4AF9995AE064F16474BA3F8BBFBEB2AC2E6BA4D3CA95C21553717F44F67"
+size = 14  # the vector's end minus its begin
 
 [symbol.token_dynamic_tokens.build."eu4-1.37.5.2-gog-win64"]
 rva = 0x16F70AF
-bytes = "48 8B 0D 6A 86 D1 00 48 2B 0D 5B 86 D1 00"
+sha256 = "8B92BF77010CC201387454CDE014992AF366E74CBFAF7018A17DA5750C8ABEDF"
+size = 14
 
 [symbol.token_dynamic_tokens.build."eu4-1.37.5.0-gog-win64"]
 rva = 0x16F70AF
-bytes = "48 8B 0D 6A 86 D1 00 48 2B 0D 5B 86 D1 00"
+sha256 = "8B92BF77010CC201387454CDE014992AF366E74CBFAF7018A17DA5750C8ABEDF"
+size = 14
 
 # --- range_profile, range_witness ----------------------------------------------
 
 [symbol.root_and_date]
 memory = "code"
 values.game_root = { at = 3, rip_relative = 7, type = "const unsigned char* const" }
-values.date_offset = { at = 9, size = 4 }
+values.date_offset = { at = 9, size = 4, is = 0x1DD0 }
 note = "the game root object and its current date (int32 hours since year -5000)"
 
 [symbol.root_and_date.build."eu4-1.37.5-steam-win64"]
 rva = 0x14321FC
-bytes = "48 8B 05 75 DC F0 00 8B 98 D0 1D 00 00"   # mov rax,[root]; mov ebx,[rax+1DD0h]
+sha256 = "1CB3A5F923B2390CEBF07440FFAC7742C7369FB6B8E4AE06E0DECBC38376D5D8"
+size = 13  # the load of the root and of its date at +0x1DD0
 
 [symbol.root_and_date.build."eu4-1.37.5.2-gog-win64"]
 rva = 0x142C19C
-bytes = "48 8B 05 55 7B EF 00 8B 98 D0 1D 00 00"
+sha256 = "D27519F86D80EB541C045FFCADE689F2EE24BDB9D7837FB6C6FDE1B5A4A1C64A"
+size = 13
 
 [symbol.root_and_date.build."eu4-1.37.5.0-gog-win64"]
 rva = 0x142C19C
-bytes = "48 8B 05 55 7B EF 00 8B 98 D0 1D 00 00"
+sha256 = "D27519F86D80EB541C045FFCADE689F2EE24BDB9D7837FB6C6FDE1B5A4A1C64A"
+size = 13
 
 [symbol.range_min_distance]
-bytes = "4C 89 4C 24 20 48 89 54 24 10 48 89 4C 24 08"
+sha256 = "486994556E50C1F6DFB12CA47DEA821E2D16079F1517E8C917F645157DA90830"
+size = 15
 memory = "code"
 signature = "int* (void* country, int* out, void* province, void* arg4, int* threshold)"
 note = "the country range check: minimum distance from the country's provinces"
@@ -384,7 +430,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x352580 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x352580 }
 
 [symbol.province_distance]
-bytes = "4C 89 4C 24 20 4C 89 44 24 18 48 89 54 24 10 48 89 4C 24 08"
+sha256 = "C102B82176167A6754B8E69EDA73A5BCE373F11337A44D35621D885CA4920C7E"
+size = 20
 memory = "code"
 signature = "void* (void* out, void* a2, void* a3, void* a4, uintptr_t a5, uintptr_t a6, uintptr_t a7)"
 note = "province-to-province distance"
@@ -393,7 +440,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x2D24D0 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x2D24D0 }
 
 [symbol.range_check_call]
-bytes = "E8 5F 05 00 00"               # call 0x3526B0
+sha256 = "2EEEA56435A6BA0430BC388CA066E30EF0B1044C5ED777D515B3716D3490B37E"
+size = 5  # the call of the range check 0x3526B0
 memory = "code"
 note = "0x3520D0 (is the province within the country's range): the call of the range check"
 build."eu4-1.37.5-steam-win64" = { rva = 0x35214C }
@@ -408,15 +456,18 @@ note = "the walk's sqrt scaling of the straight-line distance"
 
 [symbol.range_walk_scale.build."eu4-1.37.5-steam-win64"]
 rva = 0x35272E
-bytes = "F3 0F 10 35 02 F2 A6 01 F3 0F 10 3D 56 76 A4 01"   # movss xmm6,[scale]; movss xmm7,[offset]
+sha256 = "AE238DF6785141D76ABC8E1FC9C8FD5EA6EC5A872F713BFCCF0ACD7BD5FD0515"
+size = 16  # the loads of the scale and the offset
 
 [symbol.range_walk_scale.build."eu4-1.37.5.2-gog-win64"]
 rva = 0x3525FE
-bytes = "F3 0F 10 35 4A 5C A5 01 F3 0F 10 3D 56 FB A2 01"
+sha256 = "C3CDBBE23DF88A3C6A4D25F8B87002F8334CAEAA09707E72E236EB427B408831"
+size = 16
 
 [symbol.range_walk_scale.build."eu4-1.37.5.0-gog-win64"]
 rva = 0x3525FE
-bytes = "F3 0F 10 35 4A 5C A5 01 F3 0F 10 3D 56 FB A2 01"
+sha256 = "C3CDBBE23DF88A3C6A4D25F8B87002F8334CAEAA09707E72E236EB427B408831"
+size = 16
 
 [symbol.range_walk_map]
 memory = "code"
@@ -425,15 +476,18 @@ note = "the walk's map object (coordinates at [+0x6C0] + id * 0x230 + 0x7C)"
 
 [symbol.range_walk_map.build."eu4-1.37.5-steam-win64"]
 rva = 0x3527D5
-bytes = "4C 8B 05 FC D6 FE 01"         # mov r8,[map]
+sha256 = "8262CBD0DC75B6FBEB3305976EFA3D075A05AE78E17BB233E6F164323C693CBB"
+size = 7  # the load of the map object
 
 [symbol.range_walk_map.build."eu4-1.37.5.2-gog-win64"]
 rva = 0x3526A5
-bytes = "4C 8B 05 AC 16 FD 01"
+sha256 = "66F74F31A9B61523C820A10AA20EEB0E0F44F10A9955611D3C0EFA0233BE56B3"
+size = 7
 
 [symbol.range_walk_map.build."eu4-1.37.5.0-gog-win64"]
 rva = 0x3526A5
-bytes = "4C 8B 05 AC 16 FD 01"
+sha256 = "66F74F31A9B61523C820A10AA20EEB0E0F44F10A9955611D3C0EFA0233BE56B3"
+size = 7
 
 [symbol.range_walk_bonus]
 memory = "code"
@@ -442,18 +496,22 @@ note = "the walk's range bonus value"
 
 [symbol.range_walk_bonus.build."eu4-1.37.5-steam-win64"]
 rva = 0x352899
-bytes = "8B 3D 1D B8 FE 01"            # mov edi,[bonus]
+sha256 = "985A5DF1CB0A022CC3B6761763538232E83F41364ABF2AEC878173511BCC7E51"
+size = 6  # the load of the bonus
 
 [symbol.range_walk_bonus.build."eu4-1.37.5.2-gog-win64"]
 rva = 0x352769
-bytes = "8B 3D DD F7 FC 01"
+sha256 = "33CBF8BD841FC5E7EA56B59837ADF69D2BD1022CDADA3C4F1B3E2D59F1A266C8"
+size = 6
 
 [symbol.range_walk_bonus.build."eu4-1.37.5.0-gog-win64"]
 rva = 0x352769
-bytes = "8B 3D DD F7 FC 01"
+sha256 = "33CBF8BD841FC5E7EA56B59837ADF69D2BD1022CDADA3C4F1B3E2D59F1A266C8"
+size = 6
 
 [symbol.map_line]
-bytes = "40 53 48 81 EC 80 00 00 00 41 8B D8 4C 8B DA"
+sha256 = "5AAD46608BE8AC0C43A62603D86B1ED09D084E73DD04FB4C4DE1B5721B5B4670"
+size = 15
 memory = "code"
 signature = "int (const int* a, const int* b, int width, int height, uint64_t flag)"
 note = "straight-line distance between two map coordinates"
@@ -462,7 +520,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x8895C0 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x8895C0 }
 
 [symbol.range_bonus]
-bytes = "40 53 48 83 EC 20 48 8B 99 20 14 00 00"
+sha256 = "96B6F3107323433A6DAED8FCD27B967EB5F6A2F5BBE919F0991F5A653994FF30"
+size = 13
 memory = "code"
 signature = "bool (void* country)"
 note = "the country's range bonus check"
@@ -471,7 +530,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x3F1370 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x3F1370 }
 
 [symbol.related_bonus]
-bytes = "48 89 5C 24 08 57 48 83 EC 60 48 8B F9"
+sha256 = "47A973F7A99266845450A509160E53E344422E9B703CAB076234E9316F3285AC"
+size = 13
 memory = "code"
 signature = "bool (void* modifiers)"
 note = "the range bonus check of the second walk (related countries)"
@@ -480,7 +540,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x7AC230 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x7AC230 }
 
 [symbol.related_bonus_default_a]
-bytes = "40 53 48 83 EC 40"
+sha256 = "167ED9445E5040AB634E5AAB6BA0BBD8146720FA79B394D1E58959EEDD684A84"
+size = 6
 memory = "code"
 signature = "unsigned char* ()"
 note = "getter the second walk falls back to when the country has no modifier object at +0x1420"
@@ -489,7 +550,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x798130 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x798130 }
 
 [symbol.related_bonus_default_b]
-bytes = "48 89 5C 24 20 55 56 57 48 83 EC 20"
+sha256 = "F6BCDD0E8CF790D5FAE5314D6970781AD8D2C0E85377AC19242CEC46CBA57F78"
+size = 12
 memory = "code"
 signature = "unsigned char* ()"
 note = "second fallback getter"
@@ -502,42 +564,49 @@ build."eu4-1.37.5.0-gog-win64" = { rva = 0x7A6730 }
 [symbol.app_never_throttle]
 memory = "code"
 values.app_global = { at = 3, rip_relative = 7, type = "unsigned char* const" }
-values.never_throttle_offset = { at = 9, size = 4 }
+values.never_throttle_offset = { at = 9, size = 4, is = 0x32B }
 note = "never_throttle: 0xB7AD50 (the console's timer switch) stores its bool in the application object (global 0x242BF50) + 0x32B; the frame function 0x14C25A0 skips its SDL_Delay waits while it is set"
 
 [symbol.app_never_throttle.build."eu4-1.37.5-steam-win64"]
 rva = 0xB7AE12
-bytes = "48 8B 05 37 11 8B 01 88 90 2B 03 00 00"   # mov rax,[app]; mov [rax+32Bh],dl
+sha256 = "BED464551B8A3862F31DBE8A05D531149AEFD2D05E5506E3F69103C565400D9B"
+size = 13  # the load of the application object and the store of the flag at +0x32B
 
 [symbol.app_never_throttle.build."eu4-1.37.5.2-gog-win64"]
 rva = 0xB795B2
-bytes = "48 8B 05 CF 67 89 01 88 90 2B 03 00 00"
+sha256 = "B721E3A84674CBA3DDC1593670517B62D633C1A80B8ECE6BC6D946C8305DFD9A"
+size = 13
 
 [symbol.app_never_throttle.build."eu4-1.37.5.0-gog-win64"]
 rva = 0xB795B2
-bytes = "48 8B 05 CF 67 89 01 88 90 2B 03 00 00"
+sha256 = "B721E3A84674CBA3DDC1593670517B62D633C1A80B8ECE6BC6D946C8305DFD9A"
+size = 13
 
 [symbol.nested_frame_threshold]
 memory = "code"
-values.speed_offset = { at = 3, size = 4 }
+values.speed_offset = { at = 3, size = 4, is = 0x1E08 }
 note = "0x769EA0 (draw a frame from inside the daily tick when enough time passed): threshold = base [0x245B070] * table 0x1C33E18[speed index at +0x1E08] into xmm6"
 
 [symbol.nested_frame_threshold.build."eu4-1.37.5-steam-win64"]
 rva = 0x769F4B
-bytes = "48 63 86 08 1E 00 00 4C 8D 2D A7 60 89 FF F3 0F 10 35 0F 11 CF 01 F3 41 0F 59 B4 85 18 3E C3 01"
+sha256 = "D290F1E63BC24495F361B90DC8EE5569664C1A5C07DEAC59BEB46FE554BE2DD6"
+size = 32
 
 [symbol.nested_frame_threshold.build."eu4-1.37.5.2-gog-win64"]
 rva = 0x76910B
-bytes = "48 63 86 08 1E 00 00 4C 8D 2D E7 6E 89 FF F3 0F 10 35 9F 58 CD 01 F3 41 0F 59 B4 85 E8 CB C1 01"
+sha256 = "FB3CDAD95B55D2A7E67CD0F635765C37131CE3B2FD38C0C3E12D1409D317E2B5"
+size = 32
 
 [symbol.nested_frame_threshold.build."eu4-1.37.5.0-gog-win64"]
 rva = 0x76910B
-bytes = "48 63 86 08 1E 00 00 4C 8D 2D E7 6E 89 FF F3 0F 10 35 9F 58 CD 01 F3 41 0F 59 B4 85 E8 CB C1 01"
+sha256 = "FB3CDAD95B55D2A7E67CD0F635765C37131CE3B2FD38C0C3E12D1409D317E2B5"
+size = 32
 
 [symbol.nested_frame_compare]
-bytes = "0F 28 F8 F2 0F 5C BE 20 1E 00 00"   # movaps xmm7,xmm0; subsd xmm7,[rsi+1E20h]
+sha256 = "88B1092BCFC612C1288DC8E24EEE777F3FE771BC6A197463735EFBF2C214565E"
+size = 11  # the clock minus the last frame's time at +0x1E20
 memory = "code"
-values.last_frame_offset = { at = 7, size = 4 }
+values.last_frame_offset = { at = 7, size = 4, is = 0x1E20 }
 note = "0x769EA0 after the clock read: xmm6 = threshold (float), xmm0 = the clock now (double), rsi = game state with the last frame's time at +last_frame_offset; the time since the last frame is compared with xmm6 next"
 build."eu4-1.37.5-steam-win64" = { rva = 0x769F78 }
 build."eu4-1.37.5.2-gog-win64" = { rva = 0x769138 }
@@ -550,18 +619,22 @@ note = "SDL_PeepEvents of the statically linked SDL 2.0.4 (dynapi slot 80): with
 
 [symbol.sdl_peep_events.build."eu4-1.37.5-steam-win64"]
 rva = 0x17467A0
-bytes = "40 53 55 41 55 41 57 48 83 EC 68 8B 05 67 AB 86 00 45 8B E9 4C 63 FA"
+sha256 = "B3B70CF92742F150BC143FEAB4ADD18E3CE014EA736295F24D60A89FF91362FB"
+size = 23
 
 [symbol.sdl_peep_events.build."eu4-1.37.5.2-gog-win64"]
 rva = 0x1730420
-bytes = "40 53 55 41 55 41 57 48 83 EC 68 8B 05 E7 4E 86 00 45 8B E9 4C 63 FA"
+sha256 = "2E36FE8887061B8427DE4B8E02DE33F6FFB044C04015D79116241C44ECE6EF26"
+size = 23
 
 [symbol.sdl_peep_events.build."eu4-1.37.5.0-gog-win64"]
 rva = 0x1730420
-bytes = "40 53 55 41 55 41 57 48 83 EC 68 8B 05 E7 4E 86 00 45 8B E9 4C 63 FA"
+sha256 = "2E36FE8887061B8427DE4B8E02DE33F6FFB044C04015D79116241C44ECE6EF26"
+size = 23
 
 [symbol.nested_frame_render]
-bytes = "48 8B BE 00 1E 00 00"            # mov rdi,[rsi+1E00h]
+sha256 = "13A74F1FDB3A5A8934137EDA638CE0BE2C4EEFEE0FED34511598AA89DC0B2489"
+size = 7  # the branch's first read, the game state's +0x1E00
 memory = "code"
 note = "0x769EA0: the branch that draws the frame (0x14C25A0 with outer = 0)"
 build."eu4-1.37.5-steam-win64" = { rva = 0x769F9A }
@@ -571,7 +644,8 @@ build."eu4-1.37.5.0-gog-win64" = { rva = 0x76915A }
 # --- tick_profile ------------------------------------------------------------------
 
 [symbol.daily_tick]
-bytes = "48 8B C4 55 53 56 57 41 54 41 55 41 56"
+sha256 = "48C13E61104F387B743AE6DA2DB6E643C4D9E0F5B39D288391689A0E956DED07"
+size = 13
 memory = "code"
 signature = "void (void* state)"
 note = "gamestate.cpp: one game day (daily part 0x75BBE0, monthly 0x75D690, yearly 0x75E260)"
@@ -580,7 +654,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x7575F0 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x7575F0 }
 
 [symbol.nested_frame_check]
-bytes = "48 8B C4 48 89 58 10 4C 89 40 18 55 56 57"
+sha256 = "455AEA196D044804EB845C34BCC1418AFA5886291A334D3ED421203B4006FBAD"
+size = 14
 memory = "code"
 signature = "void (void* state, uint8_t force, void* a3, int line)"
 note = "gamestate.cpp: draws a frame if enough time passed; called between the stages of the tick"
@@ -589,7 +664,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x769060 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x769060 }
 
 [symbol.ai_job]
-bytes = "48 89 5C 24 10 48 89 74 24 20 55 57 41 54"
+sha256 = "F8A0D89FD857B7A09DF09BA4CF15DC82A11FF731B17B2FD71B5102ECBAC59C0F"
+size = 14
 memory = "code"
 signature = "void (void* list, void* arg)"
 note = "called only from 0x75B4B0: parallel_for on the pools over the per-country AI objects (item 0xB0FA0)"
@@ -598,7 +674,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x77CBA0 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x77CBA0 }
 
 [symbol.ai_country]
-bytes = "40 55 53 56 57 41 54 41 55"
+sha256 = "2CEF606881939BE87A233F49F747B15D8AD28F8A626B10E294B19FD0C56F6B77"
+size = 9
 memory = "code"
 signature = "void (void* ai)"
 note = "one country's daily AI update; from the pool job's functor (0x7861C2) or serially from 0x75B4B0 (0x75BA13)"
@@ -609,7 +686,8 @@ build."eu4-1.37.5.0-gog-win64" = { rva = 0xB0FD0 }
 # --- army_search_profile -----------------------------------------------------------
 
 [symbol.army_search]
-bytes = "4C 89 4C 24 20 89 54 24 10 48 89 4C 24 08 55 53 56 57 41 54"
+sha256 = "8A81CBDEDD63FD96B49359B3523D25004796CFA699347F90D8F5FB532F24DF79"
+size = 20
 memory = "code"
 signature = "uint64_t (void* scorer, int mode, void* army, uint64_t arg, float* score, uint8_t a6, uint8_t* a7, uint8_t* a8, uint8_t* a9, uint8_t a10, uint8_t a11, void* path)"
 note = "ai_army.cpp (called from 0xEAB50): AI army search over the province graph with a scoring functor"
@@ -620,7 +698,8 @@ build."eu4-1.37.5.0-gog-win64" = { rva = 0x1022E0 }
 # --- score_probe -------------------------------------------------------------------
 
 [symbol.score_move]
-bytes = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 41 54 41 55"
+sha256 = "F1117A7BBFD789C6765D027E30764265AAFF60C1D9DC0AA5EEA44691E4033FC5"
+size = 20
 memory = "code"
 signature = "uint64_t (void* self, void* unit, void* a3, void* a4, void* a5, void* a6, char* a7)"
 note = "method of the army search's scoring functor (vtable 0x1C3CD98 + 8): can the unit move into a province"
@@ -629,7 +708,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x96EA90 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x96EA90 }
 
 [symbol.score_strength]
-bytes = "48 89 5C 24 10 48 89 4C 24 08 55 56 57 48 81 EC 90 00 00 00"
+sha256 = "882915236D9946FC33BD04F11A22C22DA77AF11348A01F2FC1A498C809D3BD21"
+size = 20
 memory = "code"
 signature = "float (uint64_t flag, uint64_t army, void* province, uint8_t a4, int a5)"
 note = "AI army strength against a province (0x198C70 on the per-province table 0x242BA00)"
@@ -638,7 +718,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x102170 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x102170 }
 
 [symbol.score_table]
-bytes = "48 8B C4 4C 89 48 20 44 89 40 18 48 89 50 10 48 89 48 08 53"
+sha256 = "793549986F8B7FB7A2BE6C20F510C401220E2212326760D4BD7F7EA00FCEBE32"
+size = 20
 memory = "code"
 signature = "int* (int* out, int64_t* entry, int delta, int64_t table, int64_t* extra)"
 note = "value of a per-province table entry at a date delta (called from 0x198C70)"
@@ -649,7 +730,8 @@ build."eu4-1.37.5.0-gog-win64" = { rva = 0x199920 }
 # --- monthly_probe (modifier_merge also hooks 0x8EA420) ---------------------------
 
 [symbol.monthly_tick]
-bytes = "88 54 24 10 55 53 56 57 41 54 41 55 41 56 41 57 48 8D AC 24 28 F1 FF FF"
+sha256 = "95467EDF180ABD9C712DF8F974D1656F5368F1B3B002A45B114C5C0D803080B9"
+size = 24
 memory = "code"
 signature = "void (void* state, uint8_t a2)"
 note = "gamestate.cpp: the monthly tick (countries 0x2F36C0, provinces 0x9F35C0, units 0x763470)"
@@ -658,7 +740,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x75C850 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x75C850 }
 
 [symbol.country_month]
-bytes = "48 8B C4 48 89 58 10 44 88 40 18 48 89 48 08 55 56 57 41 54"
+sha256 = "35AA03EBFED577E440FDD59164441A799C822F4564559AC8CD40952520D22A8F"
+size = 20
 memory = "code"
 signature = "void (void* country, uint8_t a2, uint8_t a3)"
 note = "country.cpp: one country's monthly update, called in a serial loop from the monthly tick"
@@ -667,7 +750,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x2F3670 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x2F3670 }
 
 [symbol.province_month]
-bytes = "40 55 53 56 57 41 54 41 55 41 56 41 57 48 8D AC 24 58 FF FF FF"
+sha256 = "69430974FF4D10D28005776CA65EE946E2BA8B8E531C98F1931F8E7D1DDBC5C2"
+size = 21
 memory = "code"
 signature = "void (void* province)"
 note = "one province's monthly update, called in a serial loop from the monthly tick"
@@ -676,7 +760,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x9F25A0 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x9F25A0 }
 
 [symbol.units_month]
-bytes = "48 89 5C 24 10 55 56 57 41 54 41 55 41 56 41 57 48 8D AC 24 80 F0 FF FF"
+sha256 = "2FEC19307F1F74710D540B8B8ED9C9AA2033C26A51D43DEA9515861EB6B3AC62"
+size = 24
 memory = "code"
 signature = "void (void* state, uint8_t a2)"
 note = "monthly update of the units (0x3BC640 > 0xD54600 per unit), called from the monthly tick"
@@ -685,7 +770,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x762630 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x762630 }
 
 [symbol.port_table]
-bytes = "4C 8B DC 53 55 56 57 41 56 41 57 48 81 EC 98 00 00 00"
+sha256 = "851A1EF6ADD23DC198FA0720A0AF97075E859E56F1AC59706BB79559F9A385BC"
+size = 18
 memory = "code"
 signature = "void (void* country)"
 note = "rebuilds the country's nearest-own-port table for every province (+0x2320), from 0x2F36C0"
@@ -701,18 +787,22 @@ note = "how far a province may lie from a port before the country's table marks 
 
 [symbol.port_range.build."eu4-1.37.5-steam-win64"]
 rva = 0x350A20
-bytes = "40 53 48 83 EC 20 48 8B DA"
+sha256 = "8313001EBB8F325ECD7FA8AB70D8E9727D630C90AEFF521E53648DB2E36F5196"
+size = 9
 
 [symbol.port_range.build."eu4-1.37.5.2-gog-win64"]
 rva = 0x3508F0
-bytes = "40 53 48 83 EC 20 48 8B DA"
+sha256 = "8313001EBB8F325ECD7FA8AB70D8E9727D630C90AEFF521E53648DB2E36F5196"
+size = 9
 
 [symbol.port_range.build."eu4-1.37.5.0-gog-win64"]
 rva = 0x3508F0
-bytes = "40 53 48 83 EC 20 48 8B DA"
+sha256 = "8313001EBB8F325ECD7FA8AB70D8E9727D630C90AEFF521E53648DB2E36F5196"
+size = 9
 
 [symbol.modifier_merge]
-bytes = "40 55 41 55 48 83 EC 48 4C 63 4A 64 45 33 C0 4C 89 7C 24 20"
+sha256 = "E1B4BDB00B6689963D94F245324853C881D1C599720CFD2C9704B51039990D64"
+size = 20
 memory = "code"
 signature = "void* (void* dest, void* src)"
 note = "adds the (id, value) entries of one modifier list to another; linear scan for each non-static id"
@@ -721,7 +811,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x8E9650 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x8E9650 }
 
 [symbol.game_random]
-bytes = "48 89 5C 24 08 8B 91 C0 09 00 00 48 8B D9 85 D2"
+sha256 = "66D8E1AEE20E9F3D3D25FCDE0C8FF81C1A96B508A5A134EEE98F4908590364F1"
+size = 16
 memory = "code"
 signature = "uint32_t (void* twister)"
 note = "Mersenne Twister draw (the game's random generator object at 0x2325220 among others)"
@@ -732,7 +823,8 @@ build."eu4-1.37.5.0-gog-win64" = { rva = 0x14C0D20 }
 # --- modifier_merge ----------------------------------------------------------------
 
 [symbol.game_operator_new]
-bytes = "40 53 48 83 EC 20 48 8B D9"
+sha256 = "DE6A7940819676114C24E2E19757A6270F7072C73E9CACFC21C48A48E6AF4B2B"
+size = 9
 memory = "code"
 signature = "void* (size_t size)"
 note = "the game's operator new (_malloc_base with the new handler), which 0x8EA420 calls through a thunk"
@@ -741,7 +833,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x1A1CF54 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x1A1CF54 }
 
 [symbol.pointer_vector_emplace]
-bytes = "48 89 5C 24 20 55 56 41 54 48 83 EC 20"
+sha256 = "FD196B9DB5DC916D00E8FA4CE09CCF0711C5B418A0210DA8C764916F6DA1CA26"
+size = 13
 memory = "code"
 signature = "void* (void* vector, void* where, void** value)"
 note = "std::vector<T*> reallocating insert, which 0x8EA420 calls when its vector of sources is full"
@@ -752,7 +845,8 @@ build."eu4-1.37.5.0-gog-win64" = { rva = 0x8F110 }
 # --- monthly_probe: daily country parts ---------------------------------------------
 
 [symbol.country_day]
-bytes = "40 55 53 56 57 41 54 41 55 41 56 41 57"
+sha256 = "3397AEFCCB935A0E2D6EF087C925FC9A582942BF4B9ACBFAA7F2867052A685FD"
+size = 13
 memory = "code"
 signature = "void (void* country)"
 note = "country.cpp: one country's daily update, called in a loop from 0x75B0D0"
@@ -761,7 +855,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x2EE230 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x2EE230 }
 
 [symbol.country_day_armies]
-bytes = "40 57 48 83 EC 40 4C 89 74 24 30 48 8B F9"
+sha256 = "4D5BE69BF4EFDD92DF02EE0FA072540E56A0D5828C509860B8ADC53D0E260369"
+size = 14
 memory = "code"
 signature = "void (void* unit)"
 note = "daily update of an army (0xD3E110, then 0x195E10), from the daily country update"
@@ -770,7 +865,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x1A2D60 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x1A2D60 }
 
 [symbol.country_day_93fe30]
-bytes = "48 89 5C 24 08 55 56 57 41 54 41 55 41 56 41 57"
+sha256 = "E60BC0F195CDFB5BDCEEE7A57CBA744CAF60EFCDBFF835911FB66EB15946246C"
+size = 16
 memory = "code"
 signature = "void (void* country, char* a2)"
 note = "part of the daily country update (0x93FB80 under it)"
@@ -779,7 +875,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x93F060 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x93F060 }
 
 [symbol.country_day_327dc0]
-bytes = "48 89 5C 24 10 55 56 57 41 54 41 55 41 56 41 57"
+sha256 = "DF215D9AC1AC169C81C801A38FCC707A57116F008FC1EDB3775F7023FDDA0000"
+size = 16
 memory = "code"
 signature = "void (void* country, char* a2, uint8_t a3)"
 note = "part of the daily country update (the country's modifiers through 0x93D130)"
@@ -788,7 +885,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x327D50 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x327D50 }
 
 [symbol.country_day_fleets]
-bytes = "40 53 57 48 83 EC 48 48 8B 99 E8 00 00 00 48 8B F9"
+sha256 = "295009B0ED520AF99AE3C331317FBDFF006021EACC381A061981EB3B1EC0BD84"
+size = 17
 memory = "code"
 signature = "void (void* unit)"
 note = "daily update of a fleet (0xD3E110), from the daily country update"
@@ -797,7 +895,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x90D640 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x90D640 }
 
 [symbol.country_day_18e7f0]
-bytes = "48 89 5C 24 10 48 89 6C 24 18 48 89 74 24 20 57"
+sha256 = "E83D15388F5F71FF5C0995D50C753902E03E272B3240210E2708DFF37D120657"
+size = 16
 memory = "code"
 signature = "void (void* object)"
 note = "part of the daily country update"
@@ -806,7 +905,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x18E820 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x18E820 }
 
 [symbol.country_day_37c730]
-bytes = "44 88 44 24 18 88 54 24 10 48 89 4C 24 08 55 53"
+sha256 = "5C08162458A66FD8B4CB9E04202F1F6F4CC8EDC12A50C0B62CA4BD61AC1020C4"
+size = 16
 memory = "code"
 signature = "void (void* country, uint8_t a2, uint64_t a3)"
 note = "part of the daily country update"
@@ -815,7 +915,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x37C600 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x37C600 }
 
 [symbol.country_day_358ee0]
-bytes = "48 89 4C 24 08 55 53 56 57 41 54 41 55 41 56"
+sha256 = "8F9FBB4D333D8E01D7CC229117DDCD94B2DD84360A17FAB2949F8BC4B44FD800"
+size = 15
 memory = "code"
 signature = "void (void* country)"
 note = "called by the daily country update 0x2EE280"
@@ -824,7 +925,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x358DB0 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x358DB0 }
 
 [symbol.country_day_3288b0]
-bytes = "48 89 5C 24 18 48 89 54 24 10 55 56 57 41 54"
+sha256 = "DF455EA86A9A8F1AE681445F59742BC1B8666005E41B80A2B08D1837FC643047"
+size = 15
 memory = "code"
 signature = "void (void* country, void* a2)"
 note = "called by the daily country update 0x2EE280"
@@ -833,7 +935,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x328840 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x328840 }
 
 [symbol.country_modifiers]
-bytes = "48 89 5C 24 18 48 89 6C 24 20 56 57 41 54 41 56"
+sha256 = "C8B38B9201635DE7981835CFC2D591D521CD9D6A2C326BE08F4D735D7BD35896"
+size = 16
 memory = "code"
 signature = "void (void* holder)"
 note = "recomputes a country's modifier list (date checks, 0x93ba00, 0x93D750), from 0x327DC0"
@@ -844,7 +947,8 @@ build."eu4-1.37.5.0-gog-win64" = { rva = 0x93C360 }
 # --- province_modifier_view ------------------------------------------------------------
 
 [symbol.province_culture_value]
-bytes = "4C 89 4C 24 20 48 89 54 24 10 48 89 4C 24 08 55 53 56 57 41 54"
+sha256 = "4A9B326B07772D6EDFC5429AF5D3583446E37C64567C350360D5B683C8691221"
+size = 21
 memory = "code"
 signature = "int32_t* (void* country, int32_t* out, void* province, void* culture)"
 note = "copies the province's modifier list without id 0x286, then 0x3003B0 reads one value from the copy"
@@ -853,16 +957,18 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x2FFC10 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x2FFC10 }
 
 [symbol.province_culture_value_list]
-bytes = "4D 8D A0 98 09 00 00"          # lea r12,[r8+998h]: the province's modifier list
+sha256 = "08ACF9BBA2627BEFC95BC27B596A1BE57D47D71A1D8D399D7E44853BA297B85F"
+size = 7  # the address of the province's modifier list, +0x998
 memory = "code"
-values.province_modifiers = { at = 3, size = 4 }
+values.province_modifiers = { at = 3, size = 4, is = 0x998 }
 note = "0x2FFC60: the offset of the province's modifier list it copies"
 build."eu4-1.37.5-steam-win64" = { rva = 0x2FFCB7 }
 build."eu4-1.37.5.2-gog-win64" = { rva = 0x2FFC67 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x2FFC67 }
 
 [symbol.culture_modifier_value]
-bytes = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57"
+sha256 = "442A19659FE9096DE3A84E01A789D0005AB6710232EAA0A6A807AB732A813780"
+size = 16
 memory = "code"
 signature = "int32_t* (void* country, int32_t* out, void* modifiers, void* culture)"
 note = "the value 0x2FFC60 returns, from the country's modifiers and (through 0x300720) the province list"
@@ -877,29 +983,34 @@ note = "0x300720: the registry of per-modifier value objects"
 
 [symbol.modifier_value_registry.build."eu4-1.37.5-steam-win64"]
 rva = 0x3007BF
-bytes = "4C 8B 05 BA 78 05 02"          # mov r8,[registry] in 0x300720
+sha256 = "9A3552A6313AEA6616604EBAAE2B0732A97060AA5FA3972D294093806FB3BD5E"
+size = 7  # the load of the registry in 0x300720
 
 [symbol.modifier_value_registry.build."eu4-1.37.5.2-gog-win64"]
 rva = 0x30076F
-bytes = "4C 8B 05 82 B7 03 02"
+sha256 = "7AC5BC65C21711501E2D35E865F155A3659890A14C2DB505F8BC77ED27101075"
+size = 7
 
 [symbol.modifier_value_registry.build."eu4-1.37.5.0-gog-win64"]
 rva = 0x30076F
-bytes = "4C 8B 05 82 B7 03 02"
+sha256 = "7AC5BC65C21711501E2D35E865F155A3659890A14C2DB505F8BC77ED27101075"
+size = 7
 
 [symbol.modifier_value_post_267]
-bytes = "49 8B 88 E0 E6 00 00"          # mov rcx,[r8+0E6E0h]
+sha256 = "DC94D9CABAD06D7AAAF1A50C4F178F8ED24ABBBE3CE79B057934F5EB5E39E7F7"
+size = 7  # the read of the value object at +0xE6E0
 memory = "code"
-values.post_267 = { at = 3, size = 4 }
+values.post_267 = { at = 3, size = 4, is = 0xE6E0 }
 note = "0x300720: the value object of modifier 0x267, called with the province list when set"
 build."eu4-1.37.5-steam-win64" = { rva = 0x30080A }
 build."eu4-1.37.5.2-gog-win64" = { rva = 0x3007BA }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x3007BA }
 
 [symbol.modifier_value_post_266]
-bytes = "49 8B 88 80 E6 00 00"          # mov rcx,[r8+0E680h]
+sha256 = "51A4A3F2D7AAB83BE30E4FC1DFC247BAEC35F7792A100F30CFC88D35F663BDF5"
+size = 7  # the read of the value object at +0xE680
 memory = "code"
-values.post_266 = { at = 3, size = 4 }
+values.post_266 = { at = 3, size = 4, is = 0xE680 }
 note = "0x300720: the value object of modifier 0x266, called with the province list when set"
 build."eu4-1.37.5-steam-win64" = { rva = 0x300959 }
 build."eu4-1.37.5.2-gog-win64" = { rva = 0x300909 }
@@ -908,7 +1019,8 @@ build."eu4-1.37.5.0-gog-win64" = { rva = 0x300909 }
 # --- save_compress ---------------------------------------------------------------
 
 [symbol.zip_deflate_member]
-bytes = "48 8B C4 48 89 58 10 48 89 68 18 48 89 70 20 48 89 48 08 57 41 54 41 55 41 56 41 57 48 81 EC A0 00 00 00"
+sha256 = "7EFFA09CD90BC28502151E45884244EF2270AB33C3BEA9FDFBF842B58015C366"
+size = 35
 memory = "code"
 signature = "int (void* writer, void* input, uint8_t* buffer, uint64_t size, uint32_t* crc, int level)"
 note = "compresses one ZIP member of a save (raw DEFLATE, CRC-32 a byte at a time); replaced as a whole"
@@ -922,15 +1034,18 @@ note = "0x153C790: deflateInit2_(level, 8, -15, 9, 0) of the member"
 
 [symbol.zip_deflate_member_init.build."eu4-1.37.5-steam-win64"]
 rva = 0x153C7FE
-bytes = "E8 6D 34 2E 00 85 C0"          # call 0x181FC70 (deflateInit2_); test eax,eax
+sha256 = "52F2A3BFB00046D06ECDF7D2D6A0C33D62E7A6267A7F789490879F36590A0565"
+size = 7  # the call of deflateInit2_ 0x181FC70 and the test of its result
 
 [symbol.zip_deflate_member_init.build."eu4-1.37.5.2-gog-win64"]
 rva = 0x15336FE
-bytes = "E8 ED 61 2D 00 85 C0"
+sha256 = "CE0301F68F5F2D27C4685D9589662231CBAB27D7E6EDC31BAF0540510C8A2157"
+size = 7
 
 [symbol.zip_deflate_member_init.build."eu4-1.37.5.0-gog-win64"]
 rva = 0x15336FE
-bytes = "E8 ED 61 2D 00 85 C0"
+sha256 = "CE0301F68F5F2D27C4685D9589662231CBAB27D7E6EDC31BAF0540510C8A2157"
+size = 7
 
 [symbol.zip_deflate_member_deflate]
 memory = "code"
@@ -938,15 +1053,18 @@ note = "0x153C790: deflate of each chunk read from the input"
 
 [symbol.zip_deflate_member_deflate.build."eu4-1.37.5-steam-win64"]
 rva = 0x153C884
-bytes = "E8 87 29 2E 00 85 C0"          # call 0x181F210 (deflate, Z_NO_FLUSH); test eax,eax
+sha256 = "536A050479EA317C8ECF883B63C49B7C7F84DBB2B9B4B0C99CE41AB8E28994C2"
+size = 7  # the call of deflate 0x181F210 (Z_NO_FLUSH) and the test of its result
 
 [symbol.zip_deflate_member_deflate.build."eu4-1.37.5.2-gog-win64"]
 rva = 0x1533784
-bytes = "E8 07 57 2D 00 85 C0"
+sha256 = "906FFE86A8435F5DD9B67295F8EB6830731E0F32045807128A7DAF0BB629F3EA"
+size = 7
 
 [symbol.zip_deflate_member_deflate.build."eu4-1.37.5.0-gog-win64"]
 rva = 0x1533784
-bytes = "E8 07 57 2D 00 85 C0"
+sha256 = "906FFE86A8435F5DD9B67295F8EB6830731E0F32045807128A7DAF0BB629F3EA"
+size = 7
 
 [symbol.zip_deflate_member_crc]
 memory = "code"
@@ -954,15 +1072,18 @@ note = "0x153C790: the CRC-32 loop over the bytes deflate consumed (table 0x1D91
 
 [symbol.zip_deflate_member_crc.build."eu4-1.37.5-steam-win64"]
 rva = 0x153C8A1
-bytes = "4C 8D 3D 28 54 85 00 0F 1F 84 00 00 00 00 00 41 0F B6 11 4D 8D 49 01 0F B6 C8 48 33 D1 C1 E8 08 41 33 04 97 41 83 C0 FF 75 E5"
+sha256 = "56BBC5806EB4064359D9D31987C579B112ED924AB5AA11C355E7A1C850FAC926"
+size = 42
 
 [symbol.zip_deflate_member_crc.build."eu4-1.37.5.2-gog-win64"]
 rva = 0x15337A1
-bytes = "4C 8D 3D 38 69 84 00 0F 1F 84 00 00 00 00 00 41 0F B6 11 4D 8D 49 01 0F B6 C8 48 33 D1 C1 E8 08 41 33 04 97 41 83 C0 FF 75 E5"
+sha256 = "51C12724183C059073F644B988867B1A9B9013A5264B9A9EE557C12D48AB33DC"
+size = 42
 
 [symbol.zip_deflate_member_crc.build."eu4-1.37.5.0-gog-win64"]
 rva = 0x15337A1
-bytes = "4C 8D 3D 38 69 84 00 0F 1F 84 00 00 00 00 00 41 0F B6 11 4D 8D 49 01 0F B6 C8 48 33 D1 C1 E8 08 41 33 04 97 41 83 C0 FF 75 E5"
+sha256 = "51C12724183C059073F644B988867B1A9B9013A5264B9A9EE557C12D48AB33DC"
+size = 42
 
 [symbol.zip_deflate_member_finish]
 memory = "code"
@@ -970,15 +1091,18 @@ note = "0x153C790: deflate(Z_FINISH) until the stream ends"
 
 [symbol.zip_deflate_member_finish.build."eu4-1.37.5-steam-win64"]
 rva = 0x153C930
-bytes = "BA 04 00 00 00 48 8D 4C 24 40 E8 D1 28 2E 00 85 C0 74 ED 83 F8 01"  # deflate(Z_FINISH) while Z_OK; == Z_STREAM_END
+sha256 = "C5F26761FF1DB98B769972CE27A4E5AC6C4C5077E7A806D8EF54F6477DA0A62F"
+size = 22  # deflate(Z_FINISH) while it gives Z_OK, then the test for Z_STREAM_END
 
 [symbol.zip_deflate_member_finish.build."eu4-1.37.5.2-gog-win64"]
 rva = 0x1533830
-bytes = "BA 04 00 00 00 48 8D 4C 24 40 E8 51 56 2D 00 85 C0 74 ED 83 F8 01"
+sha256 = "2C2868C9BC91404C96FD0C459153ECE10C28F71BF101B5E6D52A3D48FBE9C9C0"
+size = 22
 
 [symbol.zip_deflate_member_finish.build."eu4-1.37.5.0-gog-win64"]
 rva = 0x1533830
-bytes = "BA 04 00 00 00 48 8D 4C 24 40 E8 51 56 2D 00 85 C0 74 ED 83 F8 01"
+sha256 = "2C2868C9BC91404C96FD0C459153ECE10C28F71BF101B5E6D52A3D48FBE9C9C0"
+size = 22
 
 [symbol.zip_deflate_member_end]
 memory = "code"
@@ -986,18 +1110,22 @@ note = "0x153C790: deflateEnd and ~crc"
 
 [symbol.zip_deflate_member_end.build."eu4-1.37.5-steam-win64"]
 rva = 0x153C971
-bytes = "E8 1A 32 2E 00 41 F7 17"       # call 0x181FB90 (deflateEnd); not dword [r15]
+sha256 = "E1CFA17B919364CC4C8DE59C18D64617D22BD760CCFC1D7DE75A1441AE55F93C"
+size = 8  # the call of deflateEnd 0x181FB90 and the complement of the CRC
 
 [symbol.zip_deflate_member_end.build."eu4-1.37.5.2-gog-win64"]
 rva = 0x1533871
-bytes = "E8 9A 5F 2D 00 41 F7 17"
+sha256 = "B112B1A1E558BBE72C639D465E5ABE64EC3C046B254A7C95966AF1879E13FA02"
+size = 8
 
 [symbol.zip_deflate_member_end.build."eu4-1.37.5.0-gog-win64"]
 rva = 0x1533871
-bytes = "E8 9A 5F 2D 00 41 F7 17"
+sha256 = "B112B1A1E558BBE72C639D465E5ABE64EC3C046B254A7C95966AF1879E13FA02"
+size = 8
 
 [symbol.zlib_deflate_init2]
-bytes = "40 53 56 41 54 41 55 41 57 48 83 EC 20 48 8B 84 24 80 00 00 00"
+sha256 = "7EF883BC6ABC5BC722D35064E91BC1D31357BF249F47C8B1D1C3FB710EBD147A"
+size = 21
 memory = "code"
 signature = "int (void* strm, int level, int method, int window_bits, int mem_level, int strategy, const char* version, int stream_size)"
 note = "deflateInit2_ of the zlib 1.2.8 linked into eu4.exe"
@@ -1006,7 +1134,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x18098F0 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x18098F0 }
 
 [symbol.zlib_deflate]
-bytes = "40 53 57 41 56 48 83 EC 20 44 8B F2 48 8B F9 48 85 C9 0F 84 5A 09 00 00"
+sha256 = "E8B127A4DD5C438A25B6C08BCBC9E81C20444B5EA3E01B093962AED1B7E39798"
+size = 24
 memory = "code"
 signature = "int (void* strm, int flush)"
 note = "deflate of the zlib 1.2.8 linked into eu4.exe"
@@ -1015,7 +1144,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x1808E90 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x1808E90 }
 
 [symbol.zlib_deflate_end]
-bytes = "48 89 5C 24 08 57 48 83 EC 20 48 8B D9 48 85 C9 0F 84 B4 00 00 00"
+sha256 = "6CDE6122552BD8C5949CCAED6EDE683CDBDB68FEBF564382E4EAC268B00A22CC"
+size = 22
 memory = "code"
 signature = "int (void* strm)"
 note = "deflateEnd of the zlib 1.2.8 linked into eu4.exe"
@@ -1026,7 +1156,8 @@ build."eu4-1.37.5.0-gog-win64" = { rva = 0x1809810 }
 # --- checksum_defer (prototype, lab #66) -------------------------------------------
 
 [symbol.checksum_task_invoke]
-bytes = "40 53 48 83 EC 60 48 8B D9 48 C7 44 24 40 00 00 00 00"
+sha256 = "45CF312BFC70A12E4F5225DE432FEF45F0D3C42C90A6148428FBC3C28B7E7F47"
+size = 18
 memory = "code"
 signature = "void (void* buffer)"
 note = "the checksum task's work on a long-task worker (0x2178D0): reads the files of checksum_manifest.txt and builds the version checksum"
@@ -1035,7 +1166,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x217890 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x217890 }
 
 [symbol.database_load]
-bytes = "40 53 56 57 41 54 41 55 41 56 41 57 B8 F0 F5 00 00"
+sha256 = "34E74B984DA2DD47FABFEE3D46936A8503E2B22C494D0F8DABFC7D19747B7499"
+size = 17
 memory = "code"
 signature = "void (void* app)"
 note = "loads the game databases (0x208620); called once at start-up (0x204918), right after the checksum task was queued"
@@ -1044,7 +1176,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x2085E0 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x2085E0 }
 
 [symbol.menu_checksum_poll]
-bytes = "40 57 48 83 EC 20 48 8B 81 30 04 00 00 48 8B F9"
+sha256 = "D9902C1576E884D94CFEE91F2BF616B004E642F20E0CC8268974F9735F650EFF"
+size = 16
 memory = "code"
 signature = "bool (void* app)"
 note = "polled by the menu (0x211100): true once it copied the finished task's checksum to the game version"
@@ -1055,7 +1188,8 @@ build."eu4-1.37.5.0-gog-win64" = { rva = 0x2110C0 }
 # --- history_add -------------------------------------------------------------------
 
 [symbol.history_add_call]
-bytes = "FF 90 98 00 00 00"            # call [rax+98h], after mov rdx,rdi; mov rcx,r14
+sha256 = "68AAB98265F9B017EE6C36CD57221A43256C5E2743B9601B5EE2CC0EE9C75CA8"
+size = 6  # the virtual call through slot +0x98, with the entry as its argument
 memory = "code"
 note = "0xDA66A0 (reads one entry of a dated list from a save): the add of the entry it allocated, rdx = the entry"
 build."eu4-1.37.5-steam-win64" = { rva = 0xDA69E5 }
@@ -1063,7 +1197,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0xDA5195 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0xDA5195 }
 
 [symbol.history_add_global_call]
-bytes = "FF 90 A0 00 00 00"            # call [rax+0A0h], after mov rdx,[rdx]; mov rcx,[rax+38h]; mov rax,[rcx]
+sha256 = "B73938496372B7499BCAD9D25697D5D2AA5D502DC77F28458C0504DDF0D58142"
+size = 6  # the virtual call through slot +0xA0 of the list at +0x38
 memory = "code"
 note = "0xDA66A0: the entry goes to the list of all such entries (0x7EC6C0 + 0x38) too, rdx = the entry; after a key that is no date, the owner's last entry, which can be in that list already"
 build."eu4-1.37.5-steam-win64" = { rva = 0xDA6A1D }
@@ -1071,7 +1206,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0xDA51CD }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0xDA51CD }
 
 [symbol.history_add_walk]
-bytes = "48 8B 41 20 48 8B FA 48 8B F1"  # mov rax,[rcx+20h]; mov rdi,rdx; mov rsi,rcx
+sha256 = "8A9A6E333D8C7491839DD40BF41B43C3E2F8BA69422811468F6BACE085B76195"
+size = 10  # the read of the list's head at +0x20 and the copies of both arguments
 memory = "code"
 note = "0x7E7CD0 (add to a dated list): the head of the list, before the walk that looks for the entry; +0x20 is history_add_core.hpp's head"
 build."eu4-1.37.5-steam-win64" = { rva = 0x7E7CDA }
@@ -1079,7 +1215,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x7E704A }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x7E704A }
 
 [symbol.history_add_after_walk]
-bytes = "48 8B 06 48 8B CE 48 89 5C 24 38"  # mov rax,[rsi]; mov rcx,rsi; mov [rsp+38h],rbx
+sha256 = "A132B98F97530CDD6870F2D0637050C8D5D379685C5035E543A0893AE682A76A"
+size = 11
 memory = "code"
 note = "0x7E7CD0: where the walk ends when the entry is not in the list; reads rsi and rdi only"
 build."eu4-1.37.5-steam-win64" = { rva = 0x7E7D0E }
@@ -1089,46 +1226,51 @@ build."eu4-1.37.5.0-gog-win64" = { rva = 0x7E707E }
 # --- transfer_skip -----------------------------------------------------------------
 
 [symbol.file_transfer_add]
-bytes = "48 89 5C 24 08 48 89 74 24 10 48 89 7C 24 20 55 41 54 41 55 41 56 41 57"
+sha256 = "7E4C7BBF25BDD145838CDCE1548DF7FE29D62EBAF4BCEF503A4E7C44EA7954D2"
+size = 24
 memory = "code"
 signature = "int (void* manager, const char* name, void** data, bool compress)"
-note = "CFileTransferManager::AddFile: compress = true deflates the file at level 9 into SFileDesc::CompressedData"
+note = "0xD7AAD0 adds a file to the multiplayer file transfer: compress = true deflates it at level 9 into the entry's compressed copy"
 build."eu4-1.37.5-steam-win64" = { rva = 0xD7AAD0 }
 build."eu4-1.37.5.2-gog-win64" = { rva = 0xD79280 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0xD79280 }
 
 [symbol.file_transfer_send]
-bytes = "48 89 5C 24 10 55 56 57 41 56 41 57 48 83 EC 40 45 8B F8 48 8B E9 4C 8B 49 28"
+sha256 = "2BE239B9C4C99DF72427C2623F522DF08DE6F3C495FEAC8EEA3A70F375EDE122"
+size = 26
 memory = "code"
 signature = "uint64_t (void* manager, uint32_t index, uint32_t peer)"
-note = "CFileTransferManager::SendFile: the only reader of CompressedData; the bytes prove _Files at manager+0x28"
+note = "0xD7B2A0 sends one file of the transfer to a peer: the only reader of the compressed copy; the bytes prove the file list at manager+0x28"
 build."eu4-1.37.5-steam-win64" = { rva = 0xD7B2A0 }
 build."eu4-1.37.5.2-gog-win64" = { rva = 0xD79A50 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0xD79A50 }
 
 [symbol.game_setup_load_file]
-bytes = "48 89 5C 24 10 48 89 74 24 18 55 57 41 56 48 8D 6C 24 B0"
+sha256 = "E97E68BA508A77364E4FD2D0E8DF608B3E5BBA1727E16226B8459C4FAE24147F"
+size = 19
 memory = "code"
 signature = "uint64_t (void* handler, const char* name, void* data, bool compressed)"
-note = "CGameSetup::LoadFile, what the start command calls with the entry's Data and the flag 0"
+note = "0x110D760 loads a transferred file into the game setup; the start command calls it with the entry's uncompressed data and the flag 0"
 build."eu4-1.37.5-steam-win64" = { rva = 0x110D760 }
 build."eu4-1.37.5.2-gog-win64" = { rva = 0x1108310 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x1108310 }
 
 [symbol.file_transfer_get_session]
-bytes = "49 8B 4D 20 48 8B 01 FF 50 08 48 8B D0"  # mov rcx,[r13+20h] (_Parent); mov rax,[rcx]; call [rax+8]; mov rdx,rax
+sha256 = "B154D48F922AA5AA0218FE3AB39B73E6F8430BEF4CD5AB6A050588973E097772"
+size = 13  # the handler at +0x20, the call of its slot 1 and the copy of the result
 memory = "code"
-note = "AddFile asks its handler for the session: manager+0x20, slot 1, the offsets of transfer_skip_core.hpp"
+note = "0xD7AAD0 asks its handler for the session: manager+0x20, slot 1, the offsets of transfer_skip_core.hpp"
 build."eu4-1.37.5-steam-win64" = { rva = 0xD7AE4E }
 build."eu4-1.37.5.2-gog-win64" = { rva = 0xD795FE }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0xD795FE }
 
 [symbol.session_kind_check]
-bytes = "80 78 54 00 75 2B 80 78 55 00 75 25"  # cmp byte [rax+54h],0; jne; cmp byte [rax+55h],0; jne
+sha256 = "BE6A08E519331008CCB0033B372917E09D983F4B9C5BC81EB52D4E10B193AA59"
+size = 12  # the tests of the session's bytes +0x54 and +0x55
 memory = "code"
-values.session_is_server = { at = 2, size = 1 }
-values.session_is_dummy = { at = 8, size = 1 }
-note = "CGameSetup::Load: CSession::_bIsServer and _bIsDummy; both zero is a client, who loads at once"
+values.session_is_server = { at = 2, size = 1, is = 0x54 }
+values.session_is_dummy = { at = 8, size = 1, is = 0x55 }
+note = "the game setup's load of a game: the session's server byte (+0x54) and its dummy byte (+0x55); both zero is a client, who loads at once"
 build."eu4-1.37.5-steam-win64" = { rva = 0x1133713 }
 build."eu4-1.37.5.2-gog-win64" = { rva = 0x112DA83 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x112DA83 }
@@ -1137,7 +1279,8 @@ build."eu4-1.37.5.0-gog-win64" = { rva = 0x112DA83 }
 # --- army_search_memo ------------------------------------------------------------------
 
 [symbol.army_search_call]
-bytes = "E8 4C 67 01 00"               # call 0x1022B0
+sha256 = "DA32A3E4D66015EF733C21290061E0583CEB6CE778FC309092F8CBC1A3863243"
+size = 5  # the call of the army search 0x1022B0
 memory = "code"
 note = "0xEAB50 (ai_army.cpp): the only call of the AI army search 0x1022B0"
 build."eu4-1.37.5-steam-win64" = { rva = 0xEBB5F }
@@ -1145,7 +1288,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0xEBB8F }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0xEBB8F }
 
 [symbol.unit_path_search]
-bytes = "4C 89 4C 24 20 48 89 54 24 10 48 89 4C 24 08 55 56 57 41 54 41 55 41 56 41 57 48 81 EC 00 02 00 00"
+sha256 = "9917998D60B51E05AEDBCF4E4BAA431C76ADE45D932A1FC01BEBB32FDB4A48A2"
+size = 33
 memory = "code"
 signature = "uint8_t (void* a1, void* a2, void* a3, void* a4, void* a5, void* a6, void* a7, void* a8)"
 note = "the path search for one unit: it asks 0xD45250 for every move it considers"
@@ -1154,7 +1298,8 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x96B750 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x96B750 }
 
 [symbol.unit_neighbour_moves]
-bytes = "44 88 4C 24 20 48 89 54 24 10 55 53 41 54 41 55 41 57 48 8D 6C 24 D9 48 81 EC C0 00 00 00"
+sha256 = "0DCBD518658D971DF58F3B6BD1856F4227EF9178F01600B9A2F47F0A833EBD8D"
+size = 30
 memory = "code"
 signature = "void (void* a1, void* unit, int province, uint8_t a4, void* a5, void* a6)"
 note = "the moves of a unit from one province, in its daily update: it asks 0xD45250 for each neighbour"
@@ -1168,18 +1313,22 @@ note = "0x1A6800 (an army's speed through a province): 0xD40790(army, &out, 0xFB
 
 [symbol.army_speed_modifier_call.build."eu4-1.37.5-steam-win64"]
 rva = 0x1A6988
-bytes = "E8 03 9E B9 00"
+sha256 = "C14C8A87CB8446796064C4F94147051521D04FD0608625E039FAAE77F06794C0"
+size = 5
 
 [symbol.army_speed_modifier_call.build."eu4-1.37.5.2-gog-win64"]
 rva = 0x1A69B8
-bytes = "E8 83 85 B9 00"
+sha256 = "43D93CBBE776C1E7FE3736BE76B63CE00E00A084193335DA1CE7F6FFC657F86F"
+size = 5
 
 [symbol.army_speed_modifier_call.build."eu4-1.37.5.0-gog-win64"]
 rva = 0x1A69B8
-bytes = "E8 83 85 B9 00"
+sha256 = "43D93CBBE776C1E7FE3736BE76B63CE00E00A084193335DA1CE7F6FFC657F86F"
+size = 5
 
 [symbol.zoc_flag_call]
-bytes = "E8 4A B8 FF FF"               # call 0xD40AE0, after mov edx,0E0h and xor r8d,r8d
+sha256 = "C566243FBFC827CB9BA007982D6EA0DC6B84289C3562A288A9CDA0F893FA028D"
+size = 5  # the call of 0xD40AE0 with 0xE0 and 0
 memory = "code"
 note = "0xD45250 (is a move blocked by a fort's zone of control): 0xD40AE0(army, 0xE0, 0), whether modifier 0xE0 applies to the army"
 build."eu4-1.37.5-steam-win64" = { rva = 0xD45291 }
@@ -1187,31 +1336,35 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0xD43A41 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0xD43A41 }
 
 # --- conquer_scan (prototype, off by default) --------------------------------------------
-# The ParallelFor3 of RebuildConquerList (0x191F30) runs as a loop on the calling thread. ParallelFor3 is a
-# template; its instantiations set the global "inside a parallel loop" byte to 1 around the loop and, while the
-# calling thread's random log is on, put that log in its collecting mode (flag bit 1) and collect it afterwards;
-# the module does the same around its loop.
+# The parallel loop of the AI's conquest list (0x191F30) runs as a loop on the calling thread. The game's
+# parallel loops come from one template; its instances set the global "inside a parallel loop" byte to 1 around
+# the loop and, while the calling thread's random log is on, put that log in its collecting mode (flag bit 1) and
+# collect it afterwards; the module does the same around its loop.
 
 [symbol.parallel_for_head]
 memory = "code"
 values.parallel_flag = { at = 3, rip_relative = 7, type = "unsigned char" }
-values.random_log_flags = { at = 24, size = 1 }
-note = "ParallelFor3 0x191F30 (RebuildConquerList's): keeps the parallel byte, sets it to 1, asks for the thread's random log, tests bit 0 of its flags"
+values.random_log_flags = { at = 24, size = 1, is = 0x38 }
+note = "the parallel loop 0x191F30 of the conquest list: keeps the parallel byte, sets it to 1, asks for the thread's random log, tests bit 0 of its flags"
 
 [symbol.parallel_for_head.build."eu4-1.37.5-steam-win64"]
 rva = 0x191F68
-bytes = "0F B6 05 55 F1 E3 01 88 45 70 C6 05 4B F1 E3 01 01 E8 02 2D 34 01 F6 40 38 01"
+sha256 = "5CAB4CBBA55653C8B149589C57246D03CDB194767ED64C3398062B8C071F4F53"
+size = 26
 
 [symbol.parallel_for_head.build."eu4-1.37.5.2-gog-win64"]
 rva = 0x191F98
-bytes = "0F B6 05 25 31 E2 01 88 45 70 C6 05 1B 31 E2 01 01 E8 42 C8 33 01 F6 40 38 01"
+sha256 = "0460428035606D5DDA36EE00EDDC1CE8AA92B7110CA92B318D26AEF399645CED"
+size = 26
 
 [symbol.parallel_for_head.build."eu4-1.37.5.0-gog-win64"]
 rva = 0x191F98
-bytes = "0F B6 05 25 31 E2 01 88 45 70 C6 05 1B 31 E2 01 01 E8 42 C8 33 01 F6 40 38 01"
+sha256 = "0460428035606D5DDA36EE00EDDC1CE8AA92B7110CA92B318D26AEF399645CED"
+size = 26
 
 [symbol.random_log_impl]
-bytes = "48 83 EC 28 65 48 8B 04 25 58 00 00 00 BA 08 00 00 00 48 8B 08 8B 04 0A"
+sha256 = "D1283731F7533346E89743BC86499F2AFCD3C6AD8B77ECA23D9070DB70DB7C01"
+size = 24
 memory = "code"
 signature = "void* ()"
 note = "the calling thread's random log object (thread-local)"
@@ -1220,24 +1373,27 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x14CE7F0 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x14CE7F0 }
 
 [symbol.random_log_collect]
-bytes = "48 89 4C 24 08 55 53 56 57 41 54 41 55 41 56 41 57 B8 48 10 00 00"
+sha256 = "841F91BE71558652DB2CD40970EADC4E8C6AF5F963503899066787B61C006086"
+size = 22
 memory = "code"
 signature = "void (void* log)"
-note = "the random log's collect, which ParallelFor3 calls after a loop in the log's collecting mode"
+note = "the random log's collect, which a parallel loop calls after a loop in the log's collecting mode"
 build."eu4-1.37.5-steam-win64" = { rva = 0x14D4180 }
 build."eu4-1.37.5.2-gog-win64" = { rva = 0x14CDCF0 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x14CDCF0 }
 
 [symbol.conquer_fill_call]
-bytes = "E8 A7 A3 00 00"               # call 0x191F30
+sha256 = "FAD277D21393D021E112135411B6F29836F3C1BE83C834269D6FB0765B8972F6"
+size = 5  # the call of the parallel loop 0x191F30
 memory = "code"
-note = "0x187AD0 (the AI's conquest list): ParallelFor3(root + 0x1C90 provinces, {strategy, &count, &pairs}), the only call of 0x191F30"
+note = "0x187AD0 (the AI's conquest list): the parallel loop 0x191F30 over the provinces at root + 0x1C90 with {strategy, &count, &pairs}, its only call"
 build."eu4-1.37.5-steam-win64" = { rva = 0x187B84 }
 build."eu4-1.37.5.2-gog-win64" = { rva = 0x187BB4 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x187BB4 }
 
 [symbol.conquer_item]
-bytes = "48 89 5C 24 08 57 48 83 EC 20 48 8B 41 10 48 8B 59 08 8B 3A 48 8B 08 48 8B 14 F9 48 8B 0B E8 DD 37 FF FF 85 C0 7E 23 48 8B 4B 08 41 B8 01 00 00 00 48 8B 11 F0 44 0F C1 02 48 8B 4B 10 49 63 D0 48 8B 09 89 3C D1 89 44 D1 04 48 8B 5C 24 30 48 83 C4 20 5F C3"
+sha256 = "AF1333F4453BEA9AC839F718A13E0F7810986B3BC094F169A84C42D976278090"
+size = 85
 memory = "code"
 note = "the loop's item (the lambda's call): value = 0x187C00(strategy, provinces[i]); if > 0, pairs[count++] = (i, value); conquer_scan's loop does the same"
 build."eu4-1.37.5-steam-win64" = { rva = 0x194400 }
@@ -1245,67 +1401,74 @@ build."eu4-1.37.5.2-gog-win64" = { rva = 0x194430 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x194430 }
 
 [symbol.conquer_value]
-bytes = "48 89 54 24 10 48 89 4C 24 08 55 53 56 57 41 54 41 55 41 56 41 57 48 8D AC 24 48 FF FF FF 48 81 EC B8 01 00 00 4C 8B F2 48 8B F1 48 83 BA 38 03 00 00 00 0F 84 1E 22 00 00 48 8B 82 68 04 00 00 4C 8B 41 1C 49 8B D0 48 C1 EA 20 44 0F BF CA 48 C1 E8 20 0F BF C8 41 3B C9 0F 84 F8 21 00 00 49 8B 46 28 0F B6 88 28 02 00 00 C0 E9 03 F6 D1 80 E1 01 0F 85 DF 21 00 00"
+sha256 = "C0FEA3C69E71DBEFF7E0176FC8F01DFC36ADBFB95A7014E5AAAA3E4ED2F32988"
+size = 120
 memory = "code"
 signature = "int32_t (void* strategy, void* province)"
-values.controller_area_offset = { at = 46, size = 4 }
-values.owner_offset = { at = 60, size = 4 }
-values.template_offset = { at = 98, size = 1 }
-values.land_flags_offset = { at = 102, size = 4 }
-values.land_bit = { at = 108, size = 1 }
+values.controller_area_offset = { at = 46, size = 4, is = 0x338 }
+values.owner_offset = { at = 60, size = 4, is = 0x468 }
+values.template_offset = { at = 98, size = 1, is = 0x28 }
+values.land_flags_offset = { at = 102, size = 4, is = 0x228 }
+values.land_bit = { at = 108, size = 1, is = 0x3 }
 note = "a province's value for the AI's conquest list; 0 at once without a controller area, for the strategy's own province, and when the land bit of the province template's flags is clear"
 build."eu4-1.37.5-steam-win64" = { rva = 0x187C00 }
 build."eu4-1.37.5.2-gog-win64" = { rva = 0x187C30 }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x187C30 }
 
 # --- diplo_scan (prototype, off by default) -----------------------------------------------
-# CCountry::DailyUpdateSerialCheckDiplomacyChange (0x2EE070) reads the change bit (_bHasChanged, bit 2 of the
-# flags byte +0x46) of each 72-byte CDiplomacyStatus row of a country's diplomacy, every day for every country,
-# and clears the set ones while no save is being loaded. Every code path of eu4.exe that sets the bit (the
-# inlined "set changed" of the CDiplomacyStatus and CCountryDiplomacy setters, CCountry::SetCurrentMonarch and
-# BreakOldRoyalMarriages, TransferRelationsFrom) also sets _bDiploDescriptionArraysDirty (+0x2884) of the row's
-# owner, which only the diplomacy view's update reads and clears; a new country starts with it set.
+# The daily diplomacy-change check of a country (0x2EE070) reads the change bit (bit 2 of the flags byte +0x46)
+# of each 72-byte relation row of a country's diplomacy, every day for every country, and clears the set ones
+# while no save is being loaded. Every code path of eu4.exe that sets the bit (the inlined "set changed" of the
+# relation setters, a new ruler, the end of old royal marriages, the move of relations to another country) also
+# sets the dirty byte +0x2884 of the row's owner, which only the diplomacy view's update reads and clears; a new
+# country starts with it set.
 
 [symbol.diplo_scan]
 memory = "code"
 signature = "void (void* country)"
 values.diplo_game_state = { at = 24, rip_relative = 28, type = "const unsigned char* const" }
-values.rows_end_offset = { at = 34, size = 4 }
-values.rows_begin_offset = { at = 41, size = 4 }
-values.row_flags_offset = { at = 91, size = 1 }
-values.row_changed_mask = { at = 93, size = 1 }
-values.loader_offset = { at = 99, size = 4 }
+values.rows_end_offset = { at = 34, size = 4, is = 0x1518 }
+values.rows_begin_offset = { at = 41, size = 4, is = 0x1510 }
+values.row_flags_offset = { at = 91, size = 1, is = 0x46 }
+values.row_changed_mask = { at = 93, size = 1, is = 0x4 }
+values.loader_offset = { at = 99, size = 4, is = 0x74C8 }
 note = "0x2EE070: for each row of country + 0x1510..0x1518 (72 B), a set bit 2 of +0x46 is cleared when the game state's save loader (+0x74C8) is null; with a loader, a set bit refreshes the trade routes"
 
 [symbol.diplo_scan.build."eu4-1.37.5-steam-win64"]
 rva = 0x2EE070
-bytes = "48 89 5C 24 18 48 89 6C 24 20 56 57 41 56 48 83 EC 30 48 8B E9 4C 8B 0D EC 1D 05 02 45 32 D2 48 8B 81 18 15 00 00 48 2B 81 10 15 00 00 48 C1 F8 03 48 B9 39 8E E3 38 8E E3 38 8E 48 0F AF C1 4C 63 C0 85 C0 0F 8E 6C 01 00 00 33 C9 0F 1F 40 00 48 8B 95 10 15 00 00 0F B6 44 0A 46 A8 04 74 13 49 83 B9 C8 74 00 00 00 75 06 24 FB 88 44 0A 46"
+sha256 = "F5C3F1F87A1BFC47B40310088E1DC0FD60404A7699FDF81B63F4E8AEF5FB3CA3"
+size = 112
 
 [symbol.diplo_scan.build."eu4-1.37.5.2-gog-win64"]
 rva = 0x2EE020
-bytes = "48 89 5C 24 18 48 89 6C 24 20 56 57 41 56 48 83 EC 30 48 8B E9 4C 8B 0D BC 5C 03 02 45 32 D2 48 8B 81 18 15 00 00 48 2B 81 10 15 00 00 48 C1 F8 03 48 B9 39 8E E3 38 8E E3 38 8E 48 0F AF C1 4C 63 C0 85 C0 0F 8E 6C 01 00 00 33 C9 0F 1F 40 00 48 8B 95 10 15 00 00 0F B6 44 0A 46 A8 04 74 13 49 83 B9 C8 74 00 00 00 75 06 24 FB 88 44 0A 46"
+sha256 = "AEFD4CE841BB061DDBDE20ED90E27C336DF41A3A96580113562146F67A1992FE"
+size = 112
 
 [symbol.diplo_scan.build."eu4-1.37.5.0-gog-win64"]
 rva = 0x2EE020
-bytes = "48 89 5C 24 18 48 89 6C 24 20 56 57 41 56 48 83 EC 30 48 8B E9 4C 8B 0D BC 5C 03 02 45 32 D2 48 8B 81 18 15 00 00 48 2B 81 10 15 00 00 48 C1 F8 03 48 B9 39 8E E3 38 8E E3 38 8E 48 0F AF C1 4C 63 C0 85 C0 0F 8E 6C 01 00 00 33 C9 0F 1F 40 00 48 8B 95 10 15 00 00 0F B6 44 0A 46 A8 04 74 13 49 83 B9 C8 74 00 00 00 75 06 24 FB 88 44 0A 46"
+sha256 = "AEFD4CE841BB061DDBDE20ED90E27C336DF41A3A96580113562146F67A1992FE"
+size = 112
 
 [symbol.diplo_view_update]
 memory = "code"
 signature = "void (void* view)"
-values.view_country_offset = { at = 21, size = 4 }
+values.view_country_offset = { at = 21, size = 4, is = 0x138 }
 values.diplo_country_root = { at = 28, rip_relative = 32, type = "const unsigned char* const" }
-values.country_list_offset = { at = 43, size = 4 }
-values.diplo_dirty_offset = { at = 53, size = 4 }
-note = "CCountryDiplomacyView::UpdateDiplomaticInformation 0xF01DC0: country = countries[tag index of view + 0x138]; if its +0x2884 or the view's own flag is set, clears both and rebuilds the view; the only reader of +0x2884"
+values.country_list_offset = { at = 43, size = 4, is = 0x118 }
+values.diplo_dirty_offset = { at = 53, size = 4, is = 0x2884 }
+note = "the diplomacy view's update 0xF01DC0: country = countries[tag index of view + 0x138]; if its +0x2884 or the view's own flag is set, clears both and rebuilds the view; the only reader of +0x2884"
 
 [symbol.diplo_view_update.build."eu4-1.37.5-steam-win64"]
 rva = 0xF01DC0
-bytes = "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 40 48 8B F1 48 8B 91 38 01 00 00 48 8B 05 F0 BA 43 01 48 C1 EA 20 48 0F BF D2 48 8B 80 18 01 00 00 48 8B 0C D0 80 B9 84 28 00 00 00"
+sha256 = "F3F0FFBA6798F6B81E15A2535920D74797919AE380F266D3C1AA7C5FF6264B8D"
+size = 58
 
 [symbol.diplo_view_update.build."eu4-1.37.5.2-gog-win64"]
 rva = 0xF00570
-bytes = "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 40 48 8B F1 48 8B 91 38 01 00 00 48 8B 05 C0 11 42 01 48 C1 EA 20 48 0F BF D2 48 8B 80 18 01 00 00 48 8B 0C D0 80 B9 84 28 00 00 00"
+sha256 = "75F8ECA67D8E4890F6AD3982CF00D5DF29449EA7C13852321CB95F40DA116CF1"
+size = 58
 
 [symbol.diplo_view_update.build."eu4-1.37.5.0-gog-win64"]
 rva = 0xF00570
-bytes = "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 40 48 8B F1 48 8B 91 38 01 00 00 48 8B 05 C0 11 42 01 48 C1 EA 20 48 0F BF D2 48 8B 80 18 01 00 00 48 8B 0C D0 80 B9 84 28 00 00 00"
+sha256 = "75F8ECA67D8E4890F6AD3982CF00D5DF29449EA7C13852321CB95F40DA116CF1"
+size = 58
