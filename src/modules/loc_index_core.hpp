@@ -54,7 +54,7 @@ public:
         for (std::size_t s = Slot(key);; s = (s + 1) & mask_) {
             const Item& it = slots_[s];
             if (it.index == kEmpty) return count;
-            if (it.key == key) return it.index;
+            if (it.hash == key.hash && it.tag == key.tag) return it.index;
         }
     }
 
@@ -70,10 +70,13 @@ public:
 
 private:
     static constexpr std::uint32_t kEmpty = 0xFFFFFFFFu;
-    struct Item {
-        Key key;
+    struct Item {  // 16 bytes: ~900k entries of a table take 32 MiB at most
+        std::uint64_t hash = 0;
+        std::uint32_t tag = 0;
         std::uint32_t index = kEmpty;
+        Key key() const noexcept { return Key{hash, tag}; }
     };
+    static_assert(sizeof(Item) == 16);
 
     std::vector<Item> slots_;
     std::size_t mask_ = 0;
@@ -95,19 +98,20 @@ private:
         slots_.assign(size, Item{});
         mask_ = size - 1;
         for (const Item& it : old)
-            if (it.index != kEmpty) Put(it.key, it.index);
+            if (it.index != kEmpty) Put(it.key(), it.index);
     }
 
     void Put(Key k, std::uint32_t index) {
         for (std::size_t s = Slot(k);; s = (s + 1) & mask_) {
             Item& it = slots_[s];
             if (it.index == kEmpty) {
-                it.key = k;
+                it.hash = k.hash;
+                it.tag = k.tag;
                 it.index = index;
                 ++used_;
                 return;
             }
-            if (it.key == k) return;  // the first index stays
+            if (it.hash == k.hash && it.tag == k.tag) return;  // the first index stays
         }
     }
 

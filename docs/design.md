@@ -34,7 +34,7 @@ code only.
 | `frame_pacing` | Simulation, on by default since 0.15: at speed 5, frames drawn from inside the daily tick at most every 100 ms instead of 50 ms while no input waits, at once for a waiting press | year 1720: 23.4 → 20.8 s; key press 51.5 → 21 ms |
 | `open_warmup` | Opens the files the game will need on parallel threads (learned list per mod set) so first-open costs after a reboot or antivirus update are paid off the critical path | cold start 61 → 15 s (lab build; not measured with the plugin) |
 | `token_dict_cache` | Caches the script tokenizer's keyword lookups during start-up | −0.4 s |
-| `loc_index` | Start-up: a localisation key defined again finds its entry in the table's load-order array through an index instead of a walk from the start | Europa Expanded: Renewed, pending |
+| `loc_index` | Start-up: a localisation key defined again finds its entry in the table's load-order array through an index instead of a walk from the start | Europa Expanded: Renewed 59.9 → 48.3 s |
 | `range_witness` | Simulation: answers the country range check from the province that was in range last time (§6a) | year 1720: 27.6 → 20.6 s |
 | `modifier_merge` | Simulation: adds large modifier lists with an index instead of a scan per entry (§6a) | year 1720: 20.64 → 19.45 s |
 | `port_table` | Simulation, on by default since 1.4: the country's nearest-port table from one list of its ports (§6a) | measured with the three below, README |
@@ -1060,6 +1060,10 @@ walks as well; `"on"` does that for every 1024th key and goes back to the game's
 The indexes are dropped after the game is ready; a later load builds them again.
 
 The other walk the issue names, the hash-collision report (`0x16FB1C0`), is not changed.
+
+Lab, Europa Expanded: Renewed, 26.11.2026: `"verify"` compared all 24,372 walks of a start, 0 differences.
+Interleaved warm starts (n = 4 each): 59.90 s (59.02–60.28) without the module, 48.28 s (47.78–48.78) with it;
+process start → `Creating application...` 24.2 → 12.8 s, the other phases unchanged, the game's logs the same.
 
 ### history_add (loading)
 
