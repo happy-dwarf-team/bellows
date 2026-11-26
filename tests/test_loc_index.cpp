@@ -72,9 +72,23 @@ int main() {
     assert(index.Find(Bytes(w), w.size(), Key{8999, 0}) == w.size());
     assert(index.Find(Bytes(w), w.size(), Key{123456, 0}) == 8999);
 
+    // The same length and ends, an entry in the middle changed where the index samples: noticed.
+    const std::size_t mid = (w.size() - 1) * 3 / (sb::loc::kProbes - 1);
+    w[mid].hash = 654321;
+    assert(index.Find(Bytes(w), w.size(), Key{654321, 0}) == mid);
+
     index.Clear();
     assert(index.seen() == 0 && index.bytes() == 0);
     assert(index.Find(Bytes(w), w.size(), Key{77, 0}) == 77);
+
+    // At most 3/4 of the slots used: 100,000 distinct entries take 2^18 slots (4 MiB).
+    {
+        std::vector<Entry> big;
+        for (int i = 0; i < 100000; ++i) big.push_back(Entry{static_cast<std::uint64_t>(i) * 2654435761u, {0, 0}, 0, 0});
+        sb::loc::Index sized;
+        assert(sized.Find(Bytes(big), big.size(), Key{5, 5}) == big.size());
+        assert(sized.bytes() <= (std::size_t{1} << 18) * 16);
+    }
 
     // The collision report: every hash word's entries in load order, any tag, up to the limit (0: all).
     {
@@ -101,6 +115,12 @@ int main() {
         assert(order.builds() == builds + 1);
         order.Collect(999999, 0, b);
         assert(b.size() == 1 && b[0] == c.size() - 1);
+        // A sampled entry in the middle changed: a new build.
+        c[(c.size() - 1) * 4 / (sb::loc::kProbes - 1)].hash = 888888;
+        order.Sync(Bytes(c), c.size());
+        assert(order.builds() == builds + 2);
+        order.Collect(888888, 0, b);
+        assert(b.size() == 1);
         order.Clear();
         assert(order.bytes() == 0);
     }

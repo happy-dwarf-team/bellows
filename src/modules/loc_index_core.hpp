@@ -11,8 +11,10 @@
 //
 // Index answers the same question from a hash table: (word at +0, int at +0x10) -> the first index with them.
 // The entries' +0 and +0x10 are written only when an entry is appended, so the index follows the array by adding
-// the entries past the last one it saw. A shorter array, or a first or last seen entry that changed, means the
-// table was cleared or rebuilt: the index starts again from index 0.
+// the entries past the last one it saw. A shorter array, or a change in one of kProbes entries spread over the
+// seen ones (the first and the last among them), means the table was cleared or rebuilt: the index starts again
+// from index 0. A table refilled to at least its old length with the same entries at those places, but others
+// between them, is not noticed; the module's sampled check compares the answers with the game's walk for that.
 
 #include <cstddef>
 #include <cstdint>
@@ -37,6 +39,18 @@ inline Key EntryKey(const unsigned char* entry) noexcept {
     std::memcpy(&k.hash, entry + kEntryHash, sizeof k.hash);
     std::memcpy(&k.tag, entry + kEntryTag, sizeof k.tag);
     return k;
+}
+
+// A digest of the length and kProbes entries spread evenly over [0, count), the first and the last among them.
+inline constexpr std::size_t kProbes = 8;
+inline std::uint64_t Probe(const unsigned char* begin, std::size_t count) noexcept {
+    std::uint64_t h = count;
+    if (count == 0) return h;
+    for (std::size_t j = 0; j < kProbes; ++j) {
+        const Key k = EntryKey(begin + (count - 1) * j / (kProbes - 1) * kEntrySize);
+        h = ((h ^ k.hash) * 0x100000001B3ull) ^ k.tag;
+    }
+    return h;
 }
 
 // The game's walk: the first index in [0, count) with `key`, or `count`.
@@ -71,7 +85,7 @@ public:
 
 private:
     static constexpr std::uint32_t kEmpty = 0xFFFFFFFFu;
-    struct Item {  // 16 bytes: ~900k entries of a table take 32 MiB at most
+    struct Item {  // 16 bytes; at most 3/4 of the slots used: ~900k entries of a table take 32 MiB
         std::uint64_t hash = 0;
         std::uint32_t tag = 0;
         std::uint32_t index = kEmpty;
@@ -82,8 +96,8 @@ private:
     std::vector<Item> slots_;
     std::size_t mask_ = 0;
     std::size_t used_ = 0;
-    std::size_t seen_ = 0;  // entries [0, seen_) are in the index
-    Key first_{}, last_{};  // entries 0 and seen_ - 1 as they were when indexed
+    std::size_t seen_ = 0;    // entries [0, seen_) are in the index
+    std::uint64_t probe_ = 0;  // Probe(begin, seen_) when indexed
     std::uint64_t resets_ = 0;
 
     std::size_t Slot(Key k) const noexcept {
@@ -98,6 +112,7 @@ private:
         const std::size_t size = old.empty() ? 1024 : old.size() * 2;
         slots_.assign(size, Item{});
         mask_ = size - 1;
+        used_ = 0;  // Put counts the items again
         for (const Item& it : old)
             if (it.index != kEmpty) Put(it.key(), it.index);
     }
@@ -117,8 +132,7 @@ private:
     }
 
     void Sync(const unsigned char* begin, std::size_t count) {
-        if (seen_ > 0 && (count < seen_ || !(EntryKey(begin) == first_) ||
-                          !(EntryKey(begin + (seen_ - 1) * kEntrySize) == last_))) {
+        if (seen_ > 0 && (count < seen_ || Probe(begin, seen_) != probe_)) {
             ++resets_;
             Clear();
         }
@@ -128,8 +142,7 @@ private:
             Put(EntryKey(begin + i * kEntrySize), static_cast<std::uint32_t>(i));
         }
         seen_ = count;
-        first_ = EntryKey(begin);
-        last_ = EntryKey(begin + (count - 1) * kEntrySize);
+        probe_ = Probe(begin, count);
     }
 };
 
@@ -152,11 +165,9 @@ inline void CollectScan(const unsigned char* begin, std::size_t count, std::uint
 // The same from (hash word, index) pairs sorted once per array.
 class HashOrder {
 public:
-    // Rebuilds when the array is another one or its length or first or last entry changed since the last build.
+    // Rebuilds when the array is another one or its length or one of its Probe entries changed since the last build.
     void Sync(const unsigned char* begin, std::size_t count) {
-        if (count == count_ && begin == begin_ && count != 0 && EntryKey(begin) == first_ &&
-            EntryKey(begin + (count - 1) * kEntrySize) == last_)
-            return;
+        if (count == count_ && begin == begin_ && count != 0 && Probe(begin, count) == probe_) return;
         pairs_.clear();
         pairs_.reserve(count);
         for (std::size_t i = 0; i < count; ++i)
@@ -165,10 +176,7 @@ public:
                   [](const Pair& a, const Pair& b) { return a.hash != b.hash ? a.hash < b.hash : a.index < b.index; });
         begin_ = begin;
         count_ = count;
-        if (count != 0) {
-            first_ = EntryKey(begin);
-            last_ = EntryKey(begin + (count - 1) * kEntrySize);
-        }
+        probe_ = Probe(begin, count);
         ++builds_;
     }
 
@@ -198,7 +206,7 @@ private:
     std::vector<Pair> pairs_;
     const unsigned char* begin_ = nullptr;
     std::size_t count_ = 0;
-    Key first_{}, last_{};
+    std::uint64_t probe_ = 0;
     std::uint64_t builds_ = 0;
 };
 
