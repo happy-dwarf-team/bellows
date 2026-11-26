@@ -54,6 +54,7 @@ DWORD WINAPI FinishAfterReady(void*) {
         {"zip_profile report", sb::ReportZipProfile},
         {"token_dict_profile report", sb::ReportTokenDictProfile},
         {"token_dict_cache report", sb::ReportTokenDictCache},
+        {"loc_index report", sb::ReportLocIndex},
         {"range_profile report", sb::ReportRangeProfile},
         {"range_witness report", sb::ReportRangeWitness},
         {"frame_pacing report", sb::ReportFramePacing},
@@ -144,6 +145,7 @@ struct Bellows : anvil::Plugin {
             // only the cache's misses.
             Feature("token_dict_cache", sb::InstallTokenDictCache, &cfg::token_dict_cache_check),
             Profile("token_dict_profile", sb::InstallTokenDictProfile, cfg::token_dict_profile),
+            Feature("loc_index", sb::InstallLocIndex, &cfg::loc_index_check),
             Profile("range_profile", sb::InstallRangeProfile, cfg::range_profile),
             // range_witness answers before 0x3526B0 runs: range_profile then sees only the walks it still makes.
             Feature("range_witness", sb::InstallRangeWitness, &cfg::range_witness_check),

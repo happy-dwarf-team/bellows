@@ -141,6 +141,7 @@ const std::pair<const char*, AnvilSetting> kChecks[] = {
     {"metascript_blocks", CFG_METASCRIPT_BLOCKS_CHECK},
     {"attr_cache", CFG_ATTR_CACHE_CHECK},
     {"token_dict_cache", CFG_TOKEN_DICT_CACHE_CHECK},
+    {"loc_index", CFG_LOC_INDEX_CHECK},
     {"range_witness", CFG_RANGE_WITNESS_CHECK},
     {"pops_pacing", CFG_POPS_PACING_CHECK},
     {"modifier_merge", CFG_MODIFIER_MERGE_CHECK},
@@ -526,7 +527,7 @@ int main(int argc, char** argv) {
     // Diagnostics on: the profiles chosen in its settings run, and attr_cache's check makes it "verify".
     const std::string diag = modules ? "off" : "on";
     const std::string rest = ", metascript_subst=off, metascript_blocks=on, attr_cache=" + std::string(modules ? "on" : "verify") +
-                             ", zip_profile=" + diag + ", token_dict_cache=on, token_dict_profile=off, range_profile=" + diag +
+                             ", zip_profile=" + diag + ", token_dict_cache=on, token_dict_profile=off, loc_index=on, range_profile=" + diag +
                              ", range_witness=on, frame_pacing=on, pops_pacing=on, never_throttle=" + diag +
                              ", modifier_merge=on, port_table=on, province_modifier_view=on, army_search_memo=on, conquer_scan=on, diplo_scan=on, save_compress=on, "
                              "transfer_skip=on, history_add=on, checksum_defer=on, tick_profile=" + diag + ", army_search_profile=" + diag +
@@ -535,8 +536,8 @@ int main(int argc, char** argv) {
     {
         // Every module of [[modules]] asked once, Diagnostics and verifypath_session included, none of the profiles.
         std::lock_guard lock(g_mutex);
-        // The code asks for exactly plugin.toml's modules (27), each once.
-        assert(g_manifestModules.size() == 27 && g_moduleCalls.size() == 27);
+        // The code asks for exactly plugin.toml's modules (28), each once.
+        assert(g_manifestModules.size() == 28 && g_moduleCalls.size() == 28);
         const std::set<std::string> asked(g_moduleCalls.begin(), g_moduleCalls.end());
         assert(asked == g_manifestModules && asked.contains("mimalloc") && asked.contains("checksum_defer") &&
                asked.contains("diagnostics") && asked.contains("verifypath_session"));
@@ -668,7 +669,7 @@ int main(int argc, char** argv) {
             {"mimalloc", ok ? "startup" : "failed"}, {"open_warmup", "off"}, {"ram_prefetch", "off"},
             {"verifypath_listing", "on"}, {"exists_index", "on"}, {"trigger_intern", ok ? "on" : "failed"},
             {"metascript_subst", "off"}, {"metascript_blocks", "on"}, {"attr_cache", modules ? "on" : "verify"},
-            {"token_dict_cache", "on"},
+            {"token_dict_cache", "on"}, {"loc_index", "on"},
             {"range_witness", "on"}, {"frame_pacing", "on"}, {"pops_pacing", "on"}, {"never_throttle", "on"}, {"modifier_merge", "on"}, {"port_table", "on"}, {"province_modifier_view", "on"}, {"army_search_memo", "on"}, {"save_compress", "on"}, {"transfer_skip", "on"}, {"history_add", "on"}, {"checksum_defer", "on"},
         };
         if (modules) modes["exists_index"] = modes["never_throttle"] = "off";

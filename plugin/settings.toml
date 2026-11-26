@@ -206,6 +206,15 @@ module = "diagnostics"
 advanced = true
 restart = true
 
+[setting.loc_index_check]
+type = "bool"
+default = false
+label = "Check: Localisation index"
+description = "Runs the game's own code as well and counts differences. Slower."
+module = "diagnostics"
+advanced = true
+restart = true
+
 [setting.history_add_check]
 type = "bool"
 default = false

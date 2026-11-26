@@ -97,6 +97,7 @@ set(SB_SOURCES
     src/modules/mimalloc_heap.cpp
     src/modules/open_warmup.cpp
     src/modules/token_dict_cache.cpp
+    src/modules/loc_index.cpp
     src/modules/token_dict_profile.cpp
     src/modules/range_profile.cpp
     src/modules/range_witness.cpp
@@ -164,7 +165,7 @@ if(SB_BUILD_TESTS)
         # /UNDEBUG: the tests use assert(), which Release would compile out.
         target_compile_options(sb_test_support PUBLIC /utf-8 /permissive- /EHsc /UNDEBUG)
     endif()
-    foreach(test file_write module_switch trigger_intern token_dict_cache metascript_subst metascript_blocks settings access_profile path_rules zip_reader range_stats range_witness tick_profile army_search score_probe monthly_probe modifier_merge port_table province_modifier_view army_search_memo serial_loop diplo_scan never_throttle checksum_defer frame_pacing pops_pacing history_add verifypath_listing exists_index open_warmup open_warmup_finish ram_prefetch)
+    foreach(test file_write module_switch trigger_intern token_dict_cache metascript_subst metascript_blocks settings access_profile path_rules zip_reader range_stats range_witness tick_profile army_search score_probe monthly_probe modifier_merge port_table province_modifier_view army_search_memo serial_loop diplo_scan never_throttle checksum_defer frame_pacing pops_pacing history_add loc_index verifypath_listing exists_index open_warmup open_warmup_finish ram_prefetch)
         add_executable(test_${test} tests/test_${test}.cpp)
         target_link_libraries(test_${test} PRIVATE sb_test_support)
         add_test(NAME ${test} COMMAND test_${test})

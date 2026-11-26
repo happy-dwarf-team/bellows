@@ -27,6 +27,7 @@ void SetRamPrefetchBudget(std::uint64_t megabytes);  // before InstallRamPrefetc
 bool InstallZipProfile(anvil::Host& host, Mode mode);  // diagnostic
 bool InstallTokenDictProfile(anvil::Host& host, Mode mode);  // diagnostic
 bool InstallTokenDictCache(anvil::Host& host, Mode mode);
+bool InstallLocIndex(anvil::Host& host, Mode mode);
 bool InstallRangeProfile(anvil::Host& host, Mode mode);  // diagnostic
 bool InstallRangeWitness(anvil::Host& host, Mode mode);
 void NoteRangeWitnessSession() noexcept;  // from anvil-game's session event (a save loaded or left)
@@ -89,6 +90,7 @@ void ReportRamPrefetch();
 void ReportZipProfile();
 void ReportTokenDictProfile();
 void ReportTokenDictCache();
+void ReportLocIndex();  // also frees the indexes
 void ReportRangeProfile();
 void ReportRangeWitness();
 void ReportModifierMerge();

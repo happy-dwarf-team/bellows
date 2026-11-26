@@ -34,6 +34,7 @@ code only.
 | `frame_pacing` | Simulation, on by default since 0.15: at speed 5, frames drawn from inside the daily tick at most every 100 ms instead of 50 ms while no input waits, at once for a waiting press | year 1720: 23.4 → 20.8 s; key press 51.5 → 21 ms |
 | `open_warmup` | Opens the files the game will need on parallel threads (learned list per mod set) so first-open costs after a reboot or antivirus update are paid off the critical path | cold start 61 → 15 s (lab build; not measured with the plugin) |
 | `token_dict_cache` | Caches the script tokenizer's keyword lookups during start-up | −0.4 s |
+| `loc_index` | Start-up: a localisation key defined again finds its entry in the table's load-order array through an index instead of a walk from the start | Europa Expanded: Renewed, pending |
 | `range_witness` | Simulation: answers the country range check from the province that was in range last time (§6a) | year 1720: 27.6 → 20.6 s |
 | `modifier_merge` | Simulation: adds large modifier lists with an index instead of a scan per entry (§6a) | year 1720: 20.64 → 19.45 s |
 | `port_table` | Simulation, on by default since 1.4: the country's nearest-port table from one list of its ports (§6a) | measured with the three below, README |
@@ -1039,6 +1040,26 @@ Lab ("verify" of `verifypath_listing`, every answer compared): 0 differences in 
 save (about 102,000 after the ready event), 92,000 on a vanilla save, and 661,000 in a session that loaded the
 1719 save and played on. Interleaved "Continue": 8.55 s without it, 6.79 s with it (README, "Loading a
 save"), `setup.log`, `error.log`, `system.log` and `game.log` the same apart from times and counts.
+
+### loc_index (start-up)
+
+`0x16FAAE0` stores one localisation key in a language table. When the key's hash is in the table's sorted key array
+already (a mod defining a key of the game again, or a key repeated), it walks the table's load-order array (24-byte
+entries) from index 0 for the first entry with the same hash word at +0 and the same int at +0x10 (its third int
+argument), rewrites two offsets of that entry when it finds one and appends a new entry when it does not. The
+walk is quadratic in the number of keys: Europa Expanded: Renewed has 836,885 English keys, 75,884 of them the
+game's, and the game loads the localisation twice, with ~8 s of each load in this walk (bellows#270). The base game
+(126,744 keys, none defined again) and mods with tens of thousands of keys barely reach it.
+
+A mid hook at the start of the walk answers it from an index, (hash word, int) → the first index, kept per array
+and extended with the entries appended since the last call, and jumps to where the game goes with its answer:
+the found entry with `rdx` = its index, or the append with `rdx` = the count. The entries' +0 and +0x10 are
+written only when an entry is appended. A shorter array, or a first or last indexed entry that changed, means the
+table was cleared or rebuilt, and the index starts over (`skips` counts these). `"verify"` lets the game walk and
+walks as well; `"on"` does that for every 1024th key and goes back to the game's walk for good after a mismatch.
+The indexes are dropped after the game is ready; a later load builds them again.
+
+The other walk the issue names, the hash-collision report (`0x16FB1C0`), is not changed.
 
 ### history_add (loading)
 
