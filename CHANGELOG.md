@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.0](https://github.com/happy-dwarf-team/bellows/compare/v2.2.0...v2.3.0) (2026-11-26)
+
+
+### Features
+
+* **loc_index:** find a redefined localisation key through an index ([#271](https://github.com/happy-dwarf-team/bellows/issues/271)) ([3dc44c2](https://github.com/happy-dwarf-team/bellows/commit/3dc44c292e813f9b1199e010c6b078e5afb51e30))
+
 ## [2.2.0](https://github.com/happy-dwarf-team/bellows/compare/v2.1.0...v2.2.0) (2026-11-22)
 
 
