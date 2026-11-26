@@ -17,6 +17,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <algorithm>
 #include <vector>
 
 namespace sb::loc {
@@ -130,6 +131,75 @@ private:
         first_ = EntryKey(begin);
         last_ = EntryKey(begin + (count - 1) * kEntrySize);
     }
+};
+
+// The hash-collision report, 0x16FB1C0: for each run of equal hashes in the sorted key array it walks the whole
+// load-order array for the entries with that hash word (any int), in order, until it has `limit` of them (the
+// run's length; 0 never stops), and copies three pointers of each into the report. One call per load, with a
+// few thousand runs on Europa Expanded: Renewed: each run a walk over ~900k entries.
+//
+// The game's walk: the indices it takes for `hash`.
+inline void CollectScan(const unsigned char* begin, std::size_t count, std::uint64_t hash, std::size_t limit,
+                        std::vector<std::uint32_t>& out) {
+    out.clear();
+    for (std::size_t i = 0; i < count; ++i) {
+        if (EntryKey(begin + i * kEntrySize).hash != hash) continue;
+        out.push_back(static_cast<std::uint32_t>(i));
+        if (out.size() == limit) return;
+    }
+}
+
+// The same from (hash word, index) pairs sorted once per array.
+class HashOrder {
+public:
+    // Rebuilds when the array is another one or its length or first or last entry changed since the last build.
+    void Sync(const unsigned char* begin, std::size_t count) {
+        if (count == count_ && begin == begin_ && count != 0 && EntryKey(begin) == first_ &&
+            EntryKey(begin + (count - 1) * kEntrySize) == last_)
+            return;
+        pairs_.clear();
+        pairs_.reserve(count);
+        for (std::size_t i = 0; i < count; ++i)
+            pairs_.push_back(Pair{EntryKey(begin + i * kEntrySize).hash, static_cast<std::uint32_t>(i)});
+        std::sort(pairs_.begin(), pairs_.end(),
+                  [](const Pair& a, const Pair& b) { return a.hash != b.hash ? a.hash < b.hash : a.index < b.index; });
+        begin_ = begin;
+        count_ = count;
+        if (count != 0) {
+            first_ = EntryKey(begin);
+            last_ = EntryKey(begin + (count - 1) * kEntrySize);
+        }
+        ++builds_;
+    }
+
+    // What CollectScan takes, after Sync with the same array.
+    void Collect(std::uint64_t hash, std::size_t limit, std::vector<std::uint32_t>& out) const {
+        out.clear();
+        auto it = std::lower_bound(pairs_.begin(), pairs_.end(), hash, [](const Pair& p, std::uint64_t h) { return p.hash < h; });
+        for (; it != pairs_.end() && it->hash == hash; ++it) {
+            out.push_back(it->index);
+            if (out.size() == limit) return;
+        }
+    }
+
+    std::uint64_t builds() const noexcept { return builds_; }
+    std::size_t bytes() const noexcept { return pairs_.capacity() * sizeof(Pair); }
+    void Clear() noexcept {
+        std::vector<Pair>().swap(pairs_);
+        begin_ = nullptr;
+        count_ = 0;
+    }
+
+private:
+    struct Pair {
+        std::uint64_t hash;
+        std::uint32_t index;
+    };
+    std::vector<Pair> pairs_;
+    const unsigned char* begin_ = nullptr;
+    std::size_t count_ = 0;
+    Key first_{}, last_{};
+    std::uint64_t builds_ = 0;
 };
 
 }  // namespace sb::loc

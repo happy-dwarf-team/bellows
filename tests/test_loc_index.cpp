@@ -75,6 +75,35 @@ int main() {
     index.Clear();
     assert(index.seen() == 0 && index.bytes() == 0);
     assert(index.Find(Bytes(w), w.size(), Key{77, 0}) == 77);
+
+    // The collision report: every hash word's entries in load order, any tag, up to the limit (0: all).
+    {
+        std::vector<Entry> c;
+        for (int i = 0; i < 50000; ++i)
+            c.push_back(Entry{rng() % 3000, {0, 0}, static_cast<std::uint32_t>(rng() % 4), 0});
+        sb::loc::HashOrder order;
+        order.Sync(Bytes(c), c.size());
+        std::vector<std::uint32_t> a, b;
+        for (std::uint64_t h = 0; h < 3100; h += 7) {
+            for (std::size_t limit : {std::size_t{0}, std::size_t{1}, std::size_t{2}, std::size_t{5}, std::size_t{1000}}) {
+                sb::loc::CollectScan(Bytes(c), c.size(), h, limit, a);
+                order.Collect(h, limit, b);
+                assert(a == b);
+                if (h < 3000 && limit != 0) assert(!b.empty() && b.size() <= limit);
+            }
+        }
+        // Same array: no new build; a changed last entry: a new one.
+        const std::uint64_t builds = order.builds();
+        order.Sync(Bytes(c), c.size());
+        assert(order.builds() == builds);
+        c.back().hash = 999999;
+        order.Sync(Bytes(c), c.size());
+        assert(order.builds() == builds + 1);
+        order.Collect(999999, 0, b);
+        assert(b.size() == 1 && b[0] == c.size() - 1);
+        order.Clear();
+        assert(order.bytes() == 0);
+    }
     std::puts("loc_index: ok");
     return 0;
 }

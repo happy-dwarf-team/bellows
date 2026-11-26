@@ -1059,7 +1059,13 @@ table was cleared or rebuilt, and the index starts over (`skips` counts these). 
 walks as well; `"on"` does that for every 1024th key and goes back to the game's walk for good after a mismatch.
 The indexes are dropped after the game is ready; a later load builds them again.
 
-The other walk the issue names, the hash-collision report (`0x16FB1C0`), is not changed.
+The hash-collision report (`0x16FB1C0`, once per load) has a walk of the same kind: for each run of equal hashes
+in the sorted key array it walks the whole load-order array for that hash's entries (any int), in order, until
+it has as many as the run is long, and copies three pointers of each into the report's arrays (the two text
+offsets plus the base, and the entry's file name). A second mid hook takes those entries from (hash word, index)
+pairs sorted once per report call, writes the same pointers, sets the count (`r11d`, the only register the
+function reads after the walk) and jumps past the walk. A run end in the frame that does not grow, or another
+frame, starts a new call and a new sort. `"on"` compares every 64th run with the walk.
 
 Lab, Europa Expanded: Renewed, 26.11.2026: `"verify"` compared all 24,372 walks of a start, 0 differences.
 Interleaved warm starts (n = 4 each): 59.90 s (59.02–60.28) without the module, 48.28 s (47.78–48.78) with it;
