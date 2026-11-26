@@ -342,6 +342,7 @@ says in the Manager is one sentence; the details are here.
 | **Conditional blocks** (`metascript_blocks`) | Single-pass resolution of the `[[parameter] ...]` blocks of scripted effects and triggers (matters for mods with large scripted effects, e.g. Anbennar) |
 | **Missing-file cache** (`attr_cache`) | Remembers "file not found" answers for game and mod files during start-up (off by default: ~0.1 s left next to the other modules) |
 | **Keyword cache** (`token_dict_cache`) | Caches the script tokenizer's keyword lookups (~0.4 s) |
+| **Localisation index** (`loc_index`) | **Off by default.** Turn it on with `enabled_modules = ["bellows.loc_index"]` in `anvil.toml` or in Anvil Manager. Stores a localisation key that a mod defines again, and lists the hash collisions, without walking the whole table from the start; the table and the report come out the same (Europa Expanded: Renewed 62.4 → 40.9 s in the lab). Matters for mods with hundreds of thousands of keys (Europa Expanded: Renewed); the base game and smaller mods barely reach it |
 
 ### Loading
 

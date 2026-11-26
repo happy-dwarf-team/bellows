@@ -107,6 +107,14 @@ group = "Start-up"
 affects_gameplay = false
 
 [[modules]]
+id = "loc_index"
+name = "Localisation index"
+description = "Stores localisation keys that mods define again without rescanning the whole table. Same table."
+group = "Start-up"
+affects_gameplay = false
+default = false
+
+[[modules]]
 id = "history_add"
 name = "Dated lists while loading"
 description = "Adds dated history entries without rescanning the list. Same list."

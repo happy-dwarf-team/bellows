@@ -1223,6 +1223,63 @@ build."eu4-1.37.5-steam-win64" = { rva = 0x7E7D0E }
 build."eu4-1.37.5.2-gog-win64" = { rva = 0x7E707E }
 build."eu4-1.37.5.0-gog-win64" = { rva = 0x7E707E }
 
+# --- loc_index ---------------------------------------------------------------------
+
+[symbol.loc_index_walk]
+sha256 = "46F77A4136D786317DFDA199840D1DBD8400612E2D2444F70643DCD5DCCE5862"
+size = 52
+memory = "code"
+note = "0x16FAAE0 (stores a localisation key whose hash the table has): the walk of the load-order array at r9 (begin, end; 24-byte entries) for the first entry with the 64-bit hash rsi at +0 and r11d at +0x10; the setup loads r10 = begin, edx = 0, r8 = the count; found goes to loc_index_found with rdx = the index, not found to loc_index_not_found with rdx = the count"
+build."eu4-1.37.5-steam-win64" = { rva = 0x16FABD6 }
+build."eu4-1.37.5.2-gog-win64" = { rva = 0x16E4A26 }
+build."eu4-1.37.5.0-gog-win64" = { rva = 0x16E4A26 }
+
+[symbol.loc_index_found]
+sha256 = "2DEC898F4EB307C0C4DCCD84603F6E426DF3839BB6F29D1F4DA64D29209FA653"
+size = 24
+memory = "code"
+note = "0x16FAAE0: the walk's found entry; rewrites two offsets of entry rdx (r10 = begin, r9 = the array, r12d and ebx the offsets)"
+build."eu4-1.37.5-steam-win64" = { rva = 0x16FAC0A }
+build."eu4-1.37.5.2-gog-win64" = { rva = 0x16E4A5A }
+build."eu4-1.37.5.0-gog-win64" = { rva = 0x16E4A5A }
+
+[symbol.loc_index_not_found]
+sha256 = "9310C5C0BD99995A462B9D56FDF2F89CCEE9D9A9EB1E0C396C3455A00EA59673"
+size = 20
+memory = "code"
+note = "0x16FAAE0: after the walk; edx equal to the array's count (from r9) appends a new entry, any other edx was found"
+build."eu4-1.37.5-steam-win64" = { rva = 0x16FAC22 }
+build."eu4-1.37.5.2-gog-win64" = { rva = 0x16E4A72 }
+build."eu4-1.37.5.0-gog-win64" = { rva = 0x16E4A72 }
+
+[symbol.loc_collision_setup]
+sha256 = "56FB1724389FFCDD4FB9D7E2AABDCCE77098FDB20543EF3C697C1A2F5F637273"
+size = 324
+any = [123, 124, 125, 126, 177, 178, 179, 180, 236, 237, 238, 239, 320, 321, 322, 323]
+memory = "code"
+note = "0x16FB1C0 (reports hash collisions of a language table, rsi = the table): one run of equal hashes in the sorted key array (+0x20), its end kept in [rbp + 0x88], r12 = its length, r14 = its hash; three pointer arrays of that length on the stack (r13, r15, rcx); r11d = r10 = 0; [rbp] = the load-order array's count; rbx = the object whose +0x20 is the offsets' base. Checked only, not changed"
+build."eu4-1.37.5-steam-win64" = { rva = 0x16FB220 }
+build."eu4-1.37.5.2-gog-win64" = { rva = 0x16E5070 }
+build."eu4-1.37.5.0-gog-win64" = { rva = 0x16E5070 }
+
+[symbol.loc_collision_walk]
+sha256 = "6EDBDA0EC0BEBE6F1FAAE0C42031B2F3E054B1FC36FC8F1E16270F8B70618F42"
+size = 134
+memory = "code"
+note = "0x16FB1C0: the walk of the load-order array for the run's entries: per entry with hash word r14, in order, the dword offsets at +8 and +0xC plus the base go to the first two arrays, the file name of the dword at +0x10 (a string of the array at +0x50, 32-byte entries; -1 = none) to the third; r11d counts them; stops after r12 of them or at the end"
+build."eu4-1.37.5-steam-win64" = { rva = 0x16FB364 }
+build."eu4-1.37.5.2-gog-win64" = { rva = 0x16E51B4 }
+build."eu4-1.37.5.0-gog-win64" = { rva = 0x16E51B4 }
+
+[symbol.loc_collision_after_walk]
+sha256 = "AC4037D0FAD99DE37643DE62CEC6D3E7AD809E8065EC65C87399F435F12D17C3"
+size = 25
+memory = "code"
+note = "0x16FB1C0: after the walk; reloads ebx, rdi, r15, r13 and rcx from the frame and passes r11d on as the count"
+build."eu4-1.37.5-steam-win64" = { rva = 0x16FB3EA }
+build."eu4-1.37.5.2-gog-win64" = { rva = 0x16E523A }
+build."eu4-1.37.5.0-gog-win64" = { rva = 0x16E523A }
+
 # --- transfer_skip -----------------------------------------------------------------
 
 [symbol.file_transfer_add]
